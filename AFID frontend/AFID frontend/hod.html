@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HMS Portal - Orthodontics Department</title>
+  <style>
+    :root {
+      --bg-light: #f3f7f5;
+      --sidebar-bg: #053321;
+      --sidebar-active: #0c432d;
+      --primary-green: #0b4c33;
+      --accent-btn: #106b47;
+      --text-main: #1f2937;
+      --border-color: #cbd5e1;
+      --card-bg: #ffffff;
+      --mint-container: #e6f0eb;
+
+      --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 8px 16px rgba(11, 76, 51, 0.08);
+      --shadow-lg: 0 12px 24px rgba(5, 51, 33, 0.15);
+      --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+      --badge-busy-bg: #fde8e8;
+      --badge-busy-txt: #e02424;
+      --badge-avail-bg: #def7ec;
+      --badge-avail-txt: #03543f;
+      --badge-consult-bg: #fef3c7;
+      --badge-consult-txt: #92400e;
+      --badge-leave-bg: #ffedd5;
+      --badge-leave-txt: #ea580c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-light); color: var(--text-main); height: 100vh; width: 100%; max-width: 100%; overflow: hidden; overflow-x: hidden; display: flex; }
+
+    /* Layout Structure */
+    .app-container { display: flex; width: 100vw; height: 100vh; overflow: hidden; }
+
+    /* Sidebar Navigation */
+    .sidebar { width: 270px; background-color: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; justify-content: space-between; flex-shrink: 0; padding: 28px 20px; box-shadow: 4px 0 24px rgba(5, 51, 33, 0.15); z-index: 10; }
+    .brand-group { margin-bottom: 20px; }
+    .brand-title { font-size: 22px; font-weight: 800; letter-spacing: 0.5px; }
+    .brand-sub { font-size: 11px; color: #8fa89b; text-transform: uppercase; font-weight: 600; letter-spacing: 1px; margin-top: 4px; }
+
+    .nav-menu { display: flex; flex-direction: column; gap: 10px; margin-top: 36px; }
+    .nav-btn { background: none; border: none; color: #b5c7be; padding: 14px 18px; border-radius: 10px; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; transition: var(--transition-smooth); display: flex; align-items: center; justify-content: space-between; }
+    .nav-btn:hover { background-color: rgba(255, 255, 255, 0.08); color: #fff; transform: translateX(4px); }
+    .nav-btn.active { background-color: var(--sidebar-active); color: #fff; font-weight: 600; border-left: 4px solid #10b981; }
+
+    .sidebar-footer { border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 24px; }
+    .footer-welcome { font-size: 12px; color: #8fa89b; }
+    .footer-date { font-size: 11px; color: #6b8f7d; margin-bottom: 20px; }
+    .logout-btn { width: 100%; background-color: #991b1b; color: white; border: none; padding: 14px; font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: var(--transition-smooth); }
+    .logout-btn:hover { background-color: #b91c1c; transform: translateY(-2px); }
+
+    /* Viewport Main Area */
+    .viewport { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 30px 40px; position: relative; }
+    .topbar-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
+    .page-title { font-size: 30px; font-weight: 800; color: #042e1e; }
+    .page-subtitle { font-size: 14px; color: #52525b; margin-top: 6px; }
+
+    /* Notifications Panel */
+    .notif-wrapper { position: relative; }
+    .bell-btn { background: #fff; border: 1px solid #cbd5e1; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--shadow-sm); transition: var(--transition-smooth); }
+    .bell-icon { width: 22px; height: 22px; fill: var(--primary-green); }
+    .notif-badge { position: absolute; top: -3px; right: -3px; background-color: #dc2626; color: #fff; font-size: 11px; font-weight: 800; min-width: 20px; height: 20px; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 0 5px; border: 2px solid #fff; }
+
+    .notif-panel { position: absolute; top: 58px; right: 0; width: 420px; background: #fff; border: 1px solid #cbd5e1; border-radius: 14px; box-shadow: var(--shadow-lg); display: none; z-index: 1000; overflow: hidden; }
+    .notif-panel.active { display: block; }
+    .notif-header { background-color: var(--primary-green); color: #fff; padding: 14px 18px; font-size: 13px; font-weight: 800; display: flex; justify-content: space-between; }
+    .notif-body { max-height: 350px; overflow-y: auto; }
+    .notif-item { padding: 14px 18px; border-bottom: 1px solid #f1f5f9; }
+
+    /* Container Cards */
+    .metrics-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 32px; }
+    .metric-card { background-color: var(--card-bg); border-radius: 12px; padding: 24px; border: 1px solid rgba(11, 76, 51, 0.1); border-left: 6px solid var(--primary-green); box-shadow: var(--shadow-sm); }
+    .metric-number { font-size: 36px; font-weight: 800; color: var(--primary-green); margin-bottom: 6px; }
+    .container-card { background-color: var(--mint-container); border: 1px solid #cbd5e1; border-radius: 16px; padding: 24px; box-shadow: var(--shadow-sm); margin-bottom: 32px; }
+    .container-title { font-size: 13px; font-weight: 800; color: var(--primary-green); text-transform: uppercase; margin-bottom: 18px; border-bottom: 2px solid rgba(11, 76, 51, 0.15); padding-bottom: 10px; display: flex; justify-content: space-between; }
+    .inner-card { background-color: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+
+    /* Tables & Lists */
+    table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
+    th { background-color: var(--primary-green); color: #fff; font-weight: 600; font-size: 12px; text-transform: uppercase; padding: 14px 20px; }
+    td { padding: 14px 20px; border-bottom: 1px solid #f1f5f9; color: #374151; }
+    tr:nth-child(even) td { background-color: #fcfdfd; }
+
+    .status-pill { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+    .status-busy { background-color: var(--badge-busy-bg); color: var(--badge-busy-txt); }
+    .status-avail { background-color: var(--badge-avail-bg); color: var(--badge-avail-txt); }
+    .status-consult { background-color: var(--badge-consult-bg); color: var(--badge-consult-txt); }
+    .status-leave { background-color: var(--badge-leave-bg); color: var(--badge-leave-txt); }
+
+    .form-input { width: 100%; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px; font-size: 14px; background-color: #fff; }
+    .btn-action { border: none; padding: 6px 12px; font-size: 11px; font-weight: 800; border-radius: 6px; cursor: pointer; transition: var(--transition-smooth); }
+    .btn-approve { background-color: #0b4c33; color: white; }
+    .btn-reject { background-color: #991b1b; color: white; }
+    .btn-complete { background-color: #0284c7; color: white; }
+
+    /* Patient Pills & Procedures List */
+    .pill-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .pt-pill { padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid var(--border-color); transition: var(--transition-smooth); }
+    .pt-pill.active { background-color: var(--primary-green); color: #fff; border-color: var(--primary-green); }
+    .pt-pill.inactive { background-color: #fff; color: var(--text-main); }
+    .pt-pill.inactive:hover { background-color: #e2e8f0; }
+
+    .checklist-v { display: flex; flex-direction: column; gap: 12px; }
+    .check-item { display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 16px 20px; border-radius: 10px; border: 1px solid #e2e8f0; }
+    .check-circle { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; margin-right: 14px; flex-shrink: 0; }
+    .check-circle.completed { background-color: #def7ec; color: #03543f; }
+    .check-text { flex: 1; }
+    .check-status-badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px; }
+    .cs-completed { background-color: #def7ec; color: #03543f; }
+
+    /* Modal System */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(5, 51, 33, 0.5); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 2000; }
+    .modal-overlay.active { display: flex; }
+    .modal-card { background: #fff; border-radius: 16px; width: 520px; max-width: 90%; overflow: hidden; box-shadow: var(--shadow-lg); }
+    .modal-header { background-color: var(--primary-green); color: #fff; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; }
+
+    /* Toast Container */
+    .toast { position: fixed; bottom: 28px; right: 28px; background-color: #053321; color: #fff; padding: 14px 24px; border-radius: 10px; font-size: 13px; font-weight: 700; opacity: 0; transform: translateY(15px); transition: var(--transition-smooth); pointer-events: none; z-index: 3000; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+
+<script src="api.js"></script>
+
+<div class="app-container">
+  <aside class="sidebar">
+    <div>
+      <div class="brand-group">
+        <div class="brand-title">HMS PORTAL</div>
+        <div class="brand-sub">Orthodontics Department</div>
+      </div>
+      <nav class="nav-menu" id="nav-container"></nav>
+    </div>
+    <div class="sidebar-footer">
+      <div class="footer-welcome">Welcome, HOD Orthodontics</div>
+      <div class="footer-date">Tue, Jul 21, 2026</div>
+      <button class="logout-btn" onclick="logout()">Logout Portal</button>
+    </div>
+  </aside>
+
+  <main class="viewport">
+    <div class="topbar-header">
+      <div>
+        <h1 class="page-title" id="page-title-text">HMS Portal</h1>
+        <div class="page-subtitle" id="page-subtitle-text">Department Operations View</div>
+      </div>
+      <div class="notif-wrapper">
+        <button class="bell-btn" id="bell-btn" onclick="toggleNotifPanel()" title="Doctor Treatment Delay Alerts">
+          <svg class="bell-icon" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+          <span class="notif-badge" id="notif-badge-count">0</span>
+        </button>
+        <div class="notif-panel" id="notif-panel">
+          <div class="notif-header">
+            <span>⚠️ Prolonged Treatment Alerts</span>
+            <span style="font-size:10px; background:rgba(255,255,255,0.2); padding: 2px 6px; border-radius:4px;">> 30 Mins Threshold</span>
+          </div>
+          <div class="notif-body" id="notif-body-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-target"></div>
+  </main>
+</div>
+
+<!-- Doctor Profile Modal -->
+<div class="modal-overlay" id="doc-modal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div>
+        <h3 id="modal-doc-name">Doctor Profile</h3>
+        <div style="font-size:11px; opacity: 0.85;" id="modal-doc-specialty">Orthodontics Specialist</div>
+      </div>
+      <button style="background:none; border:none; color:white; font-size:18px; cursor:pointer;" onclick="closeDocModal()">✕</button>
+    </div>
+    <div style="padding:24px;" id="modal-doc-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast-el"></div>
+
+<script>
+  window.api = window.api || { get: async () => null, patch: async () => null };
+
+  let currentView = 'overview';
+  let selectedMRKey = 'MR-2026-0848';
+  let filterStaffRole = '';
+
+  let cachedSummary = { total_patients_today: 0, doctors_on_duty: 0, doctors_on_leave: 0, active_rooms: 0 };
+  let cachedRooms = [];
+  let cachedDoctors = [];
+  let cachedStaff = [];
+  let cachedLeaves = [];
+  let cachedTimelinePatients = {};
+  let cachedTimelineSteps = {};
+
+  function showToast(msg) {
+    const el = document.getElementById('toast-el');
+    el.innerText = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2800);
+  }
+
+  function toggleNotifPanel() {
+    document.getElementById('notif-panel').classList.toggle('active');
+  }
+
+  function openDocModal(docName) {
+    const doc = cachedDoctors.find(d => d.name === docName);
+    if (!doc) return;
+
+    document.getElementById('modal-doc-name').innerText = doc.name;
+    document.getElementById('modal-doc-body').innerHTML = `
+      <div style="display:flex; justify-content:space-between; background:#e6f0eb; padding:12px; border-radius:8px; margin-bottom:16px;">
+        <div><span style="font-size:11px; color:#6b7280;">STATUS</span><div style="font-weight:800;">${doc.status}</div></div>
+        <div><span style="font-size:11px; color:#6b7280;">RATING / EXP</span><div style="font-weight:800; color:#10b981;">${doc.rating} (${doc.experience})</div></div>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+        <div style="background:#f3f7f5; padding:16px; text-align:center; border-radius:8px;">
+          <div style="font-size:24px; font-weight:800; color:var(--primary-green);">${doc.patients_today}</div>
+          <div style="font-size:11px; font-weight:700; color:#6b7280;">Patients Today</div>
+        </div>
+        <div style="background:#f3f7f5; padding:16px; text-align:center; border-radius:8px;">
+          <div style="font-size:24px; font-weight:800; color:var(--primary-green);">${doc.total_active_cases}</div>
+          <div style="font-size:11px; font-weight:700; color:#6b7280;">Total Active Cases</div>
+        </div>
+      </div>
+    `;
+    document.getElementById('doc-modal').classList.add('active');
+  }
+
+  function closeDocModal() {
+    document.getElementById('doc-modal').classList.remove('active');
+  }
+
+  function approveExtension(roomId) {
+    const room = cachedRooms.find(r => r.id === roomId);
+    if (room) {
+      room.approved = true;
+      showToast(`✓ Extension approved for ${room.assigned_doctor}`);
+      renderView();
+    }
+  }
+
+  function completeProcedure(roomId) {
+    const room = cachedRooms.find(r => r.id === roomId);
+    if (!room) return;
+    room.status = 'available';
+    room.status_display = 'Available';
+    room.current_procedure = 'Idle / Preparing Chair';
+    room.time_in_mins = 0;
+    showToast(`Procedure completed for ${room.assigned_doctor}`);
+    renderView();
+  }
+
+  async function handleLeaveResolve(id, status) {
+    showToast(`Updating leave request to ${status}...`);
+    try {
+      await api.patch(`/leaves/${id}/status`, { status });
+      cachedLeaves = cachedLeaves.filter(l => l.id !== id);
+      renderView();
+    } catch (e) {
+      showToast(e.message || 'Unable to update leave status');
+    }
+  }
+
+  function logout() {
+    if (confirm('Are you sure you want to log out?')) {
+      removeToken();
+      removeUser();
+      window.location.replace('Login.html');
+    }
+  }
+
+  function switchView(viewKey) {
+    currentView = viewKey;
+    renderNav();
+    renderView();
+  }
+
+  function renderNav() {
+    const pages = [
+      { id: 'overview', label: 'Overview' },
+      { id: 'monitoring', label: 'Doctor Monitoring' },
+      { id: 'staff_mgmt', label: 'Staff Management' },
+      { id: 'leaves', label: 'Leave Management' },
+      { id: 'timeline', label: 'Patient Timeline' }
+    ];
+
+    document.getElementById('nav-container').innerHTML = pages.map(p => `
+      <button class="nav-btn ${currentView === p.id ? 'active' : ''}" onclick="switchView('${p.id}')">
+        <span>${p.label}</span>
+      </button>
+    `).join('');
+  }
+
+  function normalizeRoomStatus(room) {
+    const status = (room.status || '').toString().toLowerCase();
+    const mapped = status.includes('busy') ? 'busy' : status.includes('consult') ? 'consultation' : 'available';
+    return {
+      ...room,
+      id: room.id || room.room_name,
+      status: mapped,
+      status_display: mapped === 'busy' ? 'In Procedure' : mapped === 'consultation' ? 'Consultation' : 'Available',
+      time_in_mins: room.time_in_mins || 0,
+      approved: !!room.approved,
+      patient_queue: room.queue_count || room.patient_queue || 0,
+      room_name: room.room_name || room.room || 'Room',
+      assigned_doctor: room.assigned_doctor || '—',
+      current_procedure: room.current_case || room.current_procedure || '—',
+      patient_mr: room.patient_mr || '—'
+    };
+  }
+
+  async function loadPortalData() {
+    try {
+      const [summary, rooms, monitoring, staff, leaves] = await Promise.all([
+        api.get('/hod/summary'),
+        api.get('/hod/rooms'),
+        api.get('/hod/monitoring'),
+        api.get('/staff/'),
+        api.get('/leaves/')
+      ]);
+
+      cachedSummary = summary || cachedSummary;
+      cachedRooms = (rooms || []).map(normalizeRoomStatus);
+      cachedDoctors = (monitoring || []).map(doc => ({
+        name: doc.name,
+        patients_today: doc.patients_today || 0,
+        total_active_cases: doc.patients_today || 0,
+        status: doc.status || 'Available',
+        experience: 'Live availability',
+        rating: '—'
+      }));
+      cachedStaff = staff || [];
+      cachedLeaves = (leaves || []).map(l => ({
+        id: l.id,
+        requester_name: l.requester_name || 'Unknown',
+        start_date: l.start_date,
+        end_date: l.end_date,
+        reason: l.reason || '—'
+      }));
+
+      const patientList = (await api.get('/patients/')) || [];
+      const timelineMap = {};
+      const stepsMap = {};
+      for (const patient of patientList) {
+        if (patient.mr_number) {
+          timelineMap[patient.mr_number] = { full_name: patient.full_name };
+          try {
+            const steps = await api.get(`/hod/timeline/${encodeURIComponent(patient.mr_number)}`);
+            stepsMap[patient.mr_number] = (steps || []).map(step => ({
+              id: step.id,
+              name: step.step_name,
+              status: step.status,
+              completed_by: step.updated_at || null
+            }));
+          } catch (e) {
+            stepsMap[patient.mr_number] = [];
+          }
+        }
+      }
+      cachedTimelinePatients = timelineMap;
+      cachedTimelineSteps = stepsMap;
+      if (Object.keys(cachedTimelinePatients).length) selectedMRKey = Object.keys(cachedTimelinePatients)[0];
+    } catch (e) {
+      console.warn('Failed to load HOD portal data:', e);
+    }
+  }
+
+  function updateNotifications() {
+    const alerts = cachedRooms.filter(r => r.status === 'busy' && r.time_in_mins > 30 && !r.approved);
+    const badge = document.getElementById('notif-badge-count');
+    badge.innerText = alerts.length;
+    badge.style.display = alerts.length ? 'flex' : 'none';
+
+    document.getElementById('notif-body-list').innerHTML = alerts.length ? alerts.map(a => `
+      <div class="notif-item">
+        <strong>${a.assigned_doctor}</strong> - ${a.current_procedure}
+        <div style="margin-top:4px;"><button class="btn-action btn-approve" onclick="approveExtension(${a.id})">Approve</button></div>
+      </div>
+    `).join('') : '<div style="padding:16px; text-align:center; font-size:12px; color:#6b7280;">No pending alerts</div>';
+  }
+
+  function renderOverviewView() {
+    const alerts = cachedRooms.filter(r => r.status === 'busy' && r.time_in_mins > 30 && !r.approved);
+
+    return `
+      ${alerts.length ? `
+        <div style="background:#fef2f2; border-left:6px solid #dc2626; border-radius:12px; padding:16px; margin-bottom:24px;">
+          <div style="color:#991b1b; font-size:13px; font-weight:800; margin-bottom:10px;">🚨 PROLONGED PROCEDURE ALERTS (${alerts.length})</div>
+          ${alerts.map(a => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:10px; border-radius:8px; margin-top:6px;">
+              <div><strong>${a.assigned_doctor}</strong> (${a.room_name}) — ${a.current_procedure}</div>
+              <button class="btn-action btn-approve" onclick="approveExtension(${a.id})">✓ Approve (${a.time_in_mins}m)</button>
+            </div>
+          `).join('')}
+        </div>` : ''}
+
+      <div class="metrics-row">
+        <div class="metric-card"><div class="metric-number">${cachedSummary.total_patients_today}</div><div>Patients Today</div></div>
+        <div class="metric-card"><div class="metric-number">${cachedSummary.doctors_on_duty}</div><div>Doctors On Duty</div></div>
+        <div class="metric-card"><div class="metric-number">${cachedSummary.active_rooms}</div><div>Active Rooms</div></div>
+      </div>
+
+      <div class="container-card">
+        <div class="container-title">Operatory Room Status</div>
+        <div class="inner-card">
+          <table>
+            <thead><tr><th>Room</th><th>Doctor</th><th>Procedure</th><th>Queue</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              ${cachedRooms.map(r => `
+                <tr>
+                  <td><strong>${r.room_name}</strong></td>
+                  <td>${r.assigned_doctor}</td>
+                  <td>${r.current_procedure} <small>(${r.patient_mr})</small></td>
+                  <td>${r.patient_queue}</td>
+                  <td><span class="status-pill status-${r.status}">${r.status_display} (${r.time_in_mins}m)</span></td>
+                  <td>
+                    ${r.status !== 'available'
+            ? `<button class="btn-action btn-complete" onclick="completeProcedure(${r.id})">Complete</button>`
+            : '<small style="color:#9ca3af">Idle</small>'}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderMonitoringView() {
+    return `
+      <div class="container-card">
+        <div class="container-title">Doctor Workload Matrix</div>
+        <div class="inner-card">
+          <table>
+            <thead><tr><th>Doctor</th><th>Today</th><th>Active Load</th><th>Status</th><th>Profile</th></tr></thead>
+            <tbody>
+              ${cachedDoctors.map(d => `
+                <tr>
+                  <td><strong>${d.name}</strong></td>
+                  <td>${d.patients_today}</td>
+                  <td>${d.total_active_cases} cases</td>
+                  <td><span class="status-pill ${d.status.includes('Busy') ? 'status-busy' : 'status-avail'}">${d.status}</span></td>
+                  <td><button class="btn-action" style="background:#e2e8f0;" onclick="openDocModal('${d.name}')">👁 View</button></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderStaffMgmtView() {
+    const filtered = cachedStaff.filter(s => !filterStaffRole || s.role === filterStaffRole);
+    return `
+      <div class="container-card">
+        <div class="container-title">Staff Registry</div>
+        <select class="form-input" style="margin-bottom:16px;" onchange="filterStaffRole=this.value; renderView();">
+          <option value="">All Roles</option>
+          ${[...new Set(cachedStaff.map(s => s.role))].map(r => `<option value="${r}" ${filterStaffRole === r ? 'selected' : ''}>${r}</option>`).join('')}
+        </select>
+        <div class="inner-card">
+          <table>
+            <thead><tr><th>Name</th><th>Role</th><th>Status</th></tr></thead>
+            <tbody>
+              ${filtered.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.role}</td><td>${s.status}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderLeavesView() {
+    return `
+      <div class="container-card">
+        <div class="container-title">Leave Approvals</div>
+        <div class="inner-card">
+          <table>
+            <thead><tr><th>Requester</th><th>Dates</th><th>Reason</th><th>Actions</th></tr></thead>
+            <tbody>
+              ${cachedLeaves.map(l => `
+                <tr>
+                  <td><strong>${l.requester_name}</strong></td>
+                  <td>${l.start_date} to ${l.end_date}</td>
+                  <td>${l.reason}</td>
+                  <td>
+                    <button class="btn-action btn-approve" onclick="handleLeaveResolve(${l.id}, 'Approved')">Approve</button>
+                    <button class="btn-action btn-reject" onclick="handleLeaveResolve(${l.id}, 'Rejected')">Reject</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPatientTimelineView() {
+    const record = cachedTimelinePatients[selectedMRKey];
+    const allSteps = cachedTimelineSteps[selectedMRKey] || [];
+    const completedProcedures = allSteps.filter(s => s.status === 'Completed');
+
+    const pillsHTML = Object.keys(cachedTimelinePatients).map(key => `
+      <span class="pt-pill ${key === selectedMRKey ? 'active' : 'inactive'}"
+            onclick="selectedMRKey='${key}'; renderView();">
+        ${key} — ${cachedTimelinePatients[key].full_name}
+      </span>
+    `).join('');
+
+    let proceduresHTML = '';
+    if (completedProcedures.length > 0) {
+      proceduresHTML = completedProcedures.map(s => `
+        <div class="check-item">
+          <div class="check-circle completed">✓</div>
+          <div class="check-text">
+            <div style="font-size: 15px; font-weight: 700; color: #1f2937;">${s.name}</div>
+            <div style="font-size: 12px; color: #10b981; font-weight: 700; margin-top: 2px;">
+              Performed & Verified by ${s.completed_by || 'Assigned Doctor'}
+            </div>
+          </div>
+          <div class="check-status-badge cs-completed">Completed</div>
+        </div>
+      `).join('');
+    } else {
+      proceduresHTML = `
+        <div style="text-align: center; padding: 40px 20px; color: #6b7280; font-size: 14px; background: #fff; border-radius: 8px; border: 1px dashed var(--border-color);">
+          ℹ️ No performed procedures logged for this patient yet. Procedures will appear automatically once marked completed by the attending doctor.
+        </div>
+      `;
+    }
+
+    return `
+      <div class="container-card">
+        <div class="container-title">
+          <span>Completed Procedures Log</span>
+          <span style="font-size:11px; color:#059669; font-weight:700;">📡 Live Doctor Event Sync Enabled</span>
+        </div>
+
+        <div class="pill-container">${pillsHTML}</div>
+
+        <div style="background-color: #ffffff; border-radius:12px; border:1px solid #cbd5e1; padding: 24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; border-bottom: 2px solid #e6f0eb; padding-bottom: 12px;">
+            <div>
+              <h2 style="font-size: 18px; font-weight: 800; color: var(--primary-green);">${record ? record.full_name : 'Patient'} (${selectedMRKey})</h2>
+              <p style="font-size: 12px; color: #6b7280; margin-top: 2px;">Displaying doctor-verified treatment history</p>
+            </div>
+            <span style="font-size:12px; font-weight:700; background:#e6f0eb; padding:6px 12px; border-radius:6px; color:#0b4c33;">
+              Total Performed: ${completedProcedures.length}
+            </span>
+          </div>
+
+          <div class="checklist-v">
+            ${proceduresHTML}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderView() {
+    const target = document.getElementById('view-target');
+    if (currentView === 'overview') target.innerHTML = renderOverviewView();
+    else if (currentView === 'monitoring') target.innerHTML = renderMonitoringView();
+    else if (currentView === 'staff_mgmt') target.innerHTML = renderStaffMgmtView();
+    else if (currentView === 'leaves') target.innerHTML = renderLeavesView();
+    else if (currentView === 'timeline') target.innerHTML = renderPatientTimelineView();
+
+    updateNotifications();
+  }
+
+  window.addEventListener('DOMContentLoaded', async () => {
+    await loadPortalData();
+    renderNav();
+    renderView();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AFID HMS - Authentication</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { brand: { DEFAULT: '#0f5132', hover: '#0a3621' } } } }
+    }
+  </script>
+  <style>
+    .demo-btn {
+      transition: all 0.2s ease;
+      border: 1px solid #d1d5db;
+    }
+    .demo-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(15, 81, 50, 0.15);
+      border-color: #0f5132;
+    }
+    .demo-btn.active-demo {
+      border-color: #0f5132;
+      background-color: #f0fdf4;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+  <div class="w-full max-w-5xl bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row">
+    <div class="md:w-1/2 bg-brand relative p-0 min-h-[400px]">
+      <!-- Image covering entire green area -->
+      <img src="clinic-bg.jpg" alt="AFID Dental Clinic" class="absolute inset-0 w-full h-full object-cover">
+      
+      <!-- Dark overlay for text readability -->
+      <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
+      
+      <!-- Heading positioned at bottom left -->
+      <div class="absolute bottom-0 left-0 p-8 text-white">
+        <h1 class="text-4xl font-bold tracking-tight drop-shadow-lg">AFID HMS</h1>
+        <p class="text-green-200 text-sm mt-1 drop-shadow-md">Hospital Management System</p>
+      </div>
+    </div>
+    <div class="md:w-1/2">
+      <div class="flex border-b border-gray-200">
+      <button id="btn-login" onclick="switchMode('login')" class="flex-1 py-4 font-bold text-brand border-b-2 border-brand transition">Log In</button>
+      <button id="btn-register" onclick="switchMode('register')" class="flex-1 py-4 font-bold text-gray-400 hover:text-gray-600 transition">Registration</button>
+    </div>
+
+    <!-- ── LOGIN FORM ─────────────────────────────────────────────────────── -->
+    <form id="form-login" class="p-6 space-y-4" onsubmit="handleLogin(event)">
+      
+      <!-- Demo Account Quick-Select Buttons -->
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Quick Login — Click to auto-fill</label>
+        <div class="grid grid-cols-1 gap-2">
+          <button type="button" class="demo-btn rounded-lg px-3 py-2 text-xs font-bold text-left flex items-center gap-2" onclick="fillDemo('hod@afid.mil', 'admin1234', this)">
+            <span class="w-2 h-2 rounded-full bg-purple-500 inline-block"></span>
+            <span><span class="text-gray-700">HOD / Admin</span> <span class="text-gray-400 font-normal">— hod@afid.mil</span></span>
+          </button>
+          <button type="button" class="demo-btn rounded-lg px-3 py-2 text-xs font-bold text-left flex items-center gap-2" onclick="fillDemo('doctor@afid.mil', 'doctor1234', this)">
+            <span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
+            <span><span class="text-gray-700">Doctor (Primary)</span> <span class="text-gray-400 font-normal">— doctor@afid.mil</span></span>
+          </button>
+          <button type="button" class="demo-btn rounded-lg px-3 py-2 text-xs font-bold text-left flex items-center gap-2" onclick="fillDemo('rehan@afid.mil', 'doctor1234', this)">
+            <span class="w-2 h-2 rounded-full bg-blue-400 inline-block"></span>
+            <span><span class="text-gray-700">Doctor (Rehan)</span> <span class="text-gray-400 font-normal">— rehan@afid.mil</span></span>
+          </button>
+          <button type="button" class="demo-btn rounded-lg px-3 py-2 text-xs font-bold text-left flex items-center gap-2" onclick="fillDemo('sana@afid.mil', 'doctor1234', this)">
+            <span class="w-2 h-2 rounded-full bg-blue-300 inline-block"></span>
+            <span><span class="text-gray-700">Doctor (Sana)</span> <span class="text-gray-400 font-normal">— sana@afid.mil</span></span>
+          </button>
+          <button type="button" class="demo-btn rounded-lg px-3 py-2 text-xs font-bold text-left flex items-center gap-2" onclick="fillDemo('reception@afid.mil', 'staff1234', this)">
+            <span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+            <span><span class="text-gray-700">Reception Staff</span> <span class="text-gray-400 font-normal">— reception@afid.mil</span></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="border-t border-gray-200 pt-3">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Work Email</label>
+          <input id="login-email" type="email" placeholder="you@hospital.org"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none"
+            required>
+        </div>
+        <div class="mt-3">
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+          <input id="login-password" type="password" placeholder="Enter your password"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none"
+            required>
+        </div>
+        <div class="flex items-center justify-between text-sm mt-2">
+          <label class="flex items-center gap-2 text-gray-600">
+            <input type="checkbox" class="accent-brand"> Remember me
+          </label>
+          <a href="#" class="text-brand font-medium hover:underline">Forgot password?</a>
+        </div>
+
+        <!-- error banner -->
+        <div id="login-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2 mt-2"></div>
+
+        <button type="submit" id="login-btn"
+          class="w-full bg-brand hover:bg-brand-hover text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 mt-3">
+          <span id="login-btn-text">Sign In →</span>
+          <svg id="login-spinner" class="hidden animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+        </button>
+      </div>
+    </form>
+
+    <!-- ── REGISTER FORM ──────────────────────────────────────────────────── -->
+    <form id="form-register" class="p-8 space-y-4 hidden" onsubmit="handleRegister(event)">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">First Name</label>
+          <input id="reg-firstname" type="text" placeholder="Amara"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none"
+            required>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Last Name</label>
+          <input id="reg-lastname" type="text" placeholder="Osei"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none"
+            required>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-1">Work Email</label>
+        <input id="reg-email" type="email" placeholder="you@hospital.org"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none"
+          required>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Staff ID</label>
+          <input id="reg-staffid" type="text" placeholder="HMS-0000"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Role</label>
+          <select id="reg-role" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none">
+            <option value="doctor">Doctor</option>
+            <option value="nurse">Nurse</option>
+            <option value="receptionist">Receptionist</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+        <input id="reg-password" type="password" placeholder="Min 8 characters"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none"
+          minlength="8" required>
+      </div>
+
+      <!-- error / success banners -->
+      <div id="reg-error"   class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2"></div>
+      <div id="reg-success" class="hidden text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2"></div>
+
+      <button type="submit" id="reg-btn"
+        class="w-full bg-brand hover:bg-brand-hover text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2">
+        <span id="reg-btn-text">Create Account →</span>
+        <svg id="reg-spinner" class="hidden animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+      </button>
+    </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── shared api helper ───────────────────────────────────────────────── -->
+  <script src="api.js"></script>
+
+  <script>
+    // ── If already authenticated, skip straight to portal ──────────────────
+    (function () {
+      if (getToken()) {
+        const user = getUser();
+        window.location.replace(portalForRole(user && user.role));
+      }
+    })();
+
+    // ── Role → portal mapping ───────────────────────────────────────────────
+    function portalForRole(role) {
+      if (!role) return 'staff.html';
+      const r = role.toLowerCase();
+      if (r === 'doctor')        return 'doctor (1).html';
+      if (r === 'hod' || r === 'admin') return 'hod.html';
+      return 'staff.html';         // receptionist / nurse / default
+    }
+
+    // ── Tab switcher ────────────────────────────────────────────────────────
+    function switchMode(mode) {
+      const loginForm = document.getElementById('form-login');
+      const regForm   = document.getElementById('form-register');
+      const btnLogin  = document.getElementById('btn-login');
+      const btnReg    = document.getElementById('btn-register');
+
+      if (mode === 'register') {
+        loginForm.classList.add('hidden');
+        regForm.classList.remove('hidden');
+        btnLogin.className = 'flex-1 py-4 font-bold text-gray-400 hover:text-gray-600 transition';
+        btnReg.className   = 'flex-1 py-4 font-bold text-brand border-b-2 border-brand transition';
+      } else {
+        regForm.classList.add('hidden');
+        loginForm.classList.remove('hidden');
+        btnReg.className   = 'flex-1 py-4 font-bold text-gray-400 hover:text-gray-600 transition';
+        btnLogin.className = 'flex-1 py-4 font-bold text-brand border-b-2 border-brand transition';
+      }
+    }
+
+    // ── Demo auto-fill ──────────────────────────────────────────────────────
+    function fillDemo(email, password, btnEl) {
+      document.getElementById('login-email').value = email;
+      document.getElementById('login-password').value = password;
+      document.getElementById('login-error').classList.add('hidden');
+      // Highlight the clicked button
+      document.querySelectorAll('.demo-btn').forEach(b => b.classList.remove('active-demo'));
+      btnEl.classList.add('active-demo');
+    }
+
+    // ── Banner helpers ──────────────────────────────────────────────────────
+    function showError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    function hideError(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function setLoading(btnId, spinnerId, textId, loading, defaultText) {
+      document.getElementById(btnId).disabled = loading;
+      document.getElementById(spinnerId).classList.toggle('hidden', !loading);
+      document.getElementById(textId).textContent = loading ? 'Please wait…' : defaultText;
+    }
+
+    // ── LOGIN ───────────────────────────────────────────────────────────────
+    async function handleLogin(e) {
+      e.preventDefault();
+      hideError('login-error');
+
+      const email    = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+
+      setLoading('login-btn', 'login-spinner', 'login-btn-text', true, 'Sign In →');
+
+      try {
+        // 1. Obtain JWT
+        const tokenData = await apiRequest('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        });
+        setToken(tokenData.access_token);
+
+        // 2. Fetch user profile
+        const user = await apiRequest('/auth/me');
+        setUser(user);
+
+        // 3. Redirect to the correct portal based on role
+        window.location.replace(portalForRole(user.role));
+
+      } catch (err) {
+        setLoading('login-btn', 'login-spinner', 'login-btn-text', false, 'Sign In →');
+        showError('login-error', err.message || 'Login failed. Please check your credentials.');
+      }
+    }
+
+    // ── REGISTER ────────────────────────────────────────────────────────────
+    async function handleRegister(e) {
+      e.preventDefault();
+      hideError('reg-error');
+      hideError('reg-success');
+
+      const firstName = document.getElementById('reg-firstname').value.trim();
+      const lastName  = document.getElementById('reg-lastname').value.trim();
+      const email     = document.getElementById('reg-email').value.trim();
+      const password  = document.getElementById('reg-password').value;
+      const role      = document.getElementById('reg-role').value;
+
+      setLoading('reg-btn', 'reg-spinner', 'reg-btn-text', true, 'Create Account →');
+
+      try {
+        await apiRequest('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({
+            full_name: `${firstName} ${lastName}`,
+            email,
+            password,
+            role,
+          }),
+        });
+
+        setLoading('reg-btn', 'reg-spinner', 'reg-btn-text', false, 'Create Account →');
+        document.getElementById('reg-success').textContent =
+          'Account created! Your registration is pending verification. You can log in once approved.';
+        document.getElementById('reg-success').classList.remove('hidden');
+        document.getElementById('form-register').reset();
+
+      } catch (err) {
+        setLoading('reg-btn', 'reg-spinner', 'reg-btn-text', false, 'Create Account →');
+        const msg = err.message.includes('404') || err.message.includes('Not Found')
+          ? 'Self-registration is not yet enabled. Please contact your administrator to create your account.'
+          : (err.message || 'Registration failed. Please try again.');
+        showError('reg-error', msg);
+      }
+    }
+  </script>
+</body>
+</html>

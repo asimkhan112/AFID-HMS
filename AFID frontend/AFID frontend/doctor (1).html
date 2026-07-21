@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dental Command Portal</title>
+  <style>
+    :root {
+      --green-dark: #073e2b;
+      --green-med: #0f6244;
+      --green-light: #e6f0ec;
+      --green-soft: #f0f7f4;
+      --border: #d1e2dc;
+      --text-dark: #1f2937;
+      --text-muted: #6b7280;
+      --red: #991b1b;
+      --red-soft: #fee2e2;
+      --bg-main: #f9fafb;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { display: flex; height: 100vh; width: 100%; max-width: 100%; background-color: var(--bg-main); color: var(--text-dark); overflow: hidden; overflow-x: hidden; }
+
+    /* Layout Wrapper */
+    .sidebar { width: 260px; background: var(--green-dark); color: white; display: flex; flex-direction: column; justify-content: space-between; }
+    .sidebar-header { padding: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-header h2 { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+    .nav-group { flex: 1; padding: 20px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .nav-item { background: none; border: none; color: #a3b8b0; padding: 12px 16px; text-align: left; font-size: 14px; font-weight: 500; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+    .nav-item:hover, .nav-item.active { background: var(--green-med); color: white; }
+    .sidebar-footer { padding: 20px; background: rgba(0,0,0,0.15); font-size: 13px; }
+    .sidebar-footer .user-info { font-weight: 600; color: white; margin-bottom: 4px; }
+
+    .main-viewport { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+    .content-container { padding: 32px; max-width: 1200px; width: 100%; margin: 0 auto; }
+
+    /* Typography & Structural Panels */
+    .dashboard-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 2px solid var(--border); padding-bottom: 12px; }
+    .dashboard-title-row h1 { font-size: 24px; color: var(--green-dark); font-weight: 700; }
+    .meta-tag { background: var(--green-light); color: var(--green-dark); font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 4px; text-transform: uppercase; }
+
+    .panel { background: white; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+    .panel-header { background: var(--green-soft); padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 600; color: var(--green-dark); }
+    .panel-body { padding: 20px; }
+
+    .grid { display: grid; gap: 24px; }
+    .grid-executive { grid-template-columns: 1fr; }
+
+    /* Personal Analytics Card */
+    .doc-card { border: 1px solid var(--border); border-radius: 8px; padding: 20px; background: white; }
+    .doc-card h3 { margin-top: 0; margin-bottom: 16px; font-size: 16px; color: var(--green-dark); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+
+    /* Operational Elements */
+    .flex-row-inputs { display: flex; gap: 12px; margin-bottom: 16px; align-items: flex-end; }
+    .form-group { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
+    .form-group label, .label { font-size: 12px; font-weight: 600; color: var(--text-dark); }
+
+    input[type="text"], input[type="date"], input[type="time"], select, textarea { 
+      width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; color: var(--text-dark); background: white; outline: none; transition: border 0.15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--green-med); box-shadow: 0 0 0 3px rgba(15,98,68,0.1); }
+
+    .btn { background: var(--green-med); color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: 600; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background 0.15s; }
+    .btn:hover { background: var(--green-dark); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 4px; }
+    .btn-danger { background: var(--red); }
+    .btn-danger:hover { background: #7f1d1d; }
+
+    /* Tables & Lists */
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+    th { padding: 12px 16px; background: var(--green-soft); color: var(--green-dark); font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--border); }
+    td { padding: 12px 16px; border-bottom: 1px solid var(--border); color: var(--text-dark); }
+    tr:last-child td { border-bottom: none; }
+
+    .badge { display: inline-block; padding: 4px 8px; font-size: 11px; font-weight: 700; border-radius: 4px; text-transform: uppercase; }
+    .badge-success { background: #dcfce7; color: #166534; }
+    .badge-info { background: #e0f2fe; color: #0369a1; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    .badge-danger { background: var(--red-soft); color: var(--red); }
+
+    /* Difficulty Badges */
+    .diff-easy     { background: #dcfce7; color: #15803d; }
+    .diff-moderate { background: #fef9c3; color: #a16207; }
+    .diff-complex  { background: #fee2e2; color: #b91c1c; }
+
+    .alert-box { background: var(--red-soft); border: 1px solid rgba(153,27,27,0.2); color: var(--red); padding: 14px 16px; border-radius: 6px; font-size: 13px; }
+    .patient-details-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+    .patient-details-grid .label { color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 2px; }
+    .patient-details-grid .value { font-size: 14px; font-weight: 600; color: var(--text-dark); }
+
+    /* Tabs Engine */
+    .tab-bar { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; gap: 4px; overflow-x: auto; }
+    .tab-button { background: none; border: none; padding: 12px 16px; font-size: 13px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+    .tab-button:hover { color: var(--green-med); }
+    .tab-button.active { color: var(--green-med); border-bottom-color: var(--green-med); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .qty-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--border); font-size: 14px; }
+    .qty-row:last-child { border-bottom: none; }
+    .qty-val { background: var(--green-light); color: var(--green-dark); padding: 2px 8px; font-weight: 700; border-radius: 4px; font-size: 12px; }
+
+    .reveal-section { display: none; }
+    .view-screen { display: none; }
+    .view-screen.active { display: block; }
+
+    /* Summary Print Sheet Styles */
+    .summary-sheet { background: white; border: 1px solid var(--border); padding: 30px; border-radius: 8px; margin-top: 24px; }
+    .summary-header { border-bottom: 2px solid var(--green-dark); padding-bottom: 12px; margin-bottom: 20px; text-align: center; }
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; border-bottom: 1px dashed var(--border); padding-bottom: 20px; }
+    .summary-field { margin-bottom: 20px; }
+    .summary-field label { display: block; font-weight: 700; text-transform: uppercase; font-size: 11px; color: var(--green-med); margin-bottom: 6px; }
+    .summary-field div { font-size: 14px; line-height: 1.5; color: var(--text-dark); background: var(--bg-main); padding: 12px; border-radius: 6px; }
+
+    @media print {
+      .sidebar, .dashboard-title-row button, .nav-item, .panel, .tab-bar, .afid-header, .dashboard-title-row, .print-action-row, .print-hide { display: none !important; }
+      body { background: white; }
+      .content-container { padding: 0; max-width: 100%; }
+      .summary-sheet { border: none; padding: 0; display: block !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Blueprint -->
+  <div class="sidebar">
+    <div>
+      <div class="sidebar-header">
+        <h2>Clinical Portal</h2>
+      </div>
+      <div class="nav-group" id="nav-container">
+        <!-- Injected via JavaScript initialization Engine -->
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-info">Dr. Asadullah Khan</div>
+      <div style="font-size:11px; color:#a3b8b0;">Role: Senior Consultant</div>
+      <button onclick="handleLogout()" style="background:none; border:none; color:#fca5a5; font-size:11px; margin-top:10px; cursor:pointer; font-weight:600;">Logout Session</button>
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+
+  <!-- Primary Application Execution Canvas -->
+  <div class="main-viewport">
+    <div class="content-container" id="main-root">
+      <!-- Views dynamically cycle here -->
+    </div>
+  </div>
+
+  <script>
+    /* ===================== CENTRAL DATA PRESETS ===================== */
+    const LOGGED_IN_DOCTOR = "Dr. Asadullah Khan";
+
+    const PAGES = [
+      { id: 'dashboard', label: 'Executive Dashboard' },
+      { id: 'operations', label: 'Patient Operations' },
+      { id: 'doctor-analytics', label: 'My Analytics' },
+      { id: 'leave', label: 'Leave Requests' }
+    ];
+
+    const sortByProp = (prop) => (a, b) => (a[prop] || '').localeCompare(b[prop] || '', undefined, { sensitivity: 'base' });
+
+    const PROCEDURE_MASTER = {
+      1:  { name: "U/L Bracketing", duration: 45 },
+      2:  { name: "Fixed retainer", duration: 40 },
+      3:  { name: "De bonding", duration: 30 },
+      4:  { name: "Cast Surgery / Prediction / VTO / Morphing", duration: 150 },
+      5:  { name: "Fixed adjustment (Wire/Bends/IPR/Traction/Implant)", duration: 20 },
+      6:  { name: "Loose band / Button / Bracket / Tubes", duration: 20 },
+      7:  { name: "Fixed functional appliance Adj / EOT / Face mask", duration: 20 },
+      8:  { name: "Molar bands / VFR", duration: 20 },
+      9:  { name: "NAM (First time prep + First time app)", duration: 60 },
+      10: { name: "Treatment planning / File analysis / Tracing", duration: 20 },
+      11: { name: "Space maintainer / Photography / Digital Scan", duration: 10 },
+      12: { name: "Nance LLA / Hyrax / Quad Helix / TPA / Pendulum", duration: 20 },
+      13: { name: "Impression / O/E / Separator / Removable adj", duration: 10 },
+      14: { name: "ORAL EXAM", duration: 10 },
+      15: { name: "Consultation", duration: 15 }
+    };
+
+    function getDifficultyInfo(duration) {
+      if (duration <= 25) return { label: "Easy (≤25m)", class: "diff-easy", category: "Easy" };
+      if (duration <= 50) return { label: "Moderate (25-50m)", class: "diff-moderate", category: "Moderate" };
+      return { label: "Complex (>50m)", class: "diff-complex", category: "Complex" };
+    }
+
+    const MOCK_DOCTOR_HISTORY = [
+      { id: "HIST-101", date: "2026-07-21", doctor: "Brig Abdullah Jan", procId: 4 },
+      { id: "HIST-102", date: "2026-07-21", doctor: "Brig Abdullah Jan", procId: 1 },
+      { id: "HIST-103", date: "2026-07-21", doctor: "Brig Abdullah Jan", procId: 5 },
+      { id: "HIST-104", date: "2026-07-21", doctor: "Maj Tariq", procId: 9 },
+      { id: "HIST-105", date: "2026-07-21", doctor: "Maj Tariq", procId: 14 },
+      { id: "HIST-106", date: "2026-07-20", doctor: "Maj Tariq", procId: 3 },
+      { id: "HIST-107", date: "2026-07-20", doctor: "Dr. Asadullah Khan", procId: 13 },
+      { id: "HIST-108", date: "2026-07-20", doctor: "Dr. Asadullah Khan", procId: 2 },
+      { id: "HIST-109", date: "2026-07-20", doctor: "Dr. Asadullah Khan", procId: 12 },
+      { id: "HIST-110", date: "2026-07-21", doctor: "Dr. Asadullah Khan", procId: 1 },
+      { id: "HIST-111", date: "2026-07-21", doctor: "Dr. Asadullah Khan", procId: 4 },
+      { id: "HIST-112", date: "2026-07-19", doctor: "Dr. Asadullah Khan", procId: 5 },
+      { id: "HIST-113", date: "2026-07-19", doctor: "Dr. Asadullah Khan", procId: 10 },
+      { id: "HIST-114", date: "2026-07-18", doctor: "Dr. Asadullah Khan", procId: 15 },
+      { id: "HIST-115", date: "2026-07-18", doctor: "Dr. Asadullah Khan", procId: 8 },
+      { id: "HIST-116", date: "2026-07-17", doctor: "Dr. Asadullah Khan", procId: 3 },
+      { id: "HIST-117", date: "2026-07-16", doctor: "Dr. Asadullah Khan", procId: 11 },
+      { id: "HIST-118", date: "2026-07-15", doctor: "Dr. Asadullah Khan", procId: 7 }
+    ];
+
+    const MOCK_PATIENTS = [
+      {
+        id: 1,
+        mr_number: "MR-0201708",
+        file_number: "F-9942",
+        full_name: "Maj Zeeshan Khan",
+        service_profile: "Major (PGE-5403)",
+        gender: "Male",
+        blood_group: "A+",
+        room: "Orthodontics & Surgery",
+        created_at: new Date().toISOString(),
+        allergies: "Penicillin Alternative Required (High Sensitivity Risk)",
+        diagnostic_history: "Patient has long standing class-II malocclusion with severe deep bite limits. Prior extractions of upper first premolars performed under local anesthesia without initial respiratory resistance.",
+        systemic_status: "No history of diabetic parameters. Non-hypertensive baseline tracking logs verified.",
+        procedure_category: "Root Canal Treatment",
+        status: "Active"
+      }
+    ];
+
+    let cachedPatients = MOCK_PATIENTS;
+    let cachedMyLeaves = [];
+    let currentPatient = null;
+    
+    let activeMaterials = [];
+    let activePharmacy = [];
+    let activeDiagnostics = [];
+
+    const ADVANCED_TREATMENT_ITEMS = [
+      "Digital scan",
+      "Extra oral photos",
+      "Intraoral photos",
+      "Lateral cephalogram",
+      "OPG",
+      "Study cast"
+    ];
+
+    function getUser() {
+      try {
+        const stored = localStorage.getItem('afid_user');
+        if (stored) return JSON.parse(stored);
+      } catch (e) {}
+      return { full_name: LOGGED_IN_DOCTOR, role: "Senior Consultant" };
+    }
+
+    async function loadDashboardData() {
+      try {
+        if (typeof api !== 'undefined') {
+          const [patients, leaves] = await Promise.all([
+            api.get("/patients/"),
+            api.get("/leaves/")
+          ]);
+          cachedPatients = patients || [];
+          cachedMyLeaves = leaves || [];
+        }
+
+        leaveTimeline = cachedMyLeaves.map(l => ({
+          date: `${l.start_date} - ${l.end_date}`,
+          officer: l.coverage_officer || '—',
+          status: (l.status || 'PENDING').toUpperCase(),
+          reason: l.reason || '—'
+        }));
+
+        const user = getUser();
+        if (user) {
+          const userInfoEl = document.querySelector('.sidebar-footer .user-info');
+          if (userInfoEl) userInfoEl.innerText = user.full_name || LOGGED_IN_DOCTOR;
+          const roleEl = document.querySelector('.sidebar-footer div:nth-child(2)');
+          if (roleEl) roleEl.innerText = `Role: ${(user.role || 'Senior Consultant').toUpperCase()}`;
+        }
+      } catch (e) {
+        console.warn("Failed to load doctor data, using fallback:", e);
+        cachedPatients = [];
+        cachedMyLeaves = [];
+        leaveTimeline = [];
+      }
+    }
+
+    window.openPatient = function(mrNumber) {
+      switchView('operations');
+      setTimeout(() => {
+        const input = document.getElementById('patient-search-input');
+        if (input) {
+          input.value = mrNumber;
+          executeSearch();
+        }
+      }, 50);
+    };
+
+    const GLOBAL_MATERIALS = [
+      { name: "Napkin", qty: 1 },
+      { name: "Sterilization pouch", qty: 1 },
+      { name: "Suction tip", qty: 1 }
+    ].sort(sortByProp('name'));
+
+    const PRESETS = {
+      "Consultation": {
+        materials: [
+          { name: "Mouth mirror & Probe set", qty: 1 },
+          { name: "Cotton rolls", qty: 1 }
+        ].sort(sortByProp('name')),
+        pharmacy: [],
+        diagnostics: [],
+        notes: "Initial specialist consultation conducted. Patient's chief complaints documented and preliminary treatment plan discussed."
+      },
+      "2x4, 2x6 appliance": {
+        materials: [{ name: "Brackets", qty: 1 }, { name: "composite", qty: 1 }, { name: "etchant", qty: 1 }, { name: "Primer", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Sectional archwire matrix tracking integrated successfully."
+      },
+      "Band cementation / Banding of molars": {
+        materials: [{ name: "cotton rolls", qty: 1 }, { name: "GIC", qty: 1 }, { name: "Molar bands", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Molar band trial fitting completed and cemented cleanly."
+      },
+      "Bonding of brackets": {
+        materials: [{ name: "Brackets", qty: 1 }, { name: "composite", qty: 1 }, { name: "etchant", qty: 1 }, { name: "Primer", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Complete therapeutic bonding parameters completed across direct layout matrix configurations."
+      },
+      "Coil spring placement": {
+        materials: [{ name: "Coil spring", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Open/Closed active coil spring components structural integrity verified."
+      },
+      "Fixed Retainer": {
+        materials: [{ name: "composite", qty: 1 }, { name: "etchant", qty: 1 }, { name: "Primer", qty: 1 }, { name: "retainer wire", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Lingual bonded fixed retainer wire structured and verified."
+      },
+      "Habit breaking appliance": {
+        materials: [{ name: "cotton rolls", qty: 1 }, { name: "GIC", qty: 1 }, { name: "Molar bands", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Habit breaking interceptive appliance properly positioned."
+      },
+      "Ligation": {
+        materials: [{ name: "Steel ligatures", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Archwire tied down cleanly utilizing specialized steel ligatures structural paths."
+      },
+      "MARPE": {
+        materials: [{ name: "cotton rolls", qty: 1 }, { name: "GIC", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Miniscrew-Assisted Rapid Palatal Expander logs processed."
+      },
+      "Nance / TPA / LLA insertion": {
+        materials: [{ name: "cotton rolls", qty: 1 }, { name: "GIC", qty: 1 }, { name: "Molar bands", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Nance / TPA / LLA appliance checked and structural frame safely inserted."
+      },
+      "Orthodontic Adjustment": {
+        materials: [
+          { name: "0.016 NiTi Archwire", qty: 1 },
+          { name: "Orthodontic Elastics Bag", qty: 1 },
+          { name: "Stainless Steel Bracket Kit", qty: 1 }
+        ].sort(sortByProp('name')),
+        pharmacy: [
+          { med: "Orthodontic Relief Wax", dose: "1 Box", freq: "Apply as needed" },
+          { med: "Paracetamol 500mg", dose: "500mg", freq: "PRN pain" }
+        ].sort(sortByProp('med')),
+        diagnostics: [],
+        notes: "Removed old active archwire. Inspected bracket placements. Replaced upper archwire with 0.016 NiTi wire. Secured active ligatures. Patient instructed on elastic hook placements."
+      },
+      "Power chain application": {
+        materials: [{ name: "Power chain", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Active elastomeric power chain applied for continuous space closure logs."
+      },
+      "Quad Helix": {
+        materials: [{ name: "cotton rolls", qty: 1 }, { name: "GIC", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Quad Helix expansion appliance safely configured."
+      },
+      "Root Canal Treatment": {
+        materials: [
+          { name: "0.017x0.025 NiTi Archwire", qty: 2 },
+          { name: "AH Plus Sealer (1.5g)", qty: 1 },
+          { name: "Gutta-Percha Points (ISO 30)", qty: 6 },
+          { name: "Stainless Steel Bracket Kit", qty: 1 }
+        ].sort(sortByProp('name')),
+        pharmacy: [
+          { med: "Amoxicillin 500mg", dose: "140mg", freq: "TDS x 5 days" },
+          { med: "Chlorhexidine Mouth Wash 0.2%", dose: "15ml", freq: "BD x 7 days" },
+          { med: "Ibuprofen 400mg", dose: "400mg", freq: "BD PRN pain" }
+        ].sort(sortByProp('med')),
+        diagnostics: [
+          { name: "CBCT", urgency: "Routine" },
+          { name: "Full Mouth Periapical X-rays", urgency: "Routine" }
+        ].sort(sortByProp('name')),
+        notes: "Root canal access cavity established under rubber dam isolation. Working length determined via apex locator logs. Prepped up cleanly up to size 30 manual framework files. Irrigation via 2.5% NaOCl layer channels."
+      },
+      "RPE": {
+        materials: [{ name: "cotton rolls", qty: 1 }, { name: "GIC", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Rapid Palatal Expander framework cemented securely."
+      },
+      "SARPE": {
+        materials: [{ name: "cotton rolls", qty: 1 }, { name: "GIC", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Surgically Assisted Rapid Palatal Expansion configuration logs completed."
+      },
+      "Space maintainer – Fixed": {
+        materials: [{ name: "cotton rolls", qty: 1 }, { name: "GIC", qty: 1 }, { name: "Molar bands", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Fixed space maintainer anchored seamlessly with clean occlusion safety check logs."
+      },
+      "Surgical exposure of impacted tooth": {
+        materials: [{ name: "Gold Chain", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Surgical exposure executed safely; auxiliary gold chain infrastructure integrated."
+      },
+      "TAD placement": {
+        materials: [{ name: "TAD", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "Temporary Anchorage Device safely placed into direct active cortical bone channels."
+      },
+      "W-arch": {
+        materials: [{ name: "cotton rolls", qty: 1 }, { name: "GIC", qty: 1 }].sort(sortByProp('name')),
+        pharmacy: [], diagnostics: [], notes: "W-arch layout calibrated and inserted."
+      }
+    };
+
+    let leaveTimeline = [
+      { date: '12/10 - 12/12', officer: 'Maj. T. Farooq', status: 'APPROVED', reason: 'Official Duty Rotation' }
+    ];
+
+    /* ===================== VIEW GENERATION MOTORS ===================== */
+    function panel(title, bodyHtml) {
+      return `
+        <div class="panel">
+          <div class="panel-header">${title}</div>
+          <div class="panel-body">${bodyHtml}</div>
+        </div>
+      `;
+    }
+
+    function renderDashboard() {
+      const rows = cachedPatients.slice(0, 10).map(p => `
+        <tr>
+          <td><strong>${p.mr_number}</strong></td>
+          <td>${p.full_name}</td>
+          <td>${p.status || 'Active'}</td>
+          <td>
+            <button class="btn btn-sm" onclick="openPatient('${p.mr_number}')" style="margin-right:4px;">Open Case</button>
+            <button class="btn btn-sm" onclick="viewPatientProcedureHistory(${p.id})" style="background:#0f6244;">History</button>
+          </td>
+        </tr>
+      `).join('');
+
+      return `
+        <div class="dashboard-title-row">
+          <h1>Executive Clinic Dashboard</h1>
+          <div class="meta-tag">Dental Command Portal</div>
+        </div>
+
+        <div class="grid grid-executive">
+          ${panel('Today\'s Appointment & Routine Rotation Logs', `
+            <table>
+              <thead>
+                <tr><th>Patient MR No.</th><th>Rank / Full Name</th><th>Target Action</th><th>Action Log</th></tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `)}
+        </div>
+      `;
+    }
+
+    function renderDoctorAnalytics() {
+      return `
+        <div class="dashboard-title-row">
+          <h1>My Performance & Workload Analytics</h1>
+          <div class="meta-tag">Personal Performance Log</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">Personal Activity Summary</div>
+          <div class="panel-body">
+            <div class="doc-card" id="docAnalytics-personalCard">
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>My Procedure History Log</span>
+            <input type="text" id="docAnalyticsSearch" class="search-box" style="width:220px;" placeholder="Filter procedure or ID..." onkeyup="filterDoctorAnalytics()">
+          </div>
+          <div class="panel-body" style="padding:0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Date</th>
+                  <th>Procedure Target</th>
+                  <th>Duration</th>
+                  <th>Difficulty Tier</th>
+                </tr>
+              </thead>
+              <tbody id="docAnalyticsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function buildAnalyticsRows() {
+      const currentUser = getUser();
+      const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
+      return (cachedPatients || []).map((patient, index) => {
+        const procName = patient.procedure_category || 'Clinical Assessment';
+        const duration = /root|canal/i.test(procName) ? 60 : /bracket|bond/i.test(procName) ? 45 : /retainer|align/i.test(procName) ? 30 : /consult/i.test(procName) ? 15 : 25;
+        const diff = getDifficultyInfo(duration);
+        return {
+          id: `CASE-${String(index + 1).padStart(3, '0')}`,
+          date: patient.registered_at ? new Date(patient.registered_at).toLocaleDateString() : '—',
+          doctor: currentName,
+          procName,
+          duration,
+          diff
+        };
+      });
+    }
+
+    function processAndRenderDoctorAnalytics(filteredData) {
+      const rows = (filteredData || buildAnalyticsRows()).filter(item => item.doctor === (getUser()?.full_name || LOGGED_IN_DOCTOR));
+
+      const tbody = document.getElementById("docAnalyticsTableBody");
+      if (!tbody) return;
+
+      tbody.innerHTML = "";
+      let totalMins = 0;
+      let countEasy = 0, countMod = 0, countComplex = 0;
+
+      rows.forEach(item => {
+        totalMins += item.duration;
+        if (item.diff.category === "Easy") countEasy++;
+        if (item.diff.category === "Moderate") countMod++;
+        if (item.diff.category === "Complex") countComplex++;
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td><strong>${item.id}</strong></td>
+          <td>${item.date}</td>
+          <td><strong>${item.procName}</strong></td>
+          <td>${item.duration} mins</td>
+          <td><span class="badge ${item.diff.class}">${item.diff.label}</span></td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      const personalCard = document.getElementById("docAnalytics-personalCard");
+      if (personalCard) {
+        personalCard.innerHTML = `
+          <h3>${getUser()?.full_name || LOGGED_IN_DOCTOR}</h3>
+          <div class="stat-row"><span>Total Completed Procedures:</span> <strong>${rows.length}</strong></div>
+          <div class="stat-row"><span>Total Time Executed:</span> <strong>${totalMins} mins (${(totalMins/60).toFixed(1)} hrs)</strong></div>
+          <div class="stat-row"><span>Easy Procedures (≤25m):</span> <strong style="color: #15803d">${countEasy}</strong></div>
+          <div class="stat-row"><span>Moderate Procedures (25-50m):</span> <strong style="color: #a16207">${countMod}</strong></div>
+          <div class="stat-row"><span>Complex Procedures (>50m):</span> <strong style="color: #b91c1c">${countComplex}</strong></div>
+        `;
+      }
+    }
+
+    function filterDoctorAnalytics() {
+      const query = (document.getElementById("docAnalyticsSearch")?.value || "").toLowerCase();
+      const sourceRows = buildAnalyticsRows();
+      const filtered = sourceRows.filter(item => {
+        return item.procName.toLowerCase().includes(query) || item.id.toLowerCase().includes(query);
+      });
+      processAndRenderDoctorAnalytics(filtered);
+    }
+
+    function renderOperations() {
+      const proceduralOptions = Object.keys(PRESETS).map(key => `<option value="${key}">${key}</option>`).join('');
+
+      return `
+        <!-- SCREEN 1: SEARCH / LOOKUP VIEW -->
+        <div id="view-search-screen" class="view-screen active">
+          <div class="dashboard-title-row" style="margin-bottom: 24px;">
+            <h1>Patient Operations</h1>
+            <div class="meta-tag">Record Lookup</div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">Patient Record Lookup</div>
+            <div class="panel-body">
+              <div class="flex-row-inputs" style="margin-bottom: 0;">
+                <div style="flex: 0.8;">
+                  <select id="search-filter-category">
+                    <option value="MR Number" selected>MR Number</option>
+                    <option value="CNIC No.">CNIC No.</option>
+                    <option value="File Number">File Number</option>
+                    <option value="Rank">Rank</option>
+                  </select>
+                </div>
+                <div style="flex: 2;">
+                  <input type="text" id="patient-search-input" value="" placeholder="Try typing: MR-0201708" />
+                </div>
+                <div class="btn-holder">
+                  <button class="btn" onclick="executeSearch()" style="height: 45px;">Search & Continue →</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN 2: WORKSPACE VIEW -->
+        <div id="view-workspace-screen" class="view-screen">
+          
+          <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+            <button class="btn btn-sm" onclick="returnToSearchScreen()" style="background: var(--text-muted);">&larr; Back to Search Lookup</button>
+            <span id="active-patient-badge" class="meta-tag" style="font-size: 13px;">Active Patient: None</span>
+            <button class="btn btn-sm" onclick="confirmTimeOut()" style="background: #0f6244;">Confirm Time & Complete Session</button>
+          </div>
+
+          <!-- PATIENT PROFILE EXTRACTION -->
+          <div class="panel">
+            <div class="panel-header">Extracted Patient Profile Breakdown & Medical Indicators</div>
+            <div class="panel-body">
+              <div class="patient-details-grid">
+                <div><span class="label">Full Name:</span><span class="value">—</span></div>
+                <div><span class="label">File ID / MR:</span><span class="value">—</span></div>
+                <div><span class="label">Service Profile:</span><span class="value">—</span></div>
+                <div><span class="label">Gender/Blood:</span><span class="value">—</span></div>
+                <div><span class="label">System Location:</span><span class="value">—</span></div>
+              </div>
+              <div class="alert-box" id="allergy-alert-box" style="margin-bottom:12px; display:none;"></div>
+              
+              <!-- TIME CHECK TRACKING STAGE -->
+              <div class="flex-row-inputs" style="border-top: 1px dashed var(--border); padding-top: 12px; margin-bottom: 0;">
+                <div>
+                  <label class="label" style="font-weight: 700; color: var(--green-med); font-size: 11px;">⏰ Patient Time In</label>
+                  <input type="text" id="patient-time-in" readonly style="background:#f3f4f6; color:#374151;" />
+                </div>
+                <div>
+                  <label class="label" style="font-weight: 700; color: var(--green-med); font-size: 11px;">⏰ Patient Time Out</label>
+                  <input type="text" id="patient-time-out" readonly style="background:#f3f4f6; color:#374151;" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SINGLE-SELECT PROCEDURE MANAGEMENT -->
+          <div class="panel">
+            <div class="panel-header">Procedures Management (Choose One)</div>
+            <div class="panel-body">
+              <div class="flex-row-inputs" style="margin-bottom:0;">
+                <div style="flex: 1.5;">
+                  <select id="procedure-select" onchange="applyProcedure()">
+                    <option value="" disabled selected>-- Select One Procedure --</option>
+                    ${proceduralOptions}
+                  </select>
+                </div>
+                <div>
+                  <button class="btn btn-sm" onclick="openAddProcedureModal()" style="background: var(--green-dark); height: 38px;">+ Add Procedure</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 3 TABS CONTAINER -->
+          <div id="step-3-container" class="reveal-section">
+            <div class="tab-bar">
+              <button class="tab-button active" onclick="switchSubTab(event, 'subtab-diagnostics')">Diagnostics Queue</button>
+              <button class="tab-button" onclick="switchSubTab(event, 'subtab-materials')">Clinical Materials</button>
+              <button class="tab-button" onclick="switchSubTab(event, 'subtab-pharmacy')">Pharmacy Dispensing</button>
+              <button class="tab-button" onclick="switchSubTab(event, 'subtab-notes')">Clinical Notes System</button>
+              <button class="tab-button" onclick="switchSubTab(event, 'subtab-records')">Allergy & Medical Record</button>
+            </div>
+
+            <div id="subtab-materials" class="tab-content">
+              <div class="panel" style="margin-bottom:0;">
+                <div class="panel-header">Clinical Materials Log</div>
+                <div class="panel-body">
+                  <div class="flex-row-inputs">
+                    <input type="text" id="material-input" placeholder="Add material item..." />
+                    <input type="number" id="material-qty-input" value="1" min="1" style="width: 80px; padding: 10px; border: 1px solid var(--border); border-radius: 6px;" />
+                    <button class="btn btn-sm" style="height: 45px;" onclick="addMaterialItem()">+ Add</button>
+                  </div>
+                  <div id="materials-log-list"></div>
+                </div>
+              </div>
+            </div>
+
+            <div id="subtab-pharmacy" class="tab-content">
+              <div class="panel" style="margin-bottom:0;">
+                <div class="panel-header">💊 Pharmacy Dispensing Log</div>
+                <div class="panel-body">
+                  <div class="flex-row-inputs">
+                    <input type="text" id="pharmacy-input" placeholder="Medication..." style="flex:1;" />
+                    <input type="text" id="pharmacy-dose" placeholder="Dose (e.g. 500mg)" style="width:120px;" />
+                    <input type="text" id="pharmacy-freq" placeholder="Frequency" style="width:150px;" />
+                    <button class="btn btn-sm" style="height: 45px;" onclick="addPharmacyItem()">+ Add</button>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr><th>Medication</th><th>Dose</th><th>Frequency</th></tr>
+                    </thead>
+                    <tbody id="pharmacy-log-list"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div id="subtab-diagnostics" class="tab-content active">
+              <div class="panel" id="diagnostics-panel" style="margin-bottom:0;">
+                <div class="panel-header">🔬 Investigations & Diagnostics Sheet</div>
+                <div class="panel-body">
+                  <div class="flex-row-inputs">
+                    <div style="flex:2;">
+                      <select id="diagnostic-test-select" onchange="handleDiagnosticSelectChange(this)">
+                        <option value="" disabled selected>-- Select Diagnostic Investigation / X-Ray --</option>
+                        <option value="Advise new treatment file" style="font-weight: bold; background-color: var(--green-light);">Advise new treatment file</option>
+                        <option value="3D superimposition (pre/post)">3D superimposition (pre/post)</option>
+                        <option value="Airway assessment">Airway assessment</option>
+                        <option value="Arch length analysis">Arch length analysis</option>
+                        <option value="Bolton analysis">Bolton analysis</option>
+                        <option value="CBCT" style="font-weight: bold;">X-Ray: CBCT Scan</option>
+                        <option value="Diagnostic casts (plaster/stone)">Diagnostic casts (plaster/stone)</option>
+                        <option value="Digital intraoral scan">Digital intraoral scan</option>
+                        <option value="Extraoral - 3/4 view photo">Extraoral - 3/4 view photo</option>
+                        <option value="Extraoral - frontal repose photo">Extraoral - frontal repose photo</option>
+                        <option value="Extraoral - frontal smiling photo">Extraoral - frontal smiling photo</option>
+                        <option value="Extraoral - profile photo">Extraoral - profile photo</option>
+                        <option value="Extraoral examination">Extraoral examination</option>
+                        <option value="Full Mouth Periapical X-rays" style="font-weight: bold;">X-Ray: Full Mouth Periapical (FMX)</option>
+                        <option value="Functional / TMJ examination">Functional / TMJ examination</option>
+                        <option value="Habit history & assessment">Habit history & assessment</option>
+                        <option value="Hand-wrist radiograph (skeletal age)" style="font-weight: bold;">X-Ray: Hand-Wrist Radiograph</option>
+                        <option value="Intraoral - frontal photo">Intraoral - frontal photo</option>
+                        <option value="Intraoral - left buccal photo">Intraoral - left buccal photo</option>
+                        <option value="Intraoral - lower occlusal photo">Intraoral - lower occlusal photo</option>
+                        <option value="Intraoral - right buccal photo">Intraoral - right buccal photo</option>
+                        <option value="Intraoral - upper occlusal photo">Intraoral - upper occlusal photo</option>
+                        <option value="Intraoral examination">Intraoral examination</option>
+                        <option value="Mixed dentition (Moyers/Tanaka-Johnston)">Mixed dentition (Moyers/Tanaka-Johnston)</option>
+                        <option value="Nuclear Imaging (Tc99 Scan)">Nuclear Imaging (Tc99 Scan)</option>
+                        <option value="Occlusal radiograph" style="font-weight: bold;">X-Ray: Occlusal Radiograph</option>
+                        <option value="PA (frontal) cephalogram" style="font-weight: bold;">X-Ray: PA (Frontal) Cephalogram</option>
+                        <option value="Periodontal charting">Periodontal charting</option>
+                        <option value="Photogrammetry">Photogrammetry</option>
+                        <option value="Pulp vitality / sensibility test">Pulp vitality / sensibility test</option>
+                        <option value="Speech assessment">Speech assessment</option>
+                        <option value="TMJ radiograph / MRI" style="font-weight: bold;">X-Ray: TMJ Radiograph / MRI</option>
+                      </select>
+                    </div>
+                    <div style="flex: 1;">
+                      <select id="diagnostic-urgency-select">
+                        <option value="Routine">Routine</option>
+                        <option value="Urgent">Urgent</option>
+                        <option value="STAT">STAT</option>
+                      </select>
+                    </div>
+                    <div class="btn-holder">
+                      <button class="btn btn-sm" style="height:45px;" onclick="addDiagnosticRow()">+ Request</button>
+                    </div>
+                  </div>
+                  <table style="margin-top:12px;">
+                    <thead>
+                      <tr><th>Diagnostic Test Target</th><th>Urgency Status</th><th style="width: 80px; text-align: right;">Action</th></tr>
+                    </thead>
+                    <tbody id="diagnostics-list"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div id="subtab-notes" class="tab-content">
+              <div class="panel" style="margin-bottom:0;">
+                <div class="panel-header">Ongoing Clinical Notes</div>
+                <div class="panel-body">
+                  <div class="form-group">
+                    <textarea id="clinical-notes-textarea" rows="4" placeholder="Document case observations..."></textarea>
+                  </div>
+                  <div style="text-align: center; margin-bottom: 12px;">
+                    <button id="transcribe-btn" style="background: var(--green-light); color: var(--green-dark); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">🎤 Transcribe</button>
+                  </div>
+                  <div style="text-align: center;">
+                    <button class="btn" onclick="compileMasterSummary()">📋 Use Template & Compile Master Summary Report</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="subtab-records" class="tab-content">
+              <div class="panel" style="margin-bottom:0;">
+                <div class="panel-header">Comprehensive Medical History & Allergies Sheet</div>
+                <div class="panel-body">
+                  <div class="form-group">
+                    <label style="color:var(--red); font-weight:700;">🚨 SYSTEM LEVEL DETECTED ALLERGIES</label>
+                    <input type="text" id="record-allergy-input" placeholder="e.g. Penicillin, Latex, None..." onchange="updatePatientMedicalRecord()" />
+                  </div>
+                  <div class="form-group" style="margin-top:16px;">
+                    <label>Structural Baseline Diagnostic History</label>
+                    <textarea id="record-diagnostic-history" rows="4" placeholder="Enter diagnostic history..." onchange="updatePatientMedicalRecord()"></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label>Systemic Status Records</label>
+                    <textarea id="record-systemic-status" rows="4" placeholder="Enter systemic status..." onchange="updatePatientMedicalRecord()"></textarea>
+                  </div>
+                  <div style="text-align: right; margin-top: 12px;">
+                    <button class="btn btn-sm" onclick="saveMedicalRecordChanges()">💾 Save Changes</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="master-summary-injection-point"></div>
+
+          </div>
+
+        </div>
+
+      `;
+    }
+
+    function renderLeave() {
+      const rows = leaveTimeline.map(l => `
+        <tr>
+          <td><strong>${l.date}</strong></td>
+          <td>${l.officer}</td>
+          <td>${l.reason}</td>
+          <td><span class="badge ${l.status === 'APPROVED' ? 'badge-success' : 'badge-warning'}">${l.status}</span></td>
+        </tr>
+      `).join('');
+
+      return `
+        <div class="dashboard-title-row">
+          <h1>Leave Requests & Rotations</h1>
+        </div>
+        <div class="panel">
+          <div class="panel-header">My Active Leave & Coverage Log</div>
+          <div class="panel-body">
+            <table>
+              <thead>
+                <tr><th>Date Range</th><th>Coverage Officer</th><th>Reason / Log</th><th>Status</th></tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">Submit Leave Request to HOD</div>
+          <div class="panel-body">
+            <form onsubmit="handleLeaveSubmit(event)">
+              <div class="flex-row-inputs">
+                <div style="flex: 1;">
+                  <label class="label">Start Date</label>
+                  <input type="date" id="leave-start-date" required />
+                </div>
+                <div style="flex: 1;">
+                  <label class="label">End Date</label>
+                  <input type="date" id="leave-end-date" required />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="label">Coverage Officer</label>
+                <input type="text" id="leave-coverage-officer" placeholder="e.g. Maj. T. Farooq" required />
+              </div>
+              <div class="form-group">
+                <label class="label">Reason for Leave</label>
+                <textarea id="leave-reason" rows="3" placeholder="Specify context or justification for the HOD..." required></textarea>
+              </div>
+              <button type="submit" class="btn">Submit Request to HOD</button>
+            </form>
+          </div>
+        </div>
+      `;
+    }
+
+    /* ===================== CONTROLLER MACHINERY ===================== */
+    function switchSubTab(event, targetTabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+      document.getElementById(targetTabId).classList.add('active');
+      event.currentTarget.classList.add('active');
+    }
+
+    window.handleLeaveSubmit = async function(event) {
+      event.preventDefault();
+      const start = document.getElementById('leave-start-date').value;
+      const end = document.getElementById('leave-end-date').value;
+      const officer = document.getElementById('leave-coverage-officer').value;
+      const reason = document.getElementById('leave-reason').value;
+
+      if (!start || !end || !officer || !reason) {
+        alert('Please complete all leave fields.');
+        return;
+      }
+
+      try {
+        const newLeave = await api.post('/leaves/', {
+          leave_type: 'Casual Leave',
+          coverage_officer: officer,
+          reason,
+          start_date: start,
+          end_date: end
+        });
+        cachedMyLeaves = [newLeave, ...cachedMyLeaves];
+        leaveTimeline = cachedMyLeaves.map(l => ({
+          date: `${l.start_date} - ${l.end_date}`,
+          officer: l.coverage_officer || '—',
+          status: (l.status || 'PENDING').toUpperCase(),
+          reason: l.reason || '—'
+        }));
+        alert('Leave request successfully sent to the HOD.');
+        switchView('leave');
+      } catch (err) {
+        alert('Error submitting leave request: ' + err.message);
+      }
+    };
+
+    async function viewPatientProcedureHistory(patientId) {
+      let data = { full_name: "Patient", mr_number: "MR-XXXX", procedures: [] };
+      
+      try {
+        if (typeof api !== 'undefined') {
+          data = await api.get(`/patients/${patientId}/procedures`);
+        } else {
+          const match = cachedPatients.find(p => p.id === patientId);
+          if (match) {
+            data.full_name = match.full_name;
+            data.mr_number = match.mr_number;
+          }
+          // Mock data history for the patient modal view
+          data.procedures = [
+            { name: "Consultation", session_date: "2026-07-10T10:00:00Z", is_completed: true, materials_count: 2, pharmacy_count: 0, diagnostics_count: 0 },
+            { name: "Treatment planning / File analysis / Tracing", session_date: "2026-07-14T11:30:00Z", is_completed: true, materials_count: 3, pharmacy_count: 0, diagnostics_count: 4 },
+            { name: "U/L Bracketing", session_date: "2026-07-20T09:15:00Z", is_completed: true, materials_count: 5, pharmacy_count: 2, diagnostics_count: 1 }
+          ];
+        }
+        
+        const container = document.getElementById('main-root');
+        const procRows = (data.procedures || []).map(p => `
+          <tr>
+            <td><strong>${p.name}</strong></td>
+            <td>${new Date(p.session_date).toLocaleDateString()}</td>
+            <td><span class="badge ${p.is_completed ? 'badge-success' : 'badge-info'}">${p.is_completed ? 'Completed' : 'Active'}</span></td>
+            <td style="text-align:center;">${p.materials_count}</td>
+            <td style="text-align:center;">${p.pharmacy_count}</td>
+            <td style="text-align:center;">${p.diagnostics_count}</td>
+          </tr>
+        `).join('') || `<tr><td colspan="6" style="text-align:center; color:#9ca3af;">No procedures recorded for this patient.</td></tr>`;
+
+        container.innerHTML = `
+          <div class="dashboard-title-row">
+            <h1>Procedure History</h1>
+            <div class="meta-tag">${data.full_name} (${data.mr_number})</div>
+          </div>
+          <div style="margin-bottom:16px;">
+            <button class="btn btn-sm" onclick="switchView('operations')" style="height:45px;">← Back to Operations</button>
+          </div>
+          <div class="panel">
+            <div class="panel-header">All Procedures for ${data.full_name}</div>
+            <div class="panel-body">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Procedure Name</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th style="text-align:center;">Materials</th>
+                    <th style="text-align:center;">Pharmacy</th>
+                    <th style="text-align:center;">Diagnostics</th>
+                  </tr>
+                </thead>
+                <tbody>${procRows}</tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        alert("Error loading procedure history: " + err.message);
+      }
+    }
+
+    async function executeSearch() {
+      const searchInput = document.getElementById('patient-search-input');
+      const query = searchInput ? searchInput.value.trim() : '';
+
+      if (!query) {
+        alert("Please enter search query details.");
+        return;
+      }
+
+      try {
+        let patient = null;
+        if (typeof api !== 'undefined') {
+          const patients = await api.get(`/patients/?search=${encodeURIComponent(query)}`);
+          if (patients && patients.length > 0) patient = patients[0];
+        } else {
+          patient = cachedPatients.find(p => p.mr_number.toLowerCase().includes(query.toLowerCase()) || p.full_name.toLowerCase().includes(query.toLowerCase()));
+        }
+        
+        if (!patient) {
+          alert("No patient record found matching: " + query);
+          return;
+        }
+        
+        currentPatient = patient;
+        
+        document.getElementById('view-search-screen').classList.remove('active');
+        document.getElementById('view-workspace-screen').classList.add('active');
+        
+        const badgeEl = document.getElementById('active-patient-badge');
+        if (badgeEl) badgeEl.innerText = `Active Patient: ${patient.full_name} (${patient.mr_number})`;
+
+        const values = document.querySelectorAll('#view-workspace-screen .value');
+        if (values[0]) values[0].innerText = patient.full_name;
+        if (values[1]) values[1].innerText = patient.mr_number + (patient.file_number ? ' / ' + patient.file_number : '');
+        if (values[2]) values[2].innerText = patient.service_profile || '—';
+        if (values[3]) values[3].innerText = `${patient.gender || '—'} / ${patient.blood_group || '—'}`;
+        if (values[4]) values[4].innerText = patient.room || '—';
+        
+        updateAllergyAlertBox(patient.allergies);
+
+        const recordAllergyInput = document.getElementById('record-allergy-input');
+        if (recordAllergyInput) recordAllergyInput.value = patient.allergies || "";
+
+        const recordDiagHistory = document.getElementById('record-diagnostic-history');
+        if (recordDiagHistory) recordDiagHistory.value = patient.diagnostic_history || "";
+
+        const recordSystemic = document.getElementById('record-systemic-status');
+        if (recordSystemic) recordSystemic.value = patient.systemic_status || "";
+
+        const timeInEl = document.getElementById('patient-time-in');
+        if (timeInEl) timeInEl.value = patient.check_in_time ? new Date(patient.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+        const timeOutEl = document.getElementById('patient-time-out');
+        if (timeOutEl) timeOutEl.value = patient.check_out_time ? new Date(patient.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+
+        document.getElementById('step-3-container').style.display = 'none';
+        document.getElementById('procedure-select').value = "";
+        document.getElementById('master-summary-injection-point').innerHTML = '';
+
+      } catch (err) {
+        alert("Error executing record search: " + err.message);
+      }
+    }
+
+    function updateAllergyAlertBox(allergyText) {
+      const allergyBox = document.getElementById('allergy-alert-box');
+      if (allergyBox) {
+        if (allergyText && allergyText.trim() !== "") {
+          allergyBox.innerHTML = `<strong>⚠️ CRITICAL ALLERGY:</strong> ${allergyText}`;
+          allergyBox.style.display = 'block';
+        } else {
+          allergyBox.style.display = 'none';
+        }
+      }
+    }
+
+    function updatePatientMedicalRecord() {
+      if (!currentPatient) return;
+      
+      const newAllergies = document.getElementById('record-allergy-input')?.value.trim() || "";
+      const newDiagHistory = document.getElementById('record-diagnostic-history')?.value.trim() || "";
+      const newSystemic = document.getElementById('record-systemic-status')?.value.trim() || "";
+
+      currentPatient.allergies = newAllergies;
+      currentPatient.diagnostic_history = newDiagHistory;
+      currentPatient.systemic_status = newSystemic;
+
+      updateAllergyAlertBox(newAllergies);
+    }
+
+    function saveMedicalRecordChanges() {
+      updatePatientMedicalRecord();
+      alert("Medical record updated successfully!");
+    }
+
+    function returnToSearchScreen() {
+      document.getElementById('view-workspace-screen').classList.remove('active');
+      document.getElementById('view-search-screen').classList.add('active');
+      const searchInput = document.getElementById('patient-search-input');
+      if (searchInput) searchInput.focus();
+    }
+
+    /* ===================== PROCEDURAL LOGIC ===================== */
+    function applyProcedure() {
+      const procSelect = document.getElementById('procedure-select');
+      const selectedProcedure = procSelect.value;
+      if (!selectedProcedure || !PRESETS[selectedProcedure]) return;
+
+      const data = PRESETS[selectedProcedure];
+
+      // 1. Materials
+      activeMaterials = [...GLOBAL_MATERIALS, ...data.materials].sort(sortByProp('name'));
+      renderMaterialsList();
+
+      // 2. Pharmacy
+      activePharmacy = [...data.pharmacy].sort(sortByProp('med'));
+      renderPharmacyList();
+
+      // 3. Diagnostics
+      activeDiagnostics = [...data.diagnostics].sort(sortByProp('name'));
+      renderDiagnosticsList();
+
+      // 4. Notes
+      document.getElementById('clinical-notes-textarea').value = data.notes;
+
+      document.getElementById('step-3-container').style.display = 'block';
+      document.getElementById('master-summary-injection-point').innerHTML = '';
+
+      const targetSubTabName = 'subtab-diagnostics';
+      const mockEvent = { currentTarget: document.querySelector(`[onclick*="${targetSubTabName}"]`) };
+      if(mockEvent.currentTarget) {
+        switchSubTab(mockEvent, targetSubTabName);
+      }
+    }
+
+    function handleDiagnosticSelectChange(selectElem) {
+      const val = selectElem.value;
+      if (val === "Advise new treatment file" || val === "Advise new treatment") {
+        const urgencySelect = document.getElementById('diagnostic-urgency-select');
+        const currentUrgency = urgencySelect ? urgencySelect.value : "Routine";
+        
+        if (!activeDiagnostics.some(d => d.name === "Advise new treatment file")) {
+          activeDiagnostics.push({ name: "Advise new treatment file", urgency: currentUrgency });
+        }
+
+        ADVANCED_TREATMENT_ITEMS.forEach(itemName => {
+          if (!activeDiagnostics.some(d => d.name.toLowerCase() === itemName.toLowerCase())) {
+            activeDiagnostics.push({ name: itemName, urgency: currentUrgency });
+          }
+        });
+
+        activeDiagnostics.sort(sortByProp('name'));
+        renderDiagnosticsList();
+        selectElem.value = "";
+      }
+    }
+
+    /* ===================== DYNAMIC MUTATION RENDERERS ===================== */
+    function renderMaterialsList() {
+      const container = document.getElementById('materials-log-list');
+      if (activeMaterials.length === 0) {
+        container.innerHTML = '<div style="color: var(--text-muted); font-size:13px;">No clinical items logged.</div>';
+        return;
+      }
+      container.innerHTML = activeMaterials.map((m, idx) => `
+        <div class="qty-row">
+          <span>${m.name}</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="qty-val">QTY: ${m.qty}</span>
+            <button class="btn btn-sm btn-danger" style="padding: 2px 6px; font-size: 11px;" onclick="removeMaterialItem(${idx})">Remove</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addMaterialItem() {
+      const input = document.getElementById('material-input');
+      const qtyInput = document.getElementById('material-qty-input');
+      const name = input.value.trim();
+      const qty = parseInt(qtyInput.value) || 1;
+
+      if (!name) return;
+      activeMaterials.push({ name, qty });
+      activeMaterials.sort(sortByProp('name'));
+      input.value = '';
+      qtyInput.value = '1';
+      renderMaterialsList();
+    }
+
+    function removeMaterialItem(idx) {
+      activeMaterials.splice(idx, 1);
+      renderMaterialsList();
+    }
+
+    function renderPharmacyList() {
+      const container = document.getElementById('pharmacy-log-list');
+      if (activePharmacy.length === 0) {
+        container.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No medications logged.</td></tr>';
+        return;
+      }
+      container.innerHTML = activePharmacy.map(p => `
+        <tr>
+          <td><strong>${p.med}</strong></td>
+          <td>${p.dose}</td>
+          <td>${p.freq}</td>
+        </tr>
+      `).join('');
+    }
+
+    function addPharmacyItem() {
+      const medIn = document.getElementById('pharmacy-input');
+      const doseIn = document.getElementById('pharmacy-dose');
+      const freqIn = document.getElementById('pharmacy-freq');
+
+      if (!medIn.value.trim()) return;
+      activePharmacy.push({
+        med: medIn.value.trim(),
+        dose: doseIn.value.trim() || '—',
+        freq: freqIn.value.trim() || '—'
+      });
+      activePharmacy.sort(sortByProp('med'));
+
+      medIn.value = ''; doseIn.value = ''; freqIn.value = '';
+      renderPharmacyList();
+    }
+
+    function renderDiagnosticsList() {
+      const container = document.getElementById('diagnostics-list');
+      if (activeDiagnostics.length === 0) {
+        container.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No diagnostics requested.</td></tr>';
+        return;
+      }
+      container.innerHTML = activeDiagnostics.map((d, idx) => `
+        <tr>
+          <td>${d.name}</td>
+          <td><span class="badge ${d.urgency === 'STAT' ? 'badge-danger' : d.urgency === 'Urgent' ? 'badge-warning' : 'badge-info'}">${d.urgency}</span></td>
+          <td style="text-align: right;"><button class="btn btn-sm btn-danger" onclick="removeDiagnosticRow(${idx})">Remove</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function addDiagnosticRow() {
+      const testSelect = document.getElementById('diagnostic-test-select');
+      const urgencySelect = document.getElementById('diagnostic-urgency-select');
+
+      if (!testSelect.value) {
+        alert("Please select a diagnostic test template.");
+        return;
+      }
+
+      if (testSelect.value === "Advise new treatment file" || testSelect.value === "Advise new treatment") {
+        handleDiagnosticSelectChange(testSelect);
+        return;
+      }
+
+      activeDiagnostics.push({ name: testSelect.value, urgency: urgencySelect.value });
+      activeDiagnostics.sort(sortByProp('name'));
+      
+      testSelect.value = '';
+      renderDiagnosticsList();
+    }
+
+    function removeDiagnosticRow(idx) {
+      const removedItem = activeDiagnostics[idx];
+      activeDiagnostics.splice(idx, 1);
+
+      if (removedItem && removedItem.name === "Advise new treatment file") {
+        activeDiagnostics = activeDiagnostics.filter(item => 
+          !ADVANCED_TREATMENT_ITEMS.some(adv => adv.toLowerCase() === item.name.toLowerCase())
+        );
+      }
+
+      renderDiagnosticsList();
+    }
+
+    /* ===================== SUMMARY CONTROLLER ===================== */
+    function compileMasterSummary() {
+      if (!currentPatient) return;
+
+      const procedureTitle = document.getElementById('procedure-select').value || "Routine Clinical Assessment";
+      const notesValue = document.getElementById('clinical-notes-textarea').value || "No detailed observation metrics added.";
+      const timeIn = document.getElementById('patient-time-in').value;
+      const timeOut = document.getElementById('patient-time-out').value;
+
+      const materialsHtml = activeMaterials.map(m => `<div>• ${m.name} <span class="qty-val">QTY: ${m.qty}</span></div>`).join('') || "No clinical components allocated.";
+      const pharmacyRows = activePharmacy.map(p => `<tr><td>${p.med}</td><td>${p.dose}</td><td>${p.freq}</td></tr>`).join('') || '<tr><td colspan="3">None ordered.</td></tr>';
+      const diagnosticsRows = activeDiagnostics.map(d => `<tr><td>${d.name}</td><td>${d.urgency}</td></tr>`).join('') || '<tr><td colspan="2">No systemic diagnostic runs flagged.</td></tr>';
+
+      const targetReportBox = document.getElementById('master-summary-injection-point');
+      targetReportBox.innerHTML = `
+        <div class="summary-sheet">
+          <div class="summary-header print-hide">
+            <h2>ARMED FORCES INSTITUTE OF DENTISTRY</h2>
+            <p style="font-size:12px; font-weight:600; text-transform:uppercase; color:var(--text-muted); margin-top:4px;">Official Compiled Patient Treatment & Discharge Order</p>
+          </div>
+          
+          <div class="summary-grid print-hide">
+            <div>
+              <p><strong>Patient Name:</strong> ${currentPatient.full_name}</p>
+              <p><strong>MR Number:</strong> ${currentPatient.mr_number}</p>
+              <p><strong>Rank Profile:</strong> ${currentPatient.service_profile || 'Civ / Dependent'}</p>
+            </div>
+            <div style="text-align:right;">
+              <p><strong>Session Timeline:</strong> ${timeIn} - ${timeOut}</p>
+              <p><strong>Allergy Profile:</strong> <span style="color:var(--red); font-weight:700;">${currentPatient.allergies || 'NKA'}</span></p>
+              <p><strong>Attending Specialist:</strong> ${LOGGED_IN_DOCTOR}</p>
+            </div>
+          </div>
+
+          <div class="summary-field">
+            <label>Target Clinical Operation performed</label>
+            <div><strong>${procedureTitle}</strong></div>
+          </div>
+
+          <div class="summary-field print-hide">
+            <label>Materials Used Log</label>
+            <div>${materialsHtml}</div>
+          </div>
+
+          <div class="summary-field">
+            <label>Prescribed Pharmacy Logs</label>
+            <div style="background:#fff; padding:0;">
+              <table style="width:100%;">
+                <thead><tr><th>Medication</th><th>Dose</th><th>Frequency</th></tr></thead>
+                <tbody>${pharmacyRows}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="summary-field">
+            <label>Diagnostics Actions Ordered</label>
+            <div style="background:#fff; padding:0;">
+              <table style="width:100%;">
+                <thead><tr><th>Diagnostic Screening Target</th><th>Urgency Threshold</th></tr></thead>
+                <tbody>${diagnosticsRows}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="summary-field">
+            <label>Specialist Progress Summary & Care Directives</label>
+            <div>${notesValue}</div>
+          </div>
+
+          <div style="text-align:center; margin-top:30px;" class="print-action-row">
+            <button class="btn btn-danger" style="background:var(--green-dark);" onclick="window.print()">🖨️ Dispatch & Print Structural Record</button>
+          </div>
+        </div>
+      `;
+
+      targetReportBox.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    /* ===================== SYSTEM APP ROUTER ===================== */
+    function switchView(pageId) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      const activeBtn = document.querySelector(`[data-page="${pageId}"]`);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const mainRoot = document.getElementById('main-root');
+      if (pageId === 'dashboard') {
+        mainRoot.innerHTML = renderDashboard();
+      } else if (pageId === 'operations') {
+        mainRoot.innerHTML = renderOperations();
+      } else if (pageId === 'doctor-analytics') {
+        mainRoot.innerHTML = renderDoctorAnalytics();
+        processAndRenderDoctorAnalytics();
+      } else if (pageId === 'leave') {
+        mainRoot.innerHTML = renderLeave();
+      }
+    }
+
+    function handleLogout() {
+      if (typeof window.logout === 'function') {
+        window.logout();
+      } else if (typeof logout === 'function') {
+        logout();
+      } else {
+        window.location.replace('Login.html');
+      }
+    }
+
+    function confirmTimeOut() {
+      if (!currentPatient) {
+        alert("No active patient selected.");
+        return;
+      }
+      const timeOutInput = document.getElementById('patient-time-out');
+      const timeOut = timeOutInput.value || '—';
+      if (confirm(`Confirm session completion with Time Out: ${timeOut}? This will save the session summary.`)) {
+        api.patch(`/patients/${currentPatient.id}/status`, { status: 'COMPLETED' })
+          .then(updated => {
+            currentPatient = updated;
+            const updatedTimeOut = updated.check_out_time ? new Date(updated.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+            timeOutInput.value = updatedTimeOut;
+            compileMasterSummary();
+          })
+          .catch(err => alert(err.message || "Unable to complete session"));
+      }
+    }
+
+    function openAddProcedureModal() {
+      const procName = prompt("Enter new procedure name:");
+      if (!procName || procName.trim() === "") return;
+      
+      const duration = parseInt(prompt("Enter procedure duration (minutes):")) || 30;
+      const cleanName = procName.trim();
+      
+      if (!PRESETS[cleanName]) {
+        PRESETS[cleanName] = {
+          materials: [],
+          pharmacy: [],
+          diagnostics: [],
+          notes: `Procedure performed: ${cleanName}.`
+        };
+      }
+      
+      const newOption = document.createElement('option');
+      newOption.value = cleanName;
+      newOption.text = cleanName;
+      const select = document.getElementById('procedure-select');
+      select.appendChild(newOption);
+      select.value = cleanName;
+      applyProcedure();
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      const navContainer = document.getElementById('nav-container');
+      navContainer.innerHTML = PAGES.map(p => `
+        <button class="nav-item" data-page="${p.id}" onclick="switchView('${p.id}')">${p.label}</button>
+      `).join('');
+
+      await loadDashboardData();
+      switchView('dashboard');
+    });
+  </script>
+</body>
+</html>

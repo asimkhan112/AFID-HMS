@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AFID Dental Staff Portal</title>
+  <style>
+    /* ---------------- DESIGN SYSTEM & CONSTANTS ---------------- */
+    :root {
+      --green-dark: #053c2a;
+      --green-med: #0f6244;
+      --green-accent: #10b981;
+      --green-soft: #f0fdf4;
+      --red: #991b1b;
+      --red-soft: #fee2e2;
+      --amber: #b45309;
+      --amber-soft: #fef3c7;
+      --bg: #f3f7f5;
+      --border: #cbd5e1;
+      --text-dark: #1f2937;
+      --text-muted: #6b7280;
+      --card-bg: #ffffff;
+      --mint-container: #e6f0eb;
+
+      /* Premium Depth & Hover Transitions */
+      --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 8px 20px rgba(15, 98, 68, 0.08);
+      --shadow-lg: 0 12px 28px rgba(3, 37, 26, 0.15);
+      --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      background: var(--bg);
+      color: var(--text-dark);
+      height: 100vh;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+      overflow-x: hidden;
+    }
+
+    /* ---------------- MAIN STRUCTURAL LAYOUT ---------------- */
+    .app-container {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    /* ---------------- SIDEBAR ---------------- */
+    .sidebar {
+      width: 270px;
+      flex-shrink: 0;
+      background: #03251a;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px 20px;
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: 4px 0 24px rgba(3, 37, 26, 0.15);
+      z-index: 10;
+    }
+
+    .sidebar-header {
+      margin-bottom: 24px;
+      padding-left: 12px;
+    }
+    .sidebar-header .brand {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    .sidebar-header .sub {
+      font-size: 12px;
+      color: #8fa89b;
+      margin-top: 4px;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+
+    .sidebar-menu-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+      padding-left: 12px;
+    }
+
+    .nav-menu {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .nav-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 18px;
+      background: transparent;
+      border: none;
+      border-radius: 10px;
+      color: #b5c7be;
+      font-size: 14px;
+      text-align: left;
+      cursor: pointer;
+      font-family: inherit;
+      transition: var(--transition-smooth);
+    }
+
+    .nav-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      transform: translateY(-2px) translateX(4px);
+    }
+    .nav-btn:active {
+      transform: translateY(1px) translateX(2px);
+    }
+    .nav-btn.active {
+      background: var(--green-dark);
+      color: #fff;
+      border-left: 4px solid var(--green-accent);
+      font-weight: 600;
+      box-shadow: inset 2px 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .sidebar-footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding-top: 20px;
+      padding-left: 12px;
+    }
+    .logged-user-label { font-size: 11px; color: #6b8f7d; font-weight: 600; text-transform: uppercase; }
+    .logged-user-name { font-size: 14px; font-weight: 700; margin-top: 2px; color: #ffffff; }
+    .logged-user-role { font-size: 12px; color: #6b8f7d; margin-bottom: 12px; }
+
+    .logout-btn {
+      width: 100%;
+      background-color: var(--red);
+      color: white;
+      border: none;
+      padding: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: var(--transition-smooth);
+      box-shadow: var(--shadow-sm);
+    }
+    .logout-btn:hover {
+      background-color: #7f1d1d;
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* ---------------- MAIN VIEWPORT & HEADER ---------------- */
+    .main-viewport {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .top-utility-bar {
+      height: 60px;
+      background-color: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 32px;
+      flex-shrink: 0;
+      box-shadow: var(--shadow-sm);
+    }
+    .search-wrapper { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 14px; }
+    .search-input { border: none; outline: none; width: 280px; color: var(--text-dark); font-size: 14px; background: transparent; }
+    .meta-status-group { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #4b5563; font-weight: 600; }
+    .live-indicator { background-color: var(--green-dark); color: #ffffff; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.5px; }
+
+    /* Workspace */
+    .workspace {
+      flex: 1;
+      padding: 24px 32px;
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 60px);
+      overflow: hidden;
+    }
+
+    .header-group {
+      border-bottom: 2px dashed var(--border);
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+      flex-shrink: 0;
+    }
+    .header-group h1 { font-size: 28px; font-weight: 800; color: var(--green-dark); letter-spacing: -0.5px; }
+    .header-group p { font-size: 13px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
+
+    .grid-split {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 20px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .dashboard-huge-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      padding: 10px;
+    }
+
+    .panel {
+      background: var(--mint-container);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+      transition: var(--transition-smooth);
+    }
+
+    .panel-dashboard-huge {
+      width: 100%;
+      height: 100%;
+      max-width: 1000px;
+      padding: 32px;
+      justify-content: center;
+    }
+
+    .panel:hover {
+      box-shadow: var(--shadow-md);
+    }
+
+    .panel-header {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--green-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.75px;
+      margin-bottom: 12px;
+      border-bottom: 2px solid rgba(15, 98, 68, 0.15);
+      padding-bottom: 8px;
+      flex-shrink: 0;
+    }
+
+    .panel-header-huge {
+      font-size: 18px;
+      letter-spacing: 1px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+    }
+
+    .panel-body {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: var(--shadow-sm);
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .panel-body-huge {
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 24px;
+    }
+
+    .form-row { margin-bottom: 12px; }
+    .form-row label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; }
+
+    .form-row-huge { margin-bottom: 24px; }
+    .form-row-huge label { font-size: 14px; margin-bottom: 8px; letter-spacing: 0.5px; }
+
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--text-dark);
+      background-color: #ffffff;
+      transition: var(--transition-smooth);
+    }
+
+    .input-huge {
+      padding: 16px 20px;
+      font-size: 16px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--green-med);
+      box-shadow: 0 0 0 3px rgba(15, 98, 68, 0.15);
+      background-color: #fbfdfc;
+    }
+
+    /* Tables */
+    .table-container {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      text-align: left;
+      background: var(--green-dark);
+      padding: 12px 14px;
+      font-weight: 600;
+      color: #fff;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    tbody td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; color: #374151; transition: var(--transition-smooth); }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:nth-child(even) td { background-color: #fcfdfd; }
+    tbody tr:hover td { background-color: #f1f7f4 !important; }
+
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+    .badge-active { background-color: var(--green-soft); color: var(--green-dark); }
+    .badge-waiting { background-color: var(--amber-soft); color: var(--amber); }
+    .badge-completed { background-color: #f3f4f6; color: #4b5563; }
+
+    .btn-primary {
+      background-color: var(--green-dark);
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 11px 18px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: var(--transition-smooth);
+      box-shadow: var(--shadow-sm);
+    }
+    .btn-primary:hover {
+      background-color: var(--green-med);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      border: 1px solid var(--border);
+      color: #4b5563;
+      border-radius: 6px;
+      padding: 11px 18px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: var(--transition-smooth);
+    }
+    .btn-secondary:hover { background-color: #f9fafb; transform: translateY(-2px); }
+
+    .action-link {
+      background-color: var(--green-dark);
+      color: #ffffff;
+      border: none;
+      padding: 5px 11px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+    .action-link:hover {
+      background-color: var(--green-accent);
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* --- MODAL STYLES --- */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+    }
+    .modal-box {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background-color: var(--green-dark);
+      color: #ffffff;
+      padding: 14px 24px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: var(--shadow-lg);
+      opacity: 0;
+      transform: translateY(15px);
+      transition: var(--transition-smooth);
+      pointer-events: none;
+      z-index: 100;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <script src="api.js"></script>
+
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-header">
+        <div class="brand">AFID</div>
+        <div class="sub">Dental Portal</div>
+      </div>
+
+      <div class="sidebar-menu-label">Navigation</div>
+      <nav class="nav-menu" id="nav-container"></nav>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="logged-user-label">Logged In:</div>
+      <div class="logged-user-name">Fatima Asif</div>
+      <div class="logged-user-role">Role: Reception Ops Staff</div>
+      <button class="logout-btn" onclick="logout()">← Logout Portal</button>
+    </div>
+  </aside>
+
+  <main class="main-viewport">
+    <div class="top-utility-bar">
+      <div class="search-wrapper">
+        <span>🔍</span>
+        <input type="text" class="search-input" value="MR-2026-0848" placeholder="Search records, patients, allocations..." />
+      </div>
+      <div class="meta-status-group">
+        <span id="live-clock">Tuesday, 21 July 2026</span>
+        <span class="live-indicator">+ LIVE</span>
+      </div>
+    </div>
+
+    <div class="workspace" id="main-root"></div>
+  </main>
+</div>
+
+<!-- Dynamic Modal Container -->
+<div id="modal-root"></div>
+
+<script>
+  // Safe Fallback for API
+  if (typeof window.api === 'undefined') {
+    window.api = {
+      get: async () => null,
+      post: async () => null,
+      patch: async () => null
+    };
+  }
+
+  // Removed Next Appointment tab from sidebar navigation list
+  const PAGES = [
+    { id: 'dashboard', label: 'Executive Dashboard' },
+    { id: 'patient_reg', label: 'Patient Registration' },
+    { id: 'patient_mgmt', label: 'Patient Management' },
+    { id: 'doctor_mgmt', label: 'Doctor Management' }
+  ];
+
+  /* ---------------- MASTER DATA MODEL ---------------- */
+  let patientLogs = [];
+  let doctorAllocations = [];
+
+  function normalizePatient(p) {
+    const status = (p.status || 'WAITING').toString().toUpperCase();
+    const checkIn = p.check_in_time ? new Date(p.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+    const checkOut = p.check_out_time ? new Date(p.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+    return {
+      id: p.id,
+      mr: p.mr_number,
+      file: p.file_number,
+      name: p.full_name,
+      cnic: p.cnic || '—',
+      location: p.room || '—',
+      rotation: p.procedure_category || '—',
+      assignedDoctor: p.assigned_doctor || '—',
+      time: p.registered_at ? new Date(p.registered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00 AM',
+      apptDate: p.registered_at ? new Date(p.registered_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      timeIn: checkIn,
+      timeOut: checkOut,
+      status,
+      badge: status === 'ACTIVE' ? 'badge-active' : status === 'COMPLETED' ? 'badge-completed' : 'badge-waiting'
+    };
+  }
+
+  function normalizeAllocation(a) {
+    return {
+      id: a.id,
+      name: a.doctor_name || a.name,
+      room: a.room || a.room_name,
+      department: a.department || 'Oral Exam',
+      chair: a.chair || 'Chair 1'
+    };
+  }
+
+  async function loadStaffData() {
+    try {
+      const [patients, allocations] = await Promise.all([
+        api.get('/patients/').catch(() => []),
+        api.get('/allocations').catch(() => [])
+      ]);
+
+      patientLogs = (patients || []).map(normalizePatient);
+      doctorAllocations = (allocations || []).map(normalizeAllocation);
+
+      if (!doctorAllocations.length) {
+        doctorAllocations = [
+          { id: 1, name: 'Dr. Asadullah Khan', room: 'Room 10', department: 'Orthodontics', chair: 'Chair 1' },
+          { id: 2, name: 'Dr. Rehan M.', room: 'Room 11', department: 'Orthodontics', chair: 'Chair 2' },
+          { id: 3, name: 'Dr. Sana K.', room: 'Room 12', department: 'Orthodontics', chair: 'Chair 3' }
+        ];
+      }
+    } catch (e) {
+      console.warn('Failed to load staff portal data:', e);
+      patientLogs = [];
+      doctorAllocations = [];
+    }
+  }
+
+  /* ==================== VIEWS ==================== */
+
+  function renderDashboard() {
+    return `
+    <div class="dashboard-huge-container">
+      <div class="panel panel-dashboard-huge">
+        <div class="panel-header panel-header-huge">Staff Registration Information</div>
+        <div class="panel-body panel-body-huge">
+          <div class="form-row form-row-huge">
+            <label>Active Staff Operator</label>
+            <input type="text" class="input-huge" value="Fatima Asif" readonly />
+          </div>
+          <div class="form-row form-row-huge">
+            <label>Operational Duty Terminal ID</label>
+            <input type="text" class="input-huge" value="TERM-AFID-9942" readonly />
+          </div>
+          <div class="form-row form-row-huge">
+            <label>Authorized Access Level</label>
+            <select id="staff-auth-level" class="input-huge">
+              <option value="receptionist" selected>Receptionist (Senior Operational Staff)</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  }
+
+  function renderPatientRegistration() {
+    const docOptions = doctorAllocations.map(d => `<option value="${d.name}">${d.name} (${d.room})</option>`).join('');
+    const roomOptions = Array.from({ length: 10 }, (_, i) => 10 + i)
+            .map(r => `<option value="Room ${r}">Room ${r}</option>`).join('');
+
+    return `
+    <div class="header-group">
+      <h1>Patient Registration</h1>
+      <p>Register new incoming patients into the clinical queue.</p>
+    </div>
+
+    <div style="max-width: 700px; margin: 0 auto; width: 100%;">
+      <div class="panel">
+        <div class="panel-header">Dental Registration Form</div>
+        <div class="panel-body">
+          <form id="patient-form" onsubmit="addPatient(event)">
+            <div class="form-row">
+              <label>MR Number</label>
+              <input type="text" id="p-mr" value="MR-2026-1188" placeholder="e.g. MR-2026-0848" required />
+            </div>
+            <div class="form-row">
+              <label>File Number</label>
+              <input type="text" id="p-file" value="F-10380" placeholder="e.g. F-10299" required />
+            </div>
+            <div class="form-row">
+              <label>Full Name / Rank</label>
+              <input type="text" id="p-name" value="Maj. Imran Raza" placeholder="e.g. Lt. Col. Sara Khan" required />
+            </div>
+            <div class="form-row">
+              <label>CNIC</label>
+              <input type="text" id="p-cnic" value="35202-8877665-3" placeholder="35202-1234567-9" required />
+            </div>
+            <div class="form-row">
+              <label>Target Room (Rooms 10-19)</label>
+              <select id="p-room" required>${roomOptions}</select>
+            </div>
+            <div class="form-row">
+              <label>Procedure Category</label>
+              <select id="p-procedure" required>
+                <option value="Consultation" selected>Consultation</option>
+                <option value="Follow-up Treatment">Follow-up Treatment</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Assigned Dentist</label>
+              <select id="p-doctor" required>${docOptions}</select>
+            </div>
+
+            <div style="display:flex; gap:8px; margin-top:20px;">
+              <button type="submit" class="btn-primary" style="flex:2;">Register Patient</button>
+              <button type="button" class="btn-secondary" style="flex:1;" onclick="document.getElementById('patient-form').reset()">Clear Form</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  `;
+  }
+
+  function renderPatientManagement() {
+    const tableRows = patientLogs.map((p, index) => `
+    <tr>
+      <td><strong>${p.mr}</strong></td>
+      <td><strong>${p.file}</strong></td>
+      <td><strong>${p.name}</strong></td>
+      <td>${p.cnic}</td>
+      <td>${p.location}</td>
+      <td>${p.rotation}</td>
+      <td><strong style="color:var(--green-dark);">${p.assignedDoctor || 'Unassigned'}</strong></td>
+      <td>${p.apptDate || '2026-07-21'} | ${p.time}</td>
+      <td><strong style="color:var(--green-med);">${p.timeIn}</strong></td>
+      <td><strong style="color:var(--red);">${p.timeOut}</strong></td>
+      <td><span class="badge ${p.badge}">${p.status}</span></td>
+      <td>
+        <button class="action-link" onclick="openNextAppointmentModal('${p.mr}', '${p.name}', '${p.assignedDoctor}')" style="background:var(--green-dark); margin-right:4px;">+ Next Appt</button>
+        ${p.status === 'WAITING' ? `
+          <button class="action-link" onclick="startProcedure(${index})" style="background:#0f6244;">Start</button>
+        ` : p.status === 'ACTIVE' ? `
+          <button class="action-link" onclick="completeProcedure(${index})" style="background:#10b981;">Complete</button>
+        ` : `
+          <span style="color:#9ca3af; font-size:11px; font-weight:700;">Done</span>
+        `}
+      </td>
+    </tr>
+  `).join('');
+
+    return `
+    <div class="header-group">
+      <h1>Patient Management & Doctor Queues</h1>
+      <p>Coordinate active dental patients, track doctor session timings, and schedule follow-up appointments directly in line.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">Active Doctor Queues & Appointment Register</div>
+      <div class="panel-body">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>MR No.</th>
+                <th>File No.</th>
+                <th>Name / Rank</th>
+                <th>CNIC</th>
+                <th>Room</th>
+                <th>Procedure</th>
+                <th>Doctor Queue</th>
+                <th>Appt Date & Time</th>
+                <th>Time In</th>
+                <th>Time Out</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  }
+
+  function renderDoctorManagement() {
+    const docRows = doctorAllocations.map(d => {
+      // Calculate real-time dynamic doctor appointment queues directly from Patient Logs
+      const doctorQueue = patientLogs.filter(p => p.assignedDoctor === d.name);
+      const waitingCount = doctorQueue.filter(p => p.status === 'WAITING').length;
+      const activeCount = doctorQueue.filter(p => p.status === 'ACTIVE').length;
+      const nextAppt = doctorQueue.find(p => p.status === 'WAITING');
+
+      return `
+      <tr>
+        <td><strong>${d.name}</strong></td>
+        <td>${d.room}</td>
+        <td>${d.department}</td>
+        <td><span class="badge badge-active">${activeCount} Active</span></td>
+        <td><span class="badge badge-waiting">${waitingCount} Waiting</span></td>
+        <td>${nextAppt ? `<strong>${nextAppt.name}</strong> (${nextAppt.time})` : '<span style="color:#9ca3af;">No upcoming appts</span>'}</td>
+      </tr>
+      `;
+    }).join('');
+
+    return `
+    <div class="header-group">
+      <h1>Doctor Management & Queue Allocations</h1>
+      <p>Real-time doctor station assignments and live appointment queue monitoring.</p>
+    </div>
+
+    <div class="grid-split">
+      <div class="panel">
+        <div class="panel-header">Room Allocation & Chair Setup</div>
+        <div class="panel-body">
+          <form onsubmit="addDoctorAllocation(event)">
+            <div class="form-row">
+              <label>Doctor Name</label>
+              <input type="text" id="d-name" value="Dr. Tariq Mahmood" required />
+            </div>
+            <div class="form-row">
+              <label>Assigned Room</label>
+              <select id="d-room">
+                <option value="Room 15">Room 15</option>
+                <option value="Room 16">Room 16</option>
+              </select>
+            </div>
+            <button type="submit" class="btn-primary" style="margin-top:12px;">Assign Allocation</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">Active Doctor Matrix & Live Queue Status</div>
+        <div class="panel-body">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Doctor Name</th>
+                  <th>Assigned Room</th>
+                  <th>Department</th>
+                  <th>Active Sessions</th>
+                  <th>In Queue</th>
+                  <th>Next Scheduled Appt</th>
+                </tr>
+              </thead>
+              <tbody>${docRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  }
+
+  /* --- APPOINTMENT MODAL LOGIC (INLINE IN PATIENT MANAGEMENT) --- */
+  function openNextAppointmentModal(mr, name, doctor) {
+    const today = new Date().toISOString().split('T')[0];
+    const modalHTML = `
+      <div class="modal-backdrop" id="appt-modal">
+        <div class="modal-box">
+          <h2 style="font-size:18px; font-weight:800; color:var(--green-dark); margin-bottom:4px;">Schedule Next Appointment</h2>
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Scheduling follow-up for <strong>${name} (${mr})</strong></p>
+
+          <form onsubmit="saveNextAppointment(event, '${mr}', '${name}', '${doctor}')">
+            <div class="form-row">
+              <label>Assigned Doctor (Doctor Continuity Enforced)</label>
+              <input type="text" value="${doctor}" readonly style="background:#f1f5f9; cursor:not-allowed; font-weight:700;" />
+            </div>
+
+            <div class="form-row">
+              <label>Procedure Category</label>
+              <select id="appt-procedure" required>
+                <option value="Follow-up Treatment" selected>Follow-up Treatment</option>
+                <option value="Consultation">Consultation</option>
+                <option value="Root Canal Stage 2">Root Canal Stage 2</option>
+                <option value="Scaling & Polishing">Scaling & Polishing</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <label>Appointment Date</label>
+              <input type="date" id="appt-date" value="${today}" min="${today}" required />
+            </div>
+
+            <div class="form-row">
+              <label>Appointment Time</label>
+              <input type="time" id="appt-time" value="10:30" required />
+            </div>
+
+            <div style="display:flex; gap:8px; margin-top:20px;">
+              <button type="submit" class="btn-primary" style="flex:2;">Confirm & Queue Patient</button>
+              <button type="button" class="btn-secondary" style="flex:1;" onclick="closeModal()">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    document.getElementById('modal-root').innerHTML = modalHTML;
+  }
+
+  function closeModal() {
+    document.getElementById('modal-root').innerHTML = '';
+  }
+
+  async function saveNextAppointment(e, mr, name, doctor) {
+    e.preventDefault();
+    const date = document.getElementById('appt-date').value;
+    const rawTime = document.getElementById('appt-time').value;
+    const procedure = document.getElementById('appt-procedure').value;
+
+    const [h, m] = rawTime.split(':');
+    const formattedTime = new Date(0, 0, 0, h, m).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const patientIndex = patientLogs.findIndex(p => p.mr === mr);
+    if (patientIndex !== -1) {
+      const patient = patientLogs[patientIndex];
+      try {
+        const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'WAITING' });
+        patientLogs[patientIndex] = normalizePatient(updated);
+        patientLogs[patientIndex].time = formattedTime;
+        patientLogs[patientIndex].apptDate = date;
+        patientLogs[patientIndex].rotation = procedure;
+      } catch (error) {
+        showToast(error.message || 'Unable to queue next appointment');
+        return;
+      }
+    } else {
+      patientLogs.unshift({
+        id: Date.now(),
+        mr: mr,
+        file: 'F-' + Math.floor(10000 + Math.random() * 90000),
+        name: name,
+        cnic: '35202-0000000-0',
+        location: 'Room 12',
+        rotation: procedure,
+        assignedDoctor: doctor,
+        time: formattedTime,
+        apptDate: date,
+        timeIn: '—',
+        timeOut: '—',
+        status: 'WAITING',
+        badge: 'badge-waiting'
+      });
+    }
+
+    closeModal();
+    switchView('patient_mgmt');
+    showToast(`Next appointment booked for ${date} (${formattedTime}) under ${doctor}!`);
+  }
+
+  function showToast(msg) {
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.innerText = msg;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2400);
+  }
+
+  /* ==================== ACTIONS ==================== */
+
+  async function addPatient(e) {
+    e.preventDefault();
+    const mr = document.getElementById('p-mr').value;
+    const file = document.getElementById('p-file').value;
+    const name = document.getElementById('p-name').value;
+    const cnic = document.getElementById('p-cnic').value;
+    const room = document.getElementById('p-room').value;
+    const rotation = document.getElementById('p-procedure').value;
+    const doctor = document.getElementById('p-doctor').value;
+
+    try {
+      const created = await api.post('/patients/', {
+        mr_number: mr,
+        file_number: file,
+        full_name: name,
+        cnic,
+        room,
+        assigned_doctor: doctor,
+        procedure_category: rotation
+      });
+
+      patientLogs.unshift(normalizePatient(created));
+      switchView('patient_mgmt');
+      showToast(`Registered & Queued ${name}`);
+    } catch (error) {
+      showToast(error.message || 'Unable to register patient');
+    }
+  }
+
+  async function startProcedure(index) {
+    const patient = patientLogs[index];
+    if (!patient) return;
+
+    try {
+      const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'ACTIVE' });
+      patientLogs[index] = normalizePatient(updated);
+      switchView('patient_mgmt');
+      showToast(`Time In recorded`);
+    } catch (error) {
+      showToast(error.message || 'Unable to start procedure');
+    }
+  }
+
+  async function completeProcedure(index) {
+    const patient = patientLogs[index];
+    if (!patient) return;
+
+    try {
+      const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'COMPLETED' });
+      patientLogs[index] = normalizePatient(updated);
+      switchView('patient_mgmt');
+      showToast(`Time Out recorded`);
+    } catch (error) {
+      showToast(error.message || 'Unable to complete procedure');
+    }
+  }
+
+  async function addDoctorAllocation(e) {
+    e.preventDefault();
+    const name = document.getElementById('d-name').value;
+    const room = document.getElementById('d-room').value;
+
+    try {
+      const created = await api.post('/allocations', {
+        doctor_name: name,
+        room,
+        department: 'Oral Exam',
+        chair: 'Chair 1'
+      });
+      doctorAllocations.unshift(normalizeAllocation(created));
+      switchView('doctor_mgmt');
+      showToast(`Allocation created for ${name}`);
+    } catch (error) {
+      showToast(error.message || 'Unable to create allocation');
+    }
+  }
+
+  /* ==================== CONTROLLER ==================== */
+
+  function switchView(pageId) {
+    const container = document.getElementById('main-root');
+    if (pageId === 'dashboard') container.innerHTML = renderDashboard();
+    else if (pageId === 'patient_reg') container.innerHTML = renderPatientRegistration();
+    else if (pageId === 'patient_mgmt') container.innerHTML = renderPatientManagement();
+    else if (pageId === 'doctor_mgmt') container.innerHTML = renderDoctorManagement();
+
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.page === pageId);
+    });
+  }
+
+  function initApp() {
+    const navContainer = document.getElementById('nav-container');
+    navContainer.innerHTML = PAGES.map(p => `
+      <button class="nav-btn" data-page="${p.id}" onclick="switchView('${p.id}')">
+        <span>${p.label}</span>
+      </button>
+    `).join('');
+  }
+
+  window.onload = async () => {
+    initApp();
+    await loadStaffData();
+    switchView('patient_mgmt');
+  };
+</script>
+
+</body>
+</html>
