@@ -308,7 +308,7 @@
   async function handleLeaveResolve(id, status) {
     showToast(`Updating leave request to ${status}...`);
     try {
-      await api.patch(`/leaves/${id}/status`, { status });
+      await api.patch(`/leaves/${id}/status`, { status: status.toUpperCase() });
       cachedLeaves = cachedLeaves.filter(l => l.id !== id);
       renderView();
     } catch (e) {
@@ -359,12 +359,13 @@
       id: room.id || room.room_name,
       status: mapped,
       status_display: mapped === 'busy' ? 'In Procedure' : mapped === 'consultation' ? 'Consultation' : 'Available',
+      status_class: mapped === 'busy' ? 'status-busy' : mapped === 'consultation' ? 'status-consult' : 'status-avail',
       time_in_mins: room.time_in_mins || 0,
       approved: !!room.approved,
-      patient_queue: room.queue_count || room.patient_queue || 0,
+      patient_queue: room.queue_count || 0,
       room_name: room.room_name || room.room || 'Room',
       assigned_doctor: room.assigned_doctor || '—',
-      current_procedure: room.current_case || room.current_procedure || '—',
+      current_procedure: room.current_case || '—',
       patient_mr: room.patient_mr || '—'
     };
   }
@@ -392,10 +393,13 @@
       cachedStaff = staff || [];
       cachedLeaves = (leaves || []).map(l => ({
         id: l.id,
-        requester_name: l.requester_name || 'Unknown',
+        requester_id: l.requester_id,
+        requester_name: l.requester_name || `User #${l.requester_id}`,
+        leave_type: l.leave_type,
         start_date: l.start_date,
         end_date: l.end_date,
-        reason: l.reason || '—'
+        reason: l.reason || '—',
+        status: l.status
       }));
 
       const patientList = (await api.get('/patients/')) || [];
@@ -1117,7 +1121,7 @@
                   <td>${r.assigned_doctor}</td>
                   <td>${r.current_procedure} <small>(${r.patient_mr})</small></td>
                   <td>${r.patient_queue}</td>
-                  <td><span class="status-pill status-${r.status}">${r.status_display} (${r.time_in_mins}m)</span></td>
+                  <td><span class="status-pill ${r.status_class}">${r.status_display} (${r.time_in_mins}m)</span></td>
                   <td>
                     ${r.status !== 'available'
             ? `<button class="btn-action btn-complete" onclick="completeProcedure(${r.id})">Complete</button>`
@@ -1178,14 +1182,27 @@
   }
 
   function renderLeavesView() {
+    const pendingLeaves = (cachedLeaves || []).filter(l => (l.status || '').toUpperCase() === 'PENDING');
+    const approvedCount = (cachedLeaves || []).filter(l => (l.status || '').toUpperCase() === 'APPROVED').length;
+    
     return `
       <div class="container-card">
         <div class="container-title">Leave Approvals</div>
+        <div class="metrics-row" style="margin-bottom: 20px; grid-template-columns: repeat(2, 1fr);">
+          <div class="metric-card" style="padding: 16px;">
+            <div class="metric-number" style="font-size: 24px;">${pendingLeaves.length}</div>
+            <div style="font-size: 12px; color: var(--text-muted);">Pending Review</div>
+          </div>
+          <div class="metric-card" style="padding: 16px;">
+            <div class="metric-number" style="font-size: 24px;">${approvedCount}</div>
+            <div style="font-size: 12px; color: var(--text-muted);">Approved Leaves</div>
+          </div>
+        </div>
         <div class="inner-card">
           <table>
             <thead><tr><th>Requester</th><th>Dates</th><th>Reason</th><th>Actions</th></tr></thead>
             <tbody>
-              ${cachedLeaves.map(l => `
+              ${pendingLeaves.length ? pendingLeaves.map(l => `
                 <tr>
                   <td><strong>${l.requester_name}</strong></td>
                   <td>${l.start_date} to ${l.end_date}</td>
@@ -1195,7 +1212,7 @@
                     <button class="btn-action btn-reject" onclick="handleLeaveResolve(${l.id}, 'Rejected')">Reject</button>
                   </td>
                 </tr>
-              `).join('')}
+              `).join('') : '<tr><td colspan="4" style="text-align:center; color:#6b7280;">No pending leave requests.</td></tr>'}
             </tbody>
           </table>
         </div>
