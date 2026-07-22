@@ -84,6 +84,7 @@
     .patient-details-grid .value { font-size: 14px; font-weight: 600; color: var(--text-main); }
     .form-group { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
     .form-group label { font-size: 12px; font-weight: 600; color: var(--text-main); }
+    .flex-row-inputs { display: flex; gap: 12px; margin-bottom: 16px; align-items: flex-end; }
 
     /* Tables & Lists */
     table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
@@ -102,6 +103,13 @@
     .btn-approve { background-color: #0b4c33; color: white; }
     .btn-reject { background-color: #991b1b; color: white; }
     .btn-complete { background-color: #0284c7; color: white; }
+    .btn { background-color: var(--primary-green); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
+    .btn:hover { opacity: 0.95; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 6px; }
+    input[type="text"], input[type="date"], input[type="time"], select, textarea { 
+      width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; color: var(--text-main); background: white; outline: none; transition: border 0.15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary-green); box-shadow: 0 0 0 3px rgba(11, 76, 51, 0.1); }
 
     /* Patient Pills & Procedures List */
     .pill-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -127,6 +135,38 @@
     /* Toast Container */
     .toast { position: fixed; bottom: 28px; right: 28px; background-color: #053321; color: #fff; padding: 14px 24px; border-radius: 10px; font-size: 13px; font-weight: 700; opacity: 0; transform: translateY(15px); transition: var(--transition-smooth); pointer-events: none; z-index: 3000; }
     .toast.show { opacity: 1; transform: translateY(0); }
+
+    .panel { background: #fff; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-sm); }
+    .panel-header { background: #f0fdf4; padding: 14px 20px; border-bottom: 1px solid var(--border-color); font-size: 14px; font-weight: 600; color: var(--primary-green); }
+    .panel-body { padding: 20px; }
+    .view-screen { display: none; }
+    .view-screen.active { display: block; }
+    .reveal-section { display: none; }
+    .tab-bar { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; gap: 4px; overflow-x: auto; }
+    .tab-button { background: none; border: none; padding: 12px 16px; font-size: 13px; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+    .tab-button:hover { color: var(--primary-green); }
+    .tab-button.active { color: var(--primary-green); border-bottom-color: var(--primary-green); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .alert-box { background: #fee2e2; border: 1px solid rgba(153,27,27,0.2); color: #991b1b; padding: 14px 16px; border-radius: 6px; font-size: 13px; font-weight: 700; }
+    .btn-holder { display: flex; align-items: flex-end; }
+    .dashboard-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 2px solid var(--border-color); padding-bottom: 12px; }
+    .dashboard-title-row h1 { font-size: 24px; color: var(--primary-green); font-weight: 700; }
+    .meta-tag { background: #f0fdf4; color: var(--primary-green); font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 4px; text-transform: uppercase; }
+    .badge { display: inline-block; padding: 4px 8px; font-size: 11px; font-weight: 700; border-radius: 4px; text-transform: uppercase; }
+    .badge-success { background: #dcfce7; color: #166534; }
+    .badge-info { background: #e0f2fe; color: #0369a1; }
+    .qty-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--border-color); font-size: 14px; }
+    .qty-row:last-child { border-bottom: none; }
+    .qty-val { background: #f0fdf4; color: var(--primary-green); padding: 2px 8px; font-weight: 700; border-radius: 4px; font-size: 12px; }
+    .btn-danger { background-color: #991b1b; color: white; }
+    .btn-danger:hover { background-color: #7f1d1d; }
+    .summary-sheet { background: white; border: 1px solid var(--border-color); padding: 30px; border-radius: 8px; margin-top: 24px; }
+    .summary-header { border-bottom: 2px solid var(--primary-green); padding-bottom: 12px; margin-bottom: 20px; text-align: center; }
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; border-bottom: 1px dashed var(--border-color); padding-bottom: 20px; }
+    .summary-field { margin-bottom: 20px; }
+    .summary-field label { display: block; font-weight: 700; text-transform: uppercase; font-size: 11px; color: var(--primary-green); margin-bottom: 6px; }
+    .summary-field div { font-size: 14px; line-height: 1.5; color: var(--text-main); background: #f3f7f5; padding: 12px; border-radius: 6px; }
   </style>
 </head>
 <body>
@@ -202,6 +242,7 @@
   let cachedDoctors = [];
   let cachedStaff = [];
   let cachedLeaves = [];
+  let cachedPatients = [];
   let cachedTimelinePatients = {};
   let cachedTimelineSteps = {};
 
@@ -287,7 +328,7 @@
     currentView = viewKey;
     renderNav();
     if (viewKey === 'patient_operations') {
-      loadHODOperationsData().then(() => renderPatientOperations());
+      document.getElementById('view-target').innerHTML = renderOperations();
     } else {
       renderView();
     }
@@ -358,6 +399,7 @@
       }));
 
       const patientList = (await api.get('/patients/')) || [];
+      cachedPatients = patientList;
       const timelineMap = {};
       const stepsMap = {};
       for (const patient of patientList) {
@@ -384,100 +426,626 @@
     }
   }
 
-  let hodOperationsPatient = null;
-  let hodOperationsPatients = [];
+  let hodCurrentPatient = null;
+  let hodActiveMaterials = [];
+  let hodActivePharmacy = [];
+  let hodActiveDiagnostics = [];
 
-  async function loadHODOperationsData() {
-    try {
-      hodOperationsPatients = (await api.get('/patients/')) || [];
-    } catch (e) {
-      hodOperationsPatients = [];
-    }
-  }
+  const HOD_PRESETS = {
+    "Consultation": { materials: [], pharmacy: [], diagnostics: [], notes: "Initial specialist consultation conducted." },
+    "2x4, 2x6 appliance": { materials: [], pharmacy: [], diagnostics: [], notes: "Sectional archwire matrix tracking integrated successfully." },
+    "Band cementation / Banding of molars": { materials: [], pharmacy: [], diagnostics: [], notes: "Molar band trial fitting completed and cemented cleanly." },
+    "Bonding of brackets": { materials: [], pharmacy: [], diagnostics: [], notes: "Complete therapeutic bonding parameters completed." },
+    "Coil spring placement": { materials: [], pharmacy: [], diagnostics: [], notes: "Open/Closed active coil spring components structural integrity verified." },
+    "Fixed Retainer": { materials: [], pharmacy: [], diagnostics: [], notes: "Lingual bonded fixed retainer wire structured and verified." },
+    "Habit breaking appliance": { materials: [], pharmacy: [], diagnostics: [], notes: "Habit breaking interceptive appliance properly positioned." },
+    "Ligation": { materials: [], pharmacy: [], diagnostics: [], notes: "Archwire tied down cleanly utilizing specialized steel ligatures structural paths." },
+    "MARPE": { materials: [], pharmacy: [], diagnostics: [], notes: "Miniscrew-Assisted Rapid Palatal Expander logs processed." },
+    "Nance / TPA / LLA insertion": { materials: [], pharmacy: [], diagnostics: [], notes: "Nance / TPA / LLA appliance checked and structural frame safely inserted." },
+    "Orthodontic Adjustment": { materials: [], pharmacy: [], diagnostics: [], notes: "Orthodontic adjustment completed." },
+    "U/L Bracketing": { materials: [], pharmacy: [], diagnostics: [], notes: "Bracket placement completed." },
+    "Consultation": { materials: [], pharmacy: [], diagnostics: [], notes: "Initial specialist consultation conducted." }
+  };
 
-  async function hodOperationsSearch() {
-    const query = document.getElementById('hod-ops-search-input')?.value.trim();
-    if (!query) { showToast('Enter a search query'); return; }
-    try {
-      const results = await api.get(`/patients/?search=${encodeURIComponent(query)}`);
-      const patient = (results || []).find(p => p.mr_number === query || p.full_name.toLowerCase().includes(query.toLowerCase())) || (results && results[0]);
-      if (!patient) { showToast('Patient not found'); return; }
-      hodOperationsPatient = patient;
-      renderPatientOperationsWorkspace();
-    } catch (e) {
-      showToast(e.message || 'Search failed');
-    }
-  }
-
-  function renderPatientOperationsWorkspace() {
-    const p = hodOperationsPatient || {};
-    const timeIn = p.check_in_time ? new Date(p.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-    const timeOut = p.check_out_time ? new Date(p.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-    const duration = (p.check_in_time && p.check_out_time) ? `${Math.max(0, Math.round((new Date(p.check_out_time) - new Date(p.check_in_time)) / 60000))} min` : '—';
-
-    document.getElementById('view-target').innerHTML = `
-      <div class="container-card">
-        <div class="container-title"><span>Active Case Workspace</span><button class="btn btn-sm" onclick="hodOperationsPatient=null; renderView();">← Back</button></div>
-        <div style="padding:20px;">
-          <div class="patient-details-grid">
-            <div><span class="label">Patient Name</span><div class="value">${p.full_name || '—'}</div></div>
-            <div><span class="label">MR Number</span><div class="value">${p.mr_number || '—'}</div></div>
-            <div><span class="label">Status</span><div class="value">${(p.status || '—').toString().toUpperCase()}</div></div>
-            <div><span class="label">Room</span><div class="value">${p.room || '—'}</div></div>
-            <div><span class="label">Assigned Doctor</span><div class="value">${p.assigned_doctor || '—'}</div></div>
-            <div><span class="label">Procedure</span><div class="value">${p.procedure_category || '—'}</div></div>
-            <div><span class="label">Time In</span><div class="value">${timeIn}</div></div>
-            <div><span class="label">Time Out</span><div class="value">${timeOut}</div></div>
-            <div><span class="label">Duration</span><div class="value">${duration}</div></div>
-          </div>
-          <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="btn btn-sm" onclick=" HodStartProcedure()">Start Procedure</button>
-            <button class="btn btn-sm" onclick="completeHODCase()">Confirm & Complete</button>
-            <button class="btn btn-sm" style="background:#6b7280;" onclick="showToast('Not implemented in HOD');">View Timeline</button>
+  function renderOperations() {
+    return `
+      <!-- SCREEN 1: SEARCH / LOOKUP VIEW -->
+      <div id="hod-view-search-screen" class="view-screen active">
+        <div class="dashboard-title-row" style="margin-bottom: 24px;">
+          <h1>Patient Operations</h1>
+          <div class="meta-tag">Record Lookup</div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">Patient Record Lookup</div>
+          <div class="panel-body">
+            <div class="flex-row-inputs" style="margin-bottom: 0;">
+              <div style="flex: 0.8;">
+                <select id="hod-search-filter-category">
+                  <option value="MR Number" selected>MR Number</option>
+                  <option value="CNIC No.">CNIC No.</option>
+                  <option value="File Number">File Number</option>
+                  <option value="Rank">Rank</option>
+                </select>
+              </div>
+              <div style="flex: 2;">
+                <input type="text" id="hod-patient-search-input" value="" placeholder="Try typing: MR-0201708" />
+              </div>
+              <div class="btn-holder">
+                <button class="btn" onclick="hodExecuteSearch()" style="height: 45px;">Search & Continue →</button>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
+
+      <!-- SCREEN 2: WORKSPACE VIEW -->
+      <div id="hod-view-workspace-screen" class="view-screen">
+        
+        <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+          <button class="btn btn-sm" onclick="hodReturnToSearchScreen()" style="background: #6b7280;">&larr; Back to Search Lookup</button>
+          <span id="hod-active-patient-badge" class="meta-tag" style="font-size: 13px;">Active Patient: None</span>
+          <button class="btn btn-sm" onclick="hodConfirmTimeOut()" style="background: #0f6244;">Confirm Time & Complete Session</button>
+        </div>
+
+        <!-- PATIENT PROFILE EXTRACTION -->
+        <div class="panel">
+          <div class="panel-header">Extracted Patient Profile Breakdown & Medical Indicators</div>
+          <div class="panel-body">
+            <div class="patient-details-grid">
+              <div><span class="label">Full Name:</span><span class="value" id="hod-val-name">—</span></div>
+              <div><span class="label">File ID / MR:</span><span class="value" id="hod-val-mr">—</span></div>
+              <div><span class="label">Service Profile:</span><span class="value" id="hod-val-profile">—</span></div>
+              <div><span class="label">Gender/Blood:</span><span class="value" id="hod-val-gender">—</span></div>
+              <div><span class="label">System Location:</span><span class="value" id="hod-val-room">—</span></div>
+            </div>
+            <div class="alert-box" id="hod-allergy-alert-box" style="margin-bottom:12px; display:none;"></div>
+            
+            <!-- TIME CHECK TRACKING STAGE -->
+            <div class="flex-row-inputs" style="border-top: 1px dashed var(--border-color); padding-top: 12px; margin-bottom: 0;">
+              <div>
+                <label class="label" style="font-weight: 700; color: var(--primary-green); font-size: 11px;">⏰ Patient Time In</label>
+                <input type="text" id="hod-patient-time-in" readonly style="background:#f3f4f6; color:#374151;" />
+              </div>
+              <div>
+                <label class="label" style="font-weight: 700; color: var(--primary-green); font-size: 11px;">⏰ Patient Time Out</label>
+                <input type="text" id="hod-patient-time-out" readonly style="background:#f3f4f6; color:#374151;" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SINGLE-SELECT PROCEDURE MANAGEMENT -->
+        <div class="panel">
+          <div class="panel-header">Procedures Management (Choose One)</div>
+          <div class="panel-body">
+            <div class="flex-row-inputs" style="margin-bottom:0;">
+              <div style="flex: 1.5;">
+                <select id="hod-procedure-select" onchange="hodApplyProcedure()">
+                  <option value="" disabled selected>-- Select One Procedure --</option>
+                  ${Object.keys(HOD_PRESETS).map(key => `<option value="${key}">${key}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <button class="btn btn-sm" onclick="hodOpenAddProcedureModal()" style="background: var(--primary-green); height: 38px;">+ Add Procedure</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3 TABS CONTAINER -->
+        <div id="hod-step-3-container" class="reveal-section">
+          <div class="tab-bar">
+            <button class="tab-button active" onclick="hodSwitchSubTab(event, 'hod-subtab-diagnostics')">Diagnostics Queue</button>
+            <button class="tab-button" onclick="hodSwitchSubTab(event, 'hod-subtab-materials')">Clinical Materials</button>
+            <button class="tab-button" onclick="hodSwitchSubTab(event, 'hod-subtab-pharmacy')">Pharmacy Dispensing</button>
+            <button class="tab-button" onclick="hodSwitchSubTab(event, 'hod-subtab-notes')">Clinical Notes System</button>
+            <button class="tab-button" onclick="hodSwitchSubTab(event, 'hod-subtab-records')">Allergy & Medical Record</button>
+          </div>
+
+          <div id="hod-subtab-materials" class="tab-content">
+            <div class="panel" style="margin-bottom:0;">
+              <div class="panel-header">Clinical Materials Log</div>
+              <div class="panel-body">
+                <div class="flex-row-inputs">
+                  <input type="text" id="hod-material-input" placeholder="Add material item..." />
+                  <input type="number" id="hod-material-qty-input" value="1" min="1" style="width: 80px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;" />
+                  <button class="btn btn-sm" style="height: 45px;" onclick="hodAddMaterialItem()">+ Add</button>
+                </div>
+                <div id="hod-materials-log-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="hod-subtab-pharmacy" class="tab-content">
+            <div class="panel" style="margin-bottom:0;">
+              <div class="panel-header">💊 Pharmacy Dispensing Log</div>
+              <div class="panel-body">
+                <div class="flex-row-inputs">
+                  <input type="text" id="hod-pharmacy-input" placeholder="Medication..." style="flex:1;" />
+                  <input type="text" id="hod-pharmacy-dose" placeholder="Dose (e.g. 500mg)" style="width:120px;" />
+                  <input type="text" id="hod-pharmacy-freq" placeholder="Frequency" style="width:150px;" />
+                  <button class="btn btn-sm" style="height: 45px;" onclick="hodAddPharmacyItem()">+ Add</button>
+                </div>
+                <table>
+                  <thead><tr><th>Medication</th><th>Dose</th><th>Frequency</th></tr></thead>
+                  <tbody id="hod-pharmacy-log-list"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div id="hod-subtab-diagnostics" class="tab-content active">
+            <div class="panel" id="hod-diagnostics-panel" style="margin-bottom:0;">
+              <div class="panel-header">🔬 Investigations & Diagnostics Sheet</div>
+              <div class="panel-body">
+                <div class="flex-row-inputs">
+                  <div style="flex:2;">
+                    <select id="hod-diagnostic-test-select" onchange="hodHandleDiagnosticSelectChange(this)">
+                      <option value="" disabled selected>-- Select Diagnostic Investigation / X-Ray --</option>
+                      <option value="Advise new treatment file" style="font-weight: bold; background-color: #f0fdf4;">Advise new treatment file</option>
+                      <option value="3D superimposition (pre/post)">3D superimposition (pre/post)</option>
+                      <option value="Airway assessment">Airway assessment</option>
+                      <option value="Arch length analysis">Arch length analysis</option>
+                      <option value="Bolton analysis">Bolton analysis</option>
+                      <option value="CBCT" style="font-weight: bold;">X-Ray: CBCT Scan</option>
+                      <option value="Diagnostic casts (plaster/stone)">Diagnostic casts (plaster/stone)</option>
+                      <option value="Digital intraoral scan">Digital intraoral scan</option>
+                      <option value="Extraoral - 3/4 view photo">Extraoral - 3/4 view photo</option>
+                      <option value="Extraoral - frontal repose photo">Extraoral - frontal repose photo</option>
+                      <option value="Extraoral - frontal smiling photo">Extraoral - frontal smiling photo</option>
+                      <option value="Extraoral - profile photo">Extraoral - profile photo</option>
+                      <option value="Extraoral examination">Extraoral examination</option>
+                      <option value="Full Mouth Periapical X-rays" style="font-weight: bold;">X-Ray: Full Mouth Periapical (FMX)</option>
+                      <option value="Functional / TMJ examination">Functional / TMJ examination</option>
+                      <option value="Habit history & assessment">Habit history & assessment</option>
+                      <option value="Hand-wrist radiograph (skeletal age)" style="font-weight: bold;">X-Ray: Hand-Wrist Radiograph</option>
+                      <option value="Intraoral - frontal photo">Intraoral - frontal photo</option>
+                      <option value="Intraoral - left buccal photo">Intraoral - left buccal photo</option>
+                      <option value="Intraoral - lower occlusal photo">Intraoral - lower occlusal photo</option>
+                      <option value="Intraoral - right buccal photo">Intraoral - right buccal photo</option>
+                      <option value="Intraoral - upper occlusal photo">Intraoral - upper occlusal photo</option>
+                      <option value="Intraoral examination">Intraoral examination</option>
+                      <option value="Mixed dentition (Moyers/Tanaka-Johnston)">Mixed dentition (Moyers/Tanaka-Johnston)</option>
+                      <option value="Nuclear Imaging (Tc99 Scan)">Nuclear Imaging (Tc99 Scan)</option>
+                      <option value="Occlusal radiograph" style="font-weight: bold;">X-Ray: Occlusal Radiograph</option>
+                      <option value="PA (frontal) cephalogram" style="font-weight: bold;">X-Ray: PA (Frontal) Cephalogram</option>
+                      <option value="Periodontal charting">Periodontal charting</option>
+                      <option value="Photogrammetry">Photogrammetry</option>
+                      <option value="Pulp vitality / sensibility test">Pulp vitality / sensibility test</option>
+                      <option value="Speech assessment">Speech assessment</option>
+                      <option value="TMJ radiograph / MRI" style="font-weight: bold;">X-Ray: TMJ Radiograph / MRI</option>
+                    </select>
+                  </div>
+                  <div style="flex: 1;">
+                    <select id="hod-diagnostic-urgency-select">
+                      <option value="Routine">Routine</option>
+                      <option value="Urgent">Urgent</option>
+                      <option value="STAT">STAT</option>
+                    </select>
+                  </div>
+                  <div class="btn-holder">
+                    <button class="btn btn-sm" style="height:45px;" onclick="hodAddDiagnosticRow()">+ Request</button>
+                  </div>
+                </div>
+                <table style="margin-top:12px;">
+                  <thead><tr><th>Diagnostic Test Target</th><th>Urgency Status</th><th style="width: 80px; text-align: right;">Action</th></tr></thead>
+                  <tbody id="hod-diagnostics-list"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div id="hod-subtab-notes" class="tab-content">
+            <div class="panel" style="margin-bottom:0;">
+              <div class="panel-header">Ongoing Clinical Notes</div>
+              <div class="panel-body">
+                <div class="form-group">
+                  <textarea id="hod-clinical-notes-textarea" rows="4" placeholder="Document case observations..."></textarea>
+                </div>
+                <div style="text-align: center; margin-bottom: 12px;">
+                  <button id="hod-transcribe-btn" style="background: #f0fdf4; color: var(--primary-green); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">🎤 Transcribe</button>
+                </div>
+                <div style="text-align: center;">
+                  <button class="btn" onclick="hodCompileMasterSummary()">📋 Use Template & Compile Master Summary Report</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="hod-subtab-records" class="tab-content">
+            <div class="panel" style="margin-bottom:0;">
+              <div class="panel-header">Comprehensive Medical History & Allergies Sheet</div>
+              <div class="panel-body">
+                <div class="form-group">
+                  <label style="color:#991b1b; font-weight:700;">🚨 SYSTEM LEVEL DETECTED ALLERGIES</label>
+                  <input type="text" id="hod-record-allergy-input" placeholder="e.g. Penicillin, Latex, None..." onchange="hodUpdatePatientMedicalRecord()" />
+                </div>
+                <div class="form-group" style="margin-top:16px;">
+                  <label>Structural Baseline Diagnostic History</label>
+                  <textarea id="hod-record-diagnostic-history" rows="4" placeholder="Enter diagnostic history..." onchange="hodUpdatePatientMedicalRecord()"></textarea>
+                </div>
+                <div class="form-group">
+                  <label>Systemic Status Records</label>
+                  <textarea id="hod-record-systemic-status" rows="4" placeholder="Enter systemic status..." onchange="hodUpdatePatientMedicalRecord()"></textarea>
+                </div>
+                <div style="text-align: right; margin-top: 12px;">
+                  <button class="btn btn-sm" onclick="hodSaveMedicalRecordChanges()">💾 Save Changes</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="hod-master-summary-injection-point"></div>
+
+        </div>
+
       </div>
     `;
   }
 
-  async function HodStartProcedure() {
-    if (!hodOperationsPatient) { showToast('No patient selected'); return; }
+  function hodSwitchSubTab(event, targetTabId) {
+    document.querySelectorAll('#hod-view-workspace-screen .tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('#hod-view-workspace-screen .tab-button').forEach(el => el.classList.remove('active'));
+    document.getElementById(targetTabId).classList.add('active');
+    event.currentTarget.classList.add('active');
+  }
+
+  async function hodExecuteSearch() {
+    const searchInput = document.getElementById('hod-patient-search-input');
+    const query = searchInput ? searchInput.value.trim() : '';
+
+    if (!query) {
+      alert("Please enter search query details.");
+      return;
+    }
+
     try {
-      const updated = await api.patch(`/patients/${hodOperationsPatient.id}/status`, { status: 'ACTIVE' });
-      hodOperationsPatient = updated;
-      showToast('Procedure started');
-      renderPatientOperationsWorkspace();
-    } catch (e) {
-      showToast(e.message || 'Unable to start');
+      let patient = null;
+      if (typeof api !== 'undefined') {
+        const patients = await api.get(`/patients/?search=${encodeURIComponent(query)}`);
+        if (patients && patients.length > 0) patient = patients[0];
+      }
+      
+      if (!patient) {
+        alert("No patient record found matching: " + query);
+        return;
+      }
+      
+      hodCurrentPatient = patient;
+      
+      if ((patient.status || '').toString().toUpperCase() === 'WAITING' && typeof api !== 'undefined') {
+        try {
+          const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'ACTIVE' });
+          hodCurrentPatient = updated;
+          patient = updated;
+          alert(`Patient ${patient.full_name} checked in at ${new Date(updated.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+        } catch (err) {
+          alert('Auto check-in failed: ' + (err.message || 'Unknown error'));
+        }
+      }
+      
+      document.getElementById('hod-view-search-screen').classList.remove('active');
+      document.getElementById('hod-view-workspace-screen').classList.add('active');
+      
+      const badgeEl = document.getElementById('hod-active-patient-badge');
+      if (badgeEl) badgeEl.innerText = `Active Patient: ${patient.full_name} (${patient.mr_number})`;
+
+      const valName = document.getElementById('hod-val-name');
+      if (valName) valName.innerText = patient.full_name;
+      const valMr = document.getElementById('hod-val-mr');
+      if (valMr) valMr.innerText = patient.mr_number + (patient.file_number ? ' / ' + patient.file_number : '');
+      const valProfile = document.getElementById('hod-val-profile');
+      if (valProfile) valProfile.innerText = patient.service_profile || '—';
+      const valGender = document.getElementById('hod-val-gender');
+      if (valGender) valGender.innerText = `${patient.gender || '—'} / ${patient.blood_group || '—'}`;
+      const valRoom = document.getElementById('hod-val-room');
+      if (valRoom) valRoom.innerText = patient.room || '—';
+      
+      const allergyBox = document.getElementById('hod-allergy-alert-box');
+      if (allergyBox) {
+        if (patient.allergies && patient.allergies.trim() !== '') {
+          allergyBox.innerHTML = `<strong>⚠️ CRITICAL ALLERGY:</strong> ${patient.allergies}`;
+          allergyBox.style.display = 'block';
+        } else {
+          allergyBox.style.display = 'none';
+        }
+      }
+
+      const timeInEl = document.getElementById('hod-patient-time-in');
+      if (timeInEl) timeInEl.value = patient.check_in_time ? new Date(patient.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+      const timeOutEl = document.getElementById('hod-patient-time-out');
+      if (timeOutEl) timeOutEl.value = patient.check_out_time ? new Date(patient.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+
+      document.getElementById('hod-step-3-container').style.display = 'none';
+      document.getElementById('hod-procedure-select').value = "";
+      document.getElementById('hod-master-summary-injection-point').innerHTML = '';
+
+    } catch (err) {
+      alert("Error executing record search: " + err.message);
     }
   }
 
-  async function completeHODCase() {
-    if (!hodOperationsPatient) { showToast('No patient selected'); return; }
-    try {
-      const updated = await api.patch(`/patients/${hodOperationsPatient.id}/status`, { status: 'COMPLETED' });
-      hodOperationsPatient = updated;
-      showToast('Case completed');
-      renderPatientOperationsWorkspace();
-    } catch (e) {
-      showToast(e.message || 'Unable to complete');
+  function hodReturnToSearchScreen() {
+    document.getElementById('hod-view-workspace-screen').classList.remove('active');
+    document.getElementById('hod-view-search-screen').classList.add('active');
+    const searchInput = document.getElementById('hod-patient-search-input');
+    if (searchInput) searchInput.focus();
+  }
+
+  function hodApplyProcedure() {
+    const procSelect = document.getElementById('hod-procedure-select');
+    const selectedProcedure = procSelect.value;
+    if (!selectedProcedure || !HOD_PRESETS[selectedProcedure]) return;
+
+    const data = HOD_PRESETS[selectedProcedure];
+
+    hodActiveMaterials = [...(data.materials || [])];
+    hodActivePharmacy = [...(data.pharmacy || [])];
+    hodActiveDiagnostics = [...(data.diagnostics || [])];
+    document.getElementById('hod-clinical-notes-textarea').value = data.notes || '';
+
+    document.getElementById('hod-step-3-container').style.display = 'block';
+    document.getElementById('hod-master-summary-injection-point').innerHTML = '';
+
+    const targetSubTabName = 'hod-subtab-diagnostics';
+    const mockEvent = { currentTarget: document.querySelector(`[onclick*="${targetSubTabName}"]`) };
+    if(mockEvent.currentTarget) {
+      hodSwitchSubTab(mockEvent, targetSubTabName);
     }
   }
 
-  function renderPatientOperations() {
-    hodOperationsPatient = null;
-    document.getElementById('view-target').innerHTML = `
-      <div class="container-card">
-        <div class="container-title"><span>Patient Operations</span></div>
-        <div style="padding:20px;">
-          <div class="form-group">
-            <label class="label">Search Patient by MR Number or Name</label>
-            <input type="text" id="hod-ops-search-input" placeholder="Enter MR number or patient name..." />
-            <button class="btn" style="margin-top:8px;" onclick="hodOperationsSearch()">Search Patient</button>
+  function hodOpenAddProcedureModal() {
+    const procName = prompt("Enter new procedure name:");
+    if (!procName || procName.trim() === "") return;
+    
+    const duration = parseInt(prompt("Enter procedure duration (minutes):")) || 30;
+    const cleanName = procName.trim();
+    
+    if (!HOD_PRESETS[cleanName]) {
+      HOD_PRESETS[cleanName] = {
+        materials: [],
+        pharmacy: [],
+        diagnostics: [],
+        notes: `Procedure performed: ${cleanName}.`
+      };
+    }
+    
+    const newOption = document.createElement('option');
+    newOption.value = cleanName;
+    newOption.text = cleanName;
+    const select = document.getElementById('hod-procedure-select');
+    select.appendChild(newOption);
+    select.value = cleanName;
+    hodApplyProcedure();
+  }
+
+  function hodAddMaterialItem() {
+    const input = document.getElementById('hod-material-input');
+    const qtyInput = document.getElementById('hod-material-qty-input');
+    const name = input.value.trim();
+    const qty = parseInt(qtyInput.value) || 1;
+    if (!name) return;
+    hodActiveMaterials.push({ name, qty });
+    input.value = '';
+    qtyInput.value = '1';
+    hodRenderMaterialsList();
+  }
+
+  function hodRemoveMaterialItem(index) {
+    hodActiveMaterials.splice(index, 1);
+    hodRenderMaterialsList();
+  }
+
+  function hodRenderMaterialsList() {
+    const container = document.getElementById('hod-materials-log-list');
+    if (!container) return;
+    container.innerHTML = hodActiveMaterials.map((m, i) => `
+      <div class="qty-row">
+        <span>${m.name}</span>
+        <span style="display:flex; align-items:center; gap:8px;">
+          <span class="qty-val">QTY: ${m.qty}</span>
+          <button class="btn btn-sm" style="background:#991b1b; padding:4px 8px; font-size:11px;" onclick="hodRemoveMaterialItem(${i})">Remove</button>
+        </span>
+      </div>
+    `).join('') || '<div style="color:#6b7280; font-size:13px; text-align:center; padding:12px;">No materials added.</div>';
+  }
+
+  function hodAddPharmacyItem() {
+    const med = document.getElementById('hod-pharmacy-input').value.trim();
+    const dose = document.getElementById('hod-pharmacy-dose').value.trim();
+    const freq = document.getElementById('hod-pharmacy-freq').value.trim();
+    if (!med) return;
+    hodActivePharmacy.push({ med, dose, freq });
+    document.getElementById('hod-pharmacy-input').value = '';
+    document.getElementById('hod-pharmacy-dose').value = '';
+    document.getElementById('hod-pharmacy-freq').value = '';
+    hodRenderPharmacyList();
+  }
+
+  function hodRemovePharmacyItem(index) {
+    hodActivePharmacy.splice(index, 1);
+    hodRenderPharmacyList();
+  }
+
+  function hodRenderPharmacyList() {
+    const tbody = document.getElementById('hod-pharmacy-log-list');
+    if (!tbody) return;
+    tbody.innerHTML = hodActivePharmacy.map((p, i) => `
+      <tr>
+        <td>${p.med}</td>
+        <td>${p.dose}</td>
+        <td>${p.freq}</td>
+        <td style="text-align:right;"><button class="btn btn-sm" style="background:#991b1b; padding:4px 8px; font-size:11px;" onclick="hodRemovePharmacyItem(${i})">Remove</button></td>
+      </tr>
+    `).join('') || '<tr><td colspan="4" style="text-align:center; color:#6b7280;">None ordered.</td></tr>';
+  }
+
+  function hodAddDiagnosticRow() {
+    const select = document.getElementById('hod-diagnostic-test-select');
+    const urgency = document.getElementById('hod-diagnostic-urgency-select').value;
+    const name = select.value;
+    if (!name) return;
+    hodActiveDiagnostics.push({ name, urgency });
+    select.value = '';
+    hodRenderDiagnosticsList();
+  }
+
+  function hodRemoveDiagnosticRow(index) {
+    hodActiveDiagnostics.splice(index, 1);
+    hodRenderDiagnosticsList();
+  }
+
+  function hodRenderDiagnosticsList() {
+    const tbody = document.getElementById('hod-diagnostics-list');
+    if (!tbody) return;
+    tbody.innerHTML = hodActiveDiagnostics.map((d, i) => `
+      <tr>
+        <td>${d.name}</td>
+        <td>${d.urgency}</td>
+        <td style="text-align:right;"><button class="btn btn-sm" style="background:#991b1b; padding:4px 8px; font-size:11px;" onclick="hodRemoveDiagnosticRow(${i})">Remove</button></td>
+      </tr>
+    `).join('') || '<tr><td colspan="3" style="text-align:center; color:#6b7280;">No systemic diagnostic runs flagged.</td></tr>';
+  }
+
+  function hodHandleDiagnosticSelectChange(selectElem) {
+    const val = selectElem.value;
+    if (/Advise new treatment/i.test(val)) {
+      const urgencySelect = document.getElementById('hod-diagnostic-urgency-select');
+      if (urgencySelect) urgencySelect.value = 'Routine';
+    }
+  }
+
+  function hodUpdatePatientMedicalRecord() {
+    if (!hodCurrentPatient) return;
+    
+    const newAllergies = document.getElementById('hod-record-allergy-input')?.value.trim() || "";
+    const newDiagHistory = document.getElementById('hod-record-diagnostic-history')?.value.trim() || "";
+    const newSystemic = document.getElementById('hod-record-systemic-status')?.value.trim() || "";
+
+    hodCurrentPatient.allergies = newAllergies;
+    hodCurrentPatient.diagnostic_history = newDiagHistory;
+    hodCurrentPatient.systemic_status = newSystemic;
+
+    const allergyBox = document.getElementById('hod-allergy-alert-box');
+    if (allergyBox) {
+      if (newAllergies && newAllergies.trim() !== '') {
+        allergyBox.innerHTML = `<strong>⚠️ CRITICAL ALLERGY:</strong> ${newAllergies}`;
+        allergyBox.style.display = 'block';
+      } else {
+        allergyBox.style.display = 'none';
+      }
+    }
+  }
+
+  function hodSaveMedicalRecordChanges() {
+    hodUpdatePatientMedicalRecord();
+    showToast("Medical record updated successfully!");
+  }
+
+  function hodCompileMasterSummary() {
+    if (!hodCurrentPatient) return;
+
+    const procedureTitle = document.getElementById('hod-procedure-select').value || "Routine Clinical Assessment";
+    const notesValue = document.getElementById('hod-clinical-notes-textarea').value || "No detailed observation metrics added.";
+    const timeIn = document.getElementById('hod-patient-time-in').value;
+    const timeOut = document.getElementById('hod-patient-time-out').value;
+    const duration = (hodCurrentPatient.check_in_time && hodCurrentPatient.check_out_time)
+      ? `${Math.max(0, Math.round((new Date(hodCurrentPatient.check_out_time) - new Date(hodCurrentPatient.check_in_time)) / 60000))} min`
+      : '—';
+
+    const materialsHtml = hodActiveMaterials.map(m => `<div>• ${m.name} <span class="qty-val">QTY: ${m.qty}</span></div>`).join('') || "No clinical components allocated.";
+    const pharmacyRows = hodActivePharmacy.map(p => `<tr><td>${p.med}</td><td>${p.dose}</td><td>${p.freq}</td></tr>`).join('') || '<tr><td colspan="3">None ordered.</td></tr>';
+    const diagnosticsRows = hodActiveDiagnostics.map(d => `<tr><td>${d.name}</td><td>${d.urgency}</td></tr>`).join('') || '<tr><td colspan="2">No systemic diagnostic runs flagged.</td></tr>';
+
+    const targetReportBox = document.getElementById('hod-master-summary-injection-point');
+    targetReportBox.innerHTML = `
+      <div class="summary-sheet" style="background: white; border: 1px solid var(--border-color); padding: 30px; border-radius: 8px; margin-top: 24px;">
+        <div class="summary-header" style="border-bottom: 2px solid var(--primary-green); padding-bottom: 12px; margin-bottom: 20px; text-align: center;">
+          <h2>ARMED FORCES INSTITUTE OF DENTISTRY</h2>
+          <p style="font-size:12px; font-weight:600; text-transform:uppercase; color:#52525b; margin-top:4px;">Official Compiled Patient Treatment & Discharge Order</p>
+        </div>
+        
+        <div class="summary-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; border-bottom: 1px dashed var(--border-color); padding-bottom: 20px;">
+          <div>
+            <p><strong>Patient Name:</strong> ${hodCurrentPatient.full_name}</p>
+            <p><strong>MR Number:</strong> ${hodCurrentPatient.mr_number}</p>
+            <p><strong>Rank Profile:</strong> ${hodCurrentPatient.service_profile || 'Civ / Dependent'}</p>
           </div>
+          <div style="text-align:right;">
+            <p><strong>Session Timeline:</strong> ${timeIn} - ${timeOut}</p>
+            <p><strong>Duration:</strong> ${duration}</p>
+            <p><strong>Allergy Profile:</strong> <span style="color:#991b1b; font-weight:700;">${hodCurrentPatient.allergies || 'NKA'}</span></p>
+            <p><strong>Attending Specialist:</strong> HOD</p>
+          </div>
+        </div>
+
+        <div class="summary-field" style="margin-bottom: 20px;">
+          <label style="display: block; font-weight: 700; text-transform: uppercase; font-size: 11px; color: var(--primary-green); margin-bottom: 6px;">Target Clinical Operation performed</label>
+          <div style="font-size: 14px; line-height: 1.5; color: var(--text-main); background: #f3f7f5; padding: 12px; border-radius: 6px;"><strong>${procedureTitle}</strong></div>
+        </div>
+
+        <div class="summary-field" style="margin-bottom: 20px;">
+          <label style="display: block; font-weight: 700; text-transform: uppercase; font-size: 11px; color: var(--primary-green); margin-bottom: 6px;">Materials Used Log</label>
+          <div style="font-size: 14px; line-height: 1.5; color: var(--text-main); background: #f3f7f5; padding: 12px; border-radius: 6px;">${materialsHtml}</div>
+        </div>
+
+        <div class="summary-field" style="margin-bottom: 20px;">
+          <label style="display: block; font-weight: 700; text-transform: uppercase; font-size: 11px; color: var(--primary-green); margin-bottom: 6px;">Prescribed Pharmacy Logs</label>
+          <div style="font-size: 14px; line-height: 1.5; color: var(--text-main); background: #f3f7f5; padding: 12px; border-radius: 6px;">
+            <table style="width:100%; border-collapse: collapse;"><thead><tr><th>Medication</th><th>Dose</th><th>Frequency</th></tr></thead><tbody>${pharmacyRows}</tbody></table>
+          </div>
+        </div>
+
+        <div class="summary-field" style="margin-bottom: 20px;">
+          <label style="display: block; font-weight: 700; text-transform: uppercase; font-size: 11px; color: var(--primary-green); margin-bottom: 6px;">Diagnostics Actions Ordered</label>
+          <div style="font-size: 14px; line-height: 1.5; color: var(--text-main); background: #f3f7f5; padding: 12px; border-radius: 6px;">
+            <table style="width:100%; border-collapse: collapse;"><thead><tr><th>Diagnostic Screening Target</th><th>Urgency Threshold</th></tr></thead><tbody>${diagnosticsRows}</tbody></table>
+          </div>
+        </div>
+
+        <div class="summary-field" style="margin-bottom: 20px;">
+          <label style="display: block; font-weight: 700; text-transform: uppercase; font-size: 11px; color: var(--primary-green); margin-bottom: 6px;">Specialist Progress Summary & Care Directives</label>
+          <div style="font-size: 14px; line-height: 1.5; color: var(--text-main); background: #f3f7f5; padding: 12px; border-radius: 6px;">${notesValue}</div>
+        </div>
+
+        <div style="text-align:center; margin-top:30px;">
+          <button class="btn btn-danger" style="background:var(--primary-green);" onclick="window.print()">🖨️ Dispatch & Print Structural Record</button>
         </div>
       </div>
     `;
+
+    targetReportBox.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async function hodConfirmTimeOut() {
+    if (!hodCurrentPatient) {
+      alert("No active patient selected.");
+      return;
+    }
+    const timeOutInput = document.getElementById('hod-patient-time-out');
+    const timeOut = timeOutInput.value || '—';
+    if (confirm(`Confirm session completion with Time Out: ${timeOut}? This will save the session summary.`)) {
+      try {
+        const updated = await api.patch(`/patients/${hodCurrentPatient.id}/status`, { status: 'COMPLETED' });
+        hodCurrentPatient = updated;
+        const updatedTimeOut = updated.check_out_time ? new Date(updated.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+        timeOutInput.value = updatedTimeOut;
+        hodCompileMasterSummary();
+      } catch (err) {
+        alert(err.message || "Unable to complete session");
+      }
+    }
+  }
+
+  function openHODPatientCase(mr) {
+    switchView('patient_operations');
+    setTimeout(() => {
+      const input = document.getElementById('hod-patient-search-input');
+      if (input) {
+        input.value = mr;
+        hodExecuteSearch();
+      }
+    }, 100);
   }
 
   function updateNotifications() {
@@ -496,6 +1064,7 @@
 
   function renderOverviewView() {
     const alerts = cachedRooms.filter(r => r.status === 'busy' && r.time_in_mins > 30 && !r.approved);
+    const ongoingPatients = (cachedPatients || []).filter(p => (p.status || '').toString().toUpperCase() === 'WAITING' || (p.status || '').toString().toUpperCase() === 'ACTIVE');
 
     return `
       ${alerts.length ? `
@@ -513,6 +1082,27 @@
         <div class="metric-card"><div class="metric-number">${cachedSummary.total_patients_today}</div><div>Patients Today</div></div>
         <div class="metric-card"><div class="metric-number">${cachedSummary.doctors_on_duty}</div><div>Doctors On Duty</div></div>
         <div class="metric-card"><div class="metric-number">${cachedSummary.active_rooms}</div><div>Active Rooms</div></div>
+      </div>
+
+      <div class="container-card">
+        <div class="container-title">Ongoing Patients</div>
+        <div class="inner-card">
+          <table>
+            <thead><tr><th>MR Number</th><th>File Number</th><th>Patient Name</th><th>Status</th><th>Assigned Doctor</th><th>Action</th></tr></thead>
+            <tbody>
+              ${ongoingPatients.length ? ongoingPatients.map(p => `
+                <tr>
+                  <td><strong>${p.mr_number}</strong></td>
+                  <td>${p.file_number || '—'}</td>
+                  <td>${p.full_name}</td>
+                  <td><span class="status-pill status-${(p.status || '').toString().toLowerCase()}">${(p.status || '—').toString().toUpperCase()}</span></td>
+                  <td>${p.assigned_doctor || '—'}</td>
+                  <td><button class="btn-action" style="background:#0b4c33; color:white;" onclick="openHODPatientCase('${p.mr_number}')">Open Case</button></td>
+                </tr>
+              `).join('') : '<tr><td colspan="6" style="text-align:center; color:#6b7280;">No ongoing patients.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div class="container-card">
@@ -614,16 +1204,106 @@
   }
 
   function renderPatientTimelineView() {
-    const record = cachedTimelinePatients[selectedMRKey];
-    const allSteps = cachedTimelineSteps[selectedMRKey] || [];
-    const completedProcedures = allSteps.filter(s => s.status === 'Completed');
+    return `
+      <div class="container-card">
+        <div class="container-title">
+          <span>Completed Procedures Log</span>
+          <span style="font-size:11px; color:#059669; font-weight:700;">📡 Live Doctor Event Sync Enabled</span>
+        </div>
+        <div class="panel-body">
+          <div class="flex-row-inputs" style="margin-bottom:0;">
+            <div style="flex: 1;">
+              <select id="hod-timeline-filter-type">
+                <option value="mr_number">MR Number</option>
+                <option value="file_number">File Number</option>
+                <option value="name">Name</option>
+              </select>
+            </div>
+            <div style="flex: 2;">
+              <input type="text" id="hod-timeline-search-input" placeholder="Search patient..." onkeydown="if(event.key==='Enter') hodTimelineSearch()" />
+            </div>
+            <div class="btn-holder">
+              <button class="btn" onclick="hodTimelineSearch()" style="height:45px;">Search</button>
+            </div>
+          </div>
+          <div class="inner-card" style="margin-top:16px;">
+            <table>
+              <thead><tr><th>MR Number</th><th>File Number</th><th>Name</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="hod-timeline-results-body">
+                <tr><td colspan="5" style="text-align:center; color:#6b7280;">Use the search above to find a patient.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="hod-timeline-detail-area" style="margin-top:24px; display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; border-bottom: 2px solid #e6f0eb; padding-bottom: 12px;">
+              <div>
+                <h2 style="font-size: 18px; font-weight: 800; color: var(--primary-green);" id="hod-timeline-patient-title">Patient</h2>
+                <p style="font-size: 12px; color: #6b7280; margin-top: 2px;">Displaying doctor-verified treatment history</p>
+              </div>
+              <span style="font-size:12px; font-weight:700; background:#e6f0eb; padding:6px 12px; border-radius:6px; color:#0b4c33;" id="hod-timeline-total-badge">Total Performed: 0</span>
+            </div>
+            <div class="checklist-v" id="hod-timeline-steps-list"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 
-    const pillsHTML = Object.keys(cachedTimelinePatients).map(key => `
-      <span class="pt-pill ${key === selectedMRKey ? 'active' : 'inactive'}"
-            onclick="selectedMRKey='${key}'; renderView();">
-        ${key} — ${cachedTimelinePatients[key].full_name}
-      </span>
-    `).join('');
+  async function hodTimelineSearch() {
+    const filterType = document.getElementById('hod-timeline-filter-type')?.value || 'mr_number';
+    const query = document.getElementById('hod-timeline-search-input')?.value.trim().toLowerCase() || '';
+    const tbody = document.getElementById('hod-timeline-results-body');
+    const detailArea = document.getElementById('hod-timeline-detail-area');
+    if (!tbody) return;
+
+    if (!query) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#6b7280;">Enter a search term.</td></tr>';
+      if (detailArea) detailArea.style.display = 'none';
+      return;
+    }
+
+    let results = (cachedPatients || []).filter(p => {
+      if (!p) return false;
+      const val = (p[filterType] || '').toString().toLowerCase();
+      return val.includes(query);
+    });
+
+    if (!results.length && filterType !== 'mr_number') {
+      results = (cachedPatients || []).filter(p => (p.mr_number || '').toLowerCase().includes(query));
+    }
+
+    tbody.innerHTML = results.length ? results.map(p => `
+      <tr style="cursor:pointer;" onclick="hodSelectTimelinePatient('${p.mr_number}')">
+        <td><strong>${p.mr_number}</strong></td>
+        <td>${p.file_number || '—'}</td>
+        <td>${p.full_name}</td>
+        <td><span class="status-pill status-${(p.status || '').toString().toLowerCase()}">${(p.status || '—').toString().toUpperCase()}</span></td>
+        <td><button class="btn-action" style="background:#0b4c33; color:white;" onclick="event.stopPropagation(); hodSelectTimelinePatient('${p.mr_number}')">View Timeline</button></td>
+      </tr>
+    `).join('') : '<tr><td colspan="5" style="text-align:center; color:#6b7280;">No patients found.</td></tr>';
+  }
+
+  async function hodSelectTimelinePatient(mr) {
+    selectedMRKey = mr;
+    const record = cachedTimelinePatients[mr] || null;
+    const detailArea = document.getElementById('hod-timeline-detail-area');
+    const titleEl = document.getElementById('hod-timeline-patient-title');
+    const badgeEl = document.getElementById('hod-timeline-total-badge');
+    const stepsList = document.getElementById('hod-timeline-steps-list');
+
+    if (detailArea) detailArea.style.display = 'block';
+    if (titleEl) titleEl.innerText = record ? `${record.full_name} (${mr})` : `${mr}`;
+
+    try {
+      const steps = await api.get(`/hod/timeline/${encodeURIComponent(mr)}`);
+      cachedTimelineSteps[mr] = steps || [];
+    } catch (e) {
+      cachedTimelineSteps[mr] = [];
+    }
+
+    const allSteps = cachedTimelineSteps[mr] || [];
+    const completedProcedures = allSteps.filter(s => s.status === 'Completed');
+    if (badgeEl) badgeEl.innerText = `Total Performed: ${completedProcedures.length}`;
 
     let proceduresHTML = '';
     if (completedProcedures.length > 0) {
@@ -647,32 +1327,7 @@
       `;
     }
 
-    return `
-      <div class="container-card">
-        <div class="container-title">
-          <span>Completed Procedures Log</span>
-          <span style="font-size:11px; color:#059669; font-weight:700;">📡 Live Doctor Event Sync Enabled</span>
-        </div>
-
-        <div class="pill-container">${pillsHTML}</div>
-
-        <div style="background-color: #ffffff; border-radius:12px; border:1px solid #cbd5e1; padding: 24px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; border-bottom: 2px solid #e6f0eb; padding-bottom: 12px;">
-            <div>
-              <h2 style="font-size: 18px; font-weight: 800; color: var(--primary-green);">${record ? record.full_name : 'Patient'} (${selectedMRKey})</h2>
-              <p style="font-size: 12px; color: #6b7280; margin-top: 2px;">Displaying doctor-verified treatment history</p>
-            </div>
-            <span style="font-size:12px; font-weight:700; background:#e6f0eb; padding:6px 12px; border-radius:6px; color:#0b4c33;">
-              Total Performed: ${completedProcedures.length}
-            </span>
-          </div>
-
-          <div class="checklist-v">
-            ${proceduresHTML}
-          </div>
-        </div>
-      </div>
-    `;
+    if (stepsList) stepsList.innerHTML = proceduresHTML;
   }
 
   function renderView() {
@@ -681,7 +1336,7 @@
     else if (currentView === 'monitoring') target.innerHTML = renderMonitoringView();
     else if (currentView === 'staff_mgmt') target.innerHTML = renderStaffMgmtView();
     else if (currentView === 'leaves') target.innerHTML = renderLeavesView();
-    else if (currentView === 'patient_operations') target.innerHTML = renderPatientOperations();
+    else if (currentView === 'patient_operations') target.innerHTML = renderOperations();
     else if (currentView === 'timeline') target.innerHTML = renderPatientTimelineView();
 
     updateNotifications();

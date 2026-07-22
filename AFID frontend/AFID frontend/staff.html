@@ -607,11 +607,8 @@
   async function loadTimelineData() {
     try {
       if (typeof api !== 'undefined') {
-        const patients = await api.get('/patients/');
-        cachedTimelineMRs = (patients || []).filter(p => p.mr_number).map(p => ({ mr: p.mr_number, name: p.full_name }));
-        if (!cachedSelectedTimelineMR && cachedTimelineMRs.length) cachedSelectedTimelineMR = cachedTimelineMRs[0].mr;
+        await api.get('/patients/');
       }
-      if (cachedSelectedTimelineMR) await fetchTimelineSteps(cachedSelectedTimelineMR);
       renderPatientTimeline();
     } catch (e) {
       console.warn('Timeline load failed:', e);
@@ -627,23 +624,66 @@
     }
   }
 
-  async function selectTimelineMR(mr) {
-    cachedSelectedTimelineMR = mr;
-    await fetchTimelineSteps(mr);
-    renderPatientTimeline();
+  function timelineSearch() {
+    const filterType = document.getElementById('timeline-filter-type')?.value || 'mr';
+    const query = document.getElementById('timeline-search-input')?.value.trim().toLowerCase() || '';
+    const tbody = document.getElementById('timeline-results-body');
+    const detailArea = document.getElementById('timeline-detail-area');
+    if (!tbody) return;
+
+    if (!query) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#6b7280;">Enter a search term.</td></tr>';
+      if (detailArea) detailArea.style.display = 'none';
+      return;
+    }
+
+    const fieldMap = { mr: 'mr', file: 'file', name: 'name', mr_number: 'mr', file_number: 'file' };
+    const field = fieldMap[filterType] || 'mr';
+    let results = (patientLogs || []).filter(p => (p[field] || '').toString().toLowerCase().includes(query));
+
+    if (!results.length && filterType !== 'mr' && filterType !== 'mr_number') {
+      results = (patientLogs || []).filter(p => (p.mr || '').toLowerCase().includes(query));
+    }
+
+    const statusBadge = (s) => {
+      const st = (s || '').toString().toUpperCase();
+      if (st === 'ACTIVE') return '<span class="badge badge-success">ACTIVE</span>';
+      if (st === 'COMPLETED') return '<span class="badge badge-info">COMPLETED</span>';
+      return '<span class="badge badge-warning">WAITING</span>';
+    };
+
+    tbody.innerHTML = results.length ? results.map(p => `
+      <tr style="cursor:pointer;" onclick="selectTimelinePatient('${p.mr}')">
+        <td><strong>${p.mr}</strong></td>
+        <td>${p.file || '—'}</td>
+        <td>${p.name}</td>
+        <td>${statusBadge(p.status)}</td>
+        <td><button class="btn btn-sm" onclick="event.stopPropagation(); selectTimelinePatient('${p.mr}')" style="height:38px;">View Timeline</button></td>
+      </tr>
+    `).join('') : '<tr><td colspan="5" style="text-align:center; color:#6b7280;">No patients found.</td></tr>';
   }
 
-  function renderPatientTimeline() {
-    const selected = cachedSelectedTimelineMR;
-    const record = cachedTimelineMRs.find(r => r.mr === selected) || null;
-    const allSteps = cachedTimelineSteps[selected] || [];
+  async function selectTimelinePatient(mr) {
+    const detailArea = document.getElementById('timeline-detail-area');
+    const titleEl = document.getElementById('timeline-patient-title');
+    const badgeEl = document.getElementById('timeline-total-badge');
+    const stepsList = document.getElementById('timeline-steps-list');
+    const record = (patientLogs || []).find(p => p.mr === mr) || null;
+    if (detailArea) detailArea.style.display = 'block';
+    if (titleEl) titleEl.innerText = record ? `${record.name} (${mr})` : mr;
+
+    try {
+      const steps = await api.get(`/hod/timeline/${encodeURIComponent(mr)}`);
+      cachedTimelineSteps[mr] = steps || [];
+    } catch (e) {
+      cachedTimelineSteps[mr] = [];
+    }
+
+    const allSteps = cachedTimelineSteps[mr] || [];
+    const completedProcedures = allSteps.filter(s => s.status === 'Completed');
     const pending = allSteps.filter(s => (s.status || '').toLowerCase() === 'pending');
     const inProgress = allSteps.filter(s => (s.status || '').toLowerCase() === 'in_progress');
-    const completed = allSteps.filter(s => (s.status || '').toLowerCase() === 'completed');
-
-    const pillsHTML = cachedTimelineMRs.map(r => `
-      <span class="pt-pill ${r.mr === selected ? 'active' : 'inactive'}" onclick="selectTimelineMR('${r.mr}')">${r.mr} — ${r.name}</span>
-    `).join('');
+    if (badgeEl) badgeEl.innerText = `Total Performed: ${completedProcedures.length}`;
 
     const buildList = (items, emptyLabel, badgeClass, icon) => items.length ? items.map(s => `
       <div class="check-item">
@@ -655,18 +695,52 @@
       </div>
     `).join('') : `<div style="text-align:center; padding:16px; color:#6b7280; font-size:13px;">${emptyLabel}</div>`;
 
+    if (stepsList) stepsList.innerHTML = `
+      ${buildList(pending, 'No pending steps.', 'pending', '○')}
+      ${buildList(inProgress, 'No in-progress steps.', 'active', '◐')}
+      ${buildList(completedProcedures, 'No completed procedures yet.', 'completed', '✓')}
+    `;
+  }
+
+  function renderPatientTimeline() {
     return `
       <div class="container-card">
         <div class="container-title"><span>Patient Procedure Timeline</span></div>
-        <div class="pill-container">${pillsHTML || '<span style="color:#6b7280;">No patients available</span>'}</div>
-        ${record ? `
-          <div style="margin:16px 0; font-weight:800; color:#0b4c33; font-size:16px;">${record.name} (${record.mr})</div>
-          <div class="checklist-v">
-            ${buildList(pending, 'No pending steps.', 'pending', '○')}
-            ${buildList(inProgress, 'No in-progress steps.', 'active', '◐')}
-            ${buildList(completed, 'No completed procedures yet.', 'completed', '✓')}
+        <div class="panel-body">
+          <div class="flex-row-inputs" style="margin-bottom:0;">
+            <div style="flex: 1;">
+              <select id="timeline-filter-type">
+                <option value="mr">MR Number</option>
+                <option value="file">File Number</option>
+                <option value="name">Name</option>
+              </select>
+            </div>
+            <div style="flex: 2;">
+              <input type="text" id="timeline-search-input" placeholder="Search patient..." onkeydown="if(event.key==='Enter') timelineSearch()" />
+            </div>
+            <div class="btn-holder">
+              <button class="btn" onclick="timelineSearch()" style="height:45px;">Search</button>
+            </div>
           </div>
-        ` : '<div style="padding:24px; text-align:center; color:#6b7280;">Select a patient to view timeline.</div>'}
+          <div class="inner-card" style="margin-top:16px;">
+            <table>
+              <thead><tr><th>MR Number</th><th>File Number</th><th>Name</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="timeline-results-body">
+                <tr><td colspan="5" style="text-align:center; color:#6b7280;">Use the search above to find a patient.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="timeline-detail-area" style="margin-top:24px; display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:2px solid var(--border); padding-bottom:12px;">
+              <div>
+                <h2 style="font-size:18px; font-weight:800; color:var(--green-dark);" id="timeline-patient-title">Patient</h2>
+                <p style="font-size:12px; color:var(--text-muted); margin-top:2px;">Procedure breakdown by status</p>
+              </div>
+              <span style="font-size:12px; font-weight:700; background:var(--green-light); padding:6px 12px; border-radius:6px; color:var(--green-dark);" id="timeline-total-badge">Total Performed: 0</span>
+            </div>
+            <div class="checklist-v" id="timeline-steps-list"></div>
+          </div>
+        </div>
       </div>
     `;
   }
