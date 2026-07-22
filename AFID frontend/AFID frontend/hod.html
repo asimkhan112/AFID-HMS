@@ -1297,6 +1297,15 @@
   }
 
   async function hodTimelineSearch() {
+    try {
+      const patients = await api.get('/patients/');
+      if (patients && patients.length) {
+        cachedPatients = patients;
+      }
+    } catch (e) {
+      console.warn('Failed to refresh patient data for timeline search:', e);
+    }
+
     const filterType = document.getElementById('hod-timeline-filter-type')?.value || 'mr_number';
     const query = document.getElementById('hod-timeline-search-input')?.value.trim().toLowerCase() || '';
     const tbody = document.getElementById('hod-timeline-results-body');
@@ -1358,7 +1367,7 @@
         <div class="check-item">
           <div class="check-circle completed">✓</div>
           <div class="check-text">
-            <div style="font-size: 15px; font-weight: 700; color: #1f2937;">${s.name}</div>
+            <div style="font-size: 15px; font-weight: 700; color: #1f2937;">${s.name || s.step_name || '—'}</div>
             <div style="font-size: 12px; color: #10b981; font-weight: 700; margin-top: 2px;">
               Performed & Verified by ${s.completed_by || 'Assigned Doctor'}
             </div>

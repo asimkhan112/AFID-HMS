@@ -201,7 +201,7 @@
       display: flex;
       flex-direction: column;
       height: calc(100vh - 60px);
-      overflow: hidden;
+      overflow-y: auto;
     }
 
     .header-group {
@@ -579,13 +579,14 @@
     const timeInStr = checkIn ? checkIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
     const timeOutStr = checkOut ? checkOut.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
     const duration = (checkIn && checkOut) ? `${Math.max(0, Math.round((checkOut - checkIn) / 60000))} min` : '—';
-    return {
-      id: p.id,
-      mr: p.mr_number,
-      file: p.file_number,
-      name: p.full_name,
-      cnic: p.cnic || '—',
-      location: p.room || '—',
+      const roomNum = (p.room || '').replace(/Room\s*/i, '').trim() || '—';
+      return {
+        id: p.id,
+        mr: p.mr_number,
+        file: p.file_number,
+        name: p.full_name,
+        cnic: p.cnic || '—',
+        location: roomNum,
       rotation: p.procedure_category || '—',
       assignedDoctor: p.assigned_doctor || '—',
       time: p.registered_at ? new Date(p.registered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00 AM',
@@ -652,7 +653,16 @@
     }
   }
 
-  function timelineSearch() {
+  async function timelineSearch() {
+    try {
+      const patients = await api.get('/patients/');
+      if (patients && patients.length) {
+        patientLogs = patients.map(normalizePatient);
+      }
+    } catch (e) {
+      console.warn('Failed to refresh patient data for timeline search:', e);
+    }
+
     const filterType = document.getElementById('timeline-filter-type')?.value || 'mr';
     const query = document.getElementById('timeline-search-input')?.value.trim().toLowerCase() || '';
     const tbody = document.getElementById('timeline-results-body');
@@ -710,7 +720,7 @@
     const allSteps = cachedTimelineSteps[mr] || [];
     const completedProcedures = allSteps.filter(s => s.status === 'Completed');
     const pending = allSteps.filter(s => (s.status || '').toLowerCase() === 'pending');
-    const inProgress = allSteps.filter(s => (s.status || '').toLowerCase() === 'in_progress');
+    const inProgress = allSteps.filter(s => (s.status || '').toLowerCase() === 'in progress');
     if (badgeEl) badgeEl.innerText = `Total Performed: ${completedProcedures.length}`;
 
     const buildList = (items, emptyLabel, badgeClass, icon) => items.length ? items.map(s => `
@@ -883,7 +893,7 @@
         ${p.status === 'WAITING' ? `
           <button class="action-link" onclick="startProcedure(${index})" style="background:#0f6244;">Start</button>
         ` : p.status === 'ACTIVE' ? `
-          <button class="action-link" onclick="completeProcedure(${index})" style="background:#10b981;">Complete</button>
+          <span style="color:#9ca3af; font-size:11px; font-weight:700;">In Progress</span>
         ` : `
           <span style="color:#9ca3af; font-size:11px; font-weight:700;">Done</span>
         `}
