@@ -1158,20 +1158,6 @@
     }
   }
 
-  async function completeProcedure(index) {
-    const patient = patientLogs[index];
-    if (!patient) return;
-
-    try {
-      const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'COMPLETED' });
-      patientLogs[index] = normalizePatient(updated);
-      switchView('patient_mgmt');
-      showToast(`Time Out recorded`);
-    } catch (error) {
-      showToast(error.message || 'Unable to complete procedure');
-    }
-  }
-
   async function addDoctorAllocation(e) {
     e.preventDefault();
     const name = document.getElementById('d-name').value;
