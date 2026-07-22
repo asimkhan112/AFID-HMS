@@ -472,6 +472,34 @@
     .cs-completed { background: #dcfce7; color: #166534; }
     .container-card { background: white; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 24px; overflow: hidden; }
     .container-title { background: var(--green-soft); padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 600; color: var(--green-dark); }
+    
+    /* Patient Timeline Search Styles */
+    .timeline-search-container { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow-sm); }
+    .timeline-search-row { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
+    .timeline-search-row select { flex: 0 0 160px; }
+    .timeline-search-row input[type="text"] { flex: 1; }
+    .timeline-search-row .btn-holder { flex: 0 0 auto; }
+    .timeline-results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .timeline-results-table thead th { background: var(--green-dark); color: #fff; padding: 12px 14px; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
+    .timeline-results-table tbody td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; color: #374151; }
+    .timeline-results-table tbody tr:hover td { background-color: #f1f7f4 !important; }
+    .timeline-detail-card { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-top: 20px; box-shadow: var(--shadow-sm); }
+    .timeline-detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+    .timeline-detail-title { font-size: 18px; font-weight: 800; color: var(--green-dark); }
+    .timeline-detail-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .timeline-badge { background: var(--green-soft); color: var(--green-dark); font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 6px; }
+    .timeline-steps-list { display: flex; flex-direction: column; gap: 12px; }
+    .timeline-step-item { display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; transition: var(--transition-smooth); }
+    .timeline-step-item:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    .timeline-step-circle { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; flex-shrink: 0; }
+    .timeline-step-circle.pending { background: #f3f4f6; color: #6b7280; }
+    .timeline-step-circle.active { background: #fef9c3; color: #a16207; }
+    .timeline-step-circle.completed { background: #dcfce7; color: #15803d; }
+    .timeline-step-text { flex: 1; font-size: 15px; font-weight: 700; color: #1f2937; }
+    .timeline-step-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 10px; border-radius: 12px; }
+    .timeline-step-badge.pending { background: #f3f4f6; color: #374151; }
+    .timeline-step-badge.active { background: #fef9c3; color: #92400e; }
+    .timeline-step-badge.completed { background: #dcfce7; color: #166534; }
   </style>
 </head>
 <body>
@@ -706,8 +734,8 @@
     return `
       <div class="container-card">
         <div class="container-title"><span>Patient Procedure Timeline</span></div>
-        <div class="panel-body">
-          <div class="flex-row-inputs" style="margin-bottom:0;">
+        <div class="timeline-search-container">
+          <div class="timeline-search-row">
             <div style="flex: 1;">
               <select id="timeline-filter-type">
                 <option value="mr">MR Number</option>
@@ -722,8 +750,8 @@
               <button class="btn" onclick="timelineSearch()" style="height:45px;">Search</button>
             </div>
           </div>
-          <div class="inner-card" style="margin-top:16px;">
-            <table>
+          <div class="inner-card">
+            <table class="timeline-results-table">
               <thead><tr><th>MR Number</th><th>File Number</th><th>Name</th><th>Status</th><th>Action</th></tr></thead>
               <tbody id="timeline-results-body">
                 <tr><td colspan="5" style="text-align:center; color:#6b7280;">Use the search above to find a patient.</td></tr>
@@ -731,14 +759,16 @@
             </table>
           </div>
           <div id="timeline-detail-area" style="margin-top:24px; display:none;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:2px solid var(--border); padding-bottom:12px;">
-              <div>
-                <h2 style="font-size:18px; font-weight:800; color:var(--green-dark);" id="timeline-patient-title">Patient</h2>
-                <p style="font-size:12px; color:var(--text-muted); margin-top:2px;">Procedure breakdown by status</p>
+            <div class="timeline-detail-card">
+              <div class="timeline-detail-header">
+                <div>
+                  <h2 class="timeline-detail-title" id="timeline-patient-title">Patient</h2>
+                  <p class="timeline-detail-subtitle">Procedure breakdown by status</p>
+                </div>
+                <span class="timeline-badge" id="timeline-total-badge">Total Performed: 0</span>
               </div>
-              <span style="font-size:12px; font-weight:700; background:var(--green-light); padding:6px 12px; border-radius:6px; color:var(--green-dark);" id="timeline-total-badge">Total Performed: 0</span>
+              <div class="timeline-steps-list" id="timeline-steps-list"></div>
             </div>
-            <div class="checklist-v" id="timeline-steps-list"></div>
           </div>
         </div>
       </div>
