@@ -113,6 +113,25 @@
     .summary-field label { display: block; font-weight: 700; text-transform: uppercase; font-size: 11px; color: var(--green-med); margin-bottom: 6px; }
     .summary-field div { font-size: 14px; line-height: 1.5; color: var(--text-dark); background: var(--bg-main); padding: 12px; border-radius: 6px; }
 
+    /* Patient Timeline Styles */
+    .pt-pill { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-right: 8px; margin-bottom: 8px; cursor: pointer; border: 1px solid transparent; }
+    .pt-pill.active { background: var(--green-med); color: #fff; }
+    .pt-pill.inactive { background: #fff; color: var(--text-dark); border-color: var(--border); }
+    .pill-container { margin-bottom: 16px; }
+    .checklist-v { display: flex; flex-direction: column; gap: 10px; }
+    .check-item { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; }
+    .check-circle { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: var(--green-light); color: var(--green-dark); flex-shrink: 0; }
+    .check-circle.pending { background: #f3f4f6; color: #6b7280; }
+    .check-circle.active { background: #fef9c3; color: #a16207; }
+    .check-circle.completed { background: #dcfce7; color: #15803d; }
+    .check-text { flex: 1; }
+    .check-status-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; }
+    .cs-pending { background: #f3f4f6; color: #374151; }
+    .cs-active { background: #fef9c3; color: #92400e; }
+    .cs-completed { background: #dcfce7; color: #166534; }
+    .container-card { background: white; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 24px; overflow: hidden; }
+    .container-title { background: var(--green-soft); padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 600; color: var(--green-dark); display: flex; justify-content: space-between; align-items: center; }
+
     @media print {
       .sidebar, .dashboard-title-row button, .nav-item, .panel, .tab-bar, .afid-header, .dashboard-title-row, .print-action-row, .print-hide { display: none !important; }
       body { background: white; }
@@ -156,6 +175,7 @@
     const PAGES = [
       { id: 'dashboard', label: 'Executive Dashboard' },
       { id: 'operations', label: 'Patient Operations' },
+      { id: 'timeline', label: 'Patient Timeline' },
       { id: 'doctor-analytics', label: 'My Analytics' },
       { id: 'leave', label: 'Leave Requests' }
     ];
@@ -991,6 +1011,17 @@
         
         currentPatient = patient;
         
+        if ((patient.status || '').toString().toUpperCase() === 'WAITING' && typeof api !== 'undefined') {
+          try {
+            const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'ACTIVE' });
+            currentPatient = updated;
+            patient = updated;
+            alert(`Patient ${patient.full_name} checked in at ${new Date(updated.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+          } catch (err) {
+            alert('Auto check-in failed: ' + (err.message || 'Unknown error'));
+          }
+        }
+        
         document.getElementById('view-search-screen').classList.remove('active');
         document.getElementById('view-workspace-screen').classList.add('active');
         
@@ -1248,6 +1279,9 @@
       const notesValue = document.getElementById('clinical-notes-textarea').value || "No detailed observation metrics added.";
       const timeIn = document.getElementById('patient-time-in').value;
       const timeOut = document.getElementById('patient-time-out').value;
+      const duration = (currentPatient.check_in_time && currentPatient.check_out_time)
+        ? `${Math.max(0, Math.round((new Date(currentPatient.check_out_time) - new Date(currentPatient.check_in_time)) / 60000))} min`
+        : '—';
 
       const materialsHtml = activeMaterials.map(m => `<div>• ${m.name} <span class="qty-val">QTY: ${m.qty}</span></div>`).join('') || "No clinical components allocated.";
       const pharmacyRows = activePharmacy.map(p => `<tr><td>${p.med}</td><td>${p.dose}</td><td>${p.freq}</td></tr>`).join('') || '<tr><td colspan="3">None ordered.</td></tr>';
@@ -1269,6 +1303,7 @@
             </div>
             <div style="text-align:right;">
               <p><strong>Session Timeline:</strong> ${timeIn} - ${timeOut}</p>
+              <p><strong>Duration:</strong> ${duration}</p>
               <p><strong>Allergy Profile:</strong> <span style="color:var(--red); font-weight:700;">${currentPatient.allergies || 'NKA'}</span></p>
               <p><strong>Attending Specialist:</strong> ${LOGGED_IN_DOCTOR}</p>
             </div>
@@ -1318,6 +1353,77 @@
       targetReportBox.scrollIntoView({ behavior: 'smooth' });
     }
 
+    let cachedTimelineMRs = [];
+    let cachedSelectedTimelineMR = null;
+    let cachedTimelineSteps = {};
+
+    async function loadTimelineData() {
+      try {
+        if (typeof api !== 'undefined') {
+          const patients = await api.get('/patients/');
+          cachedTimelineMRs = (patients || []).filter(p => p.mr_number).map(p => ({ mr: p.mr_number, name: p.full_name }));
+          if (!cachedSelectedTimelineMR && cachedTimelineMRs.length) cachedSelectedTimelineMR = cachedTimelineMRs[0].mr;
+        }
+        if (cachedSelectedTimelineMR) await fetchTimelineSteps(cachedSelectedTimelineMR);
+        renderPatientTimeline();
+      } catch (e) {
+        console.warn('Timeline load failed:', e);
+      }
+    }
+
+    async function fetchTimelineSteps(mr) {
+      try {
+        const steps = await api.get(`/hod/timeline/${encodeURIComponent(mr)}`);
+        cachedTimelineSteps[mr] = steps || [];
+      } catch (e) {
+        cachedTimelineSteps[mr] = [];
+      }
+    }
+
+    async function selectTimelineMR(mr) {
+      cachedSelectedTimelineMR = mr;
+      await fetchTimelineSteps(mr);
+      renderPatientTimeline();
+    }
+
+    function renderPatientTimeline() {
+      const selected = cachedSelectedTimelineMR;
+      const record = cachedTimelineMRs.find(r => r.mr === selected) || null;
+      const allSteps = cachedTimelineSteps[selected] || [];
+      const pending = allSteps.filter(s => (s.status || '').toLowerCase() === 'pending');
+      const inProgress = allSteps.filter(s => (s.status || '').toLowerCase() === 'in_progress');
+      const completed = allSteps.filter(s => (s.status || '').toLowerCase() === 'completed');
+
+      const pillsHTML = cachedTimelineMRs.map(r => `
+        <span class="pt-pill ${r.mr === selected ? 'active' : 'inactive'}" onclick="selectTimelineMR('${r.mr}')">${r.mr} — ${r.name}</span>
+      `).join('');
+
+      const buildList = (items, emptyLabel, badgeClass, icon) => items.length ? items.map(s => `
+        <div class="check-item">
+          <div class="check-circle ${badgeClass}">${icon || ''}</div>
+          <div class="check-text">
+            <div style="font-size:15px; font-weight:700; color:#1f2937;">${s.name || s.step_name || '—'}</div>
+          </div>
+          <div class="check-status-badge cs-${badgeClass}">${s.status || '—'}</div>
+        </div>
+      `).join('') : `<div style="text-align:center; padding:16px; color:#6b7280; font-size:13px;">${emptyLabel}</div>`;
+
+      return `
+        <div class="container-card">
+          <div class="container-title"><span>Patient Procedure Timeline</span></div>
+          <div class="pill-container">${pillsHTML || '<span style="color:#6b7280;">No patients available</span>'}</div>
+          ${record ? `
+            <div style="margin:16px 0; font-weight:800; color:#0c432d; font-size:16px;">${record.name} (${record.mr})</div>
+            <div class="checklist-v">
+              ${buildList(pending, 'No pending steps.', 'pending', '○')}
+              ${buildList(inProgress, 'No in-progress steps.', 'active', '◐')}
+              ${buildList(completed, 'No completed procedures yet.', 'completed', '✓')}
+            </div>
+          ` : '<div style="padding:24px; text-align:center; color:#6b7280;">Select a patient to view timeline.</div>'}
+        </div>
+      `;
+    }
+
     /* ===================== SYSTEM APP ROUTER ===================== */
     function switchView(pageId) {
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -1329,6 +1435,9 @@
         mainRoot.innerHTML = renderDashboard();
       } else if (pageId === 'operations') {
         mainRoot.innerHTML = renderOperations();
+      } else if (pageId === 'timeline') {
+        mainRoot.innerHTML = renderPatientTimeline();
+        loadTimelineData();
       } else if (pageId === 'doctor-analytics') {
         mainRoot.innerHTML = renderDoctorAnalytics();
         processAndRenderDoctorAnalytics();
@@ -1398,6 +1507,7 @@
       `).join('');
 
       await loadDashboardData();
+      await loadTimelineData();
       switchView('dashboard');
     });
   </script>

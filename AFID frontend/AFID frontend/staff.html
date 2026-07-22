@@ -453,6 +453,25 @@
       z-index: 100;
     }
     .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* Patient Timeline Styles */
+    .pt-pill { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-right: 8px; margin-bottom: 8px; cursor: pointer; border: 1px solid transparent; }
+    .pt-pill.active { background: var(--green-med); color: #fff; }
+    .pt-pill.inactive { background: #fff; color: var(--text-dark); border-color: var(--border); }
+    .pill-container { margin-bottom: 16px; }
+    .checklist-v { display: flex; flex-direction: column; gap: 10px; }
+    .check-item { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; }
+    .check-circle { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: var(--green-soft); color: var(--green-med); flex-shrink: 0; }
+    .check-circle.pending { background: #f3f4f6; color: #6b7280; }
+    .check-circle.active { background: #fef9c3; color: #a16207; }
+    .check-circle.completed { background: #dcfce7; color: #15803d; }
+    .check-text { flex: 1; }
+    .check-status-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; }
+    .cs-pending { background: #f3f4f6; color: #374151; }
+    .cs-active { background: #fef9c3; color: #92400e; }
+    .cs-completed { background: #dcfce7; color: #166534; }
+    .container-card { background: white; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 24px; overflow: hidden; }
+    .container-title { background: var(--green-soft); padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 600; color: var(--green-dark); }
   </style>
 </head>
 <body>
@@ -514,17 +533,24 @@
     { id: 'dashboard', label: 'Executive Dashboard' },
     { id: 'patient_reg', label: 'Patient Registration' },
     { id: 'patient_mgmt', label: 'Patient Management' },
+    { id: 'patient_timeline', label: 'Patient Timeline' },
     { id: 'doctor_mgmt', label: 'Doctor Management' }
   ];
 
   /* ---------------- MASTER DATA MODEL ---------------- */
   let patientLogs = [];
   let doctorAllocations = [];
+  let cachedTimelineMRs = [];
+  let cachedSelectedTimelineMR = null;
+  let cachedTimelineSteps = {};
 
   function normalizePatient(p) {
     const status = (p.status || 'WAITING').toString().toUpperCase();
-    const checkIn = p.check_in_time ? new Date(p.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-    const checkOut = p.check_out_time ? new Date(p.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+    const checkIn = p.check_in_time ? new Date(p.check_in_time) : null;
+    const checkOut = p.check_out_time ? new Date(p.check_out_time) : null;
+    const timeInStr = checkIn ? checkIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+    const timeOutStr = checkOut ? checkOut.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+    const duration = (checkIn && checkOut) ? `${Math.max(0, Math.round((checkOut - checkIn) / 60000))} min` : '—';
     return {
       id: p.id,
       mr: p.mr_number,
@@ -536,8 +562,9 @@
       assignedDoctor: p.assigned_doctor || '—',
       time: p.registered_at ? new Date(p.registered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00 AM',
       apptDate: p.registered_at ? new Date(p.registered_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      timeIn: checkIn,
-      timeOut: checkOut,
+      timeIn: timeInStr,
+      timeOut: timeOutStr,
+      duration,
       status,
       badge: status === 'ACTIVE' ? 'badge-active' : status === 'COMPLETED' ? 'badge-completed' : 'badge-waiting'
     };
@@ -575,6 +602,73 @@
       patientLogs = [];
       doctorAllocations = [];
     }
+  }
+
+  async function loadTimelineData() {
+    try {
+      if (typeof api !== 'undefined') {
+        const patients = await api.get('/patients/');
+        cachedTimelineMRs = (patients || []).filter(p => p.mr_number).map(p => ({ mr: p.mr_number, name: p.full_name }));
+        if (!cachedSelectedTimelineMR && cachedTimelineMRs.length) cachedSelectedTimelineMR = cachedTimelineMRs[0].mr;
+      }
+      if (cachedSelectedTimelineMR) await fetchTimelineSteps(cachedSelectedTimelineMR);
+      renderPatientTimeline();
+    } catch (e) {
+      console.warn('Timeline load failed:', e);
+    }
+  }
+
+  async function fetchTimelineSteps(mr) {
+    try {
+      const steps = await api.get(`/hod/timeline/${encodeURIComponent(mr)}`);
+      cachedTimelineSteps[mr] = steps || [];
+    } catch (e) {
+      cachedTimelineSteps[mr] = [];
+    }
+  }
+
+  async function selectTimelineMR(mr) {
+    cachedSelectedTimelineMR = mr;
+    await fetchTimelineSteps(mr);
+    renderPatientTimeline();
+  }
+
+  function renderPatientTimeline() {
+    const selected = cachedSelectedTimelineMR;
+    const record = cachedTimelineMRs.find(r => r.mr === selected) || null;
+    const allSteps = cachedTimelineSteps[selected] || [];
+    const pending = allSteps.filter(s => (s.status || '').toLowerCase() === 'pending');
+    const inProgress = allSteps.filter(s => (s.status || '').toLowerCase() === 'in_progress');
+    const completed = allSteps.filter(s => (s.status || '').toLowerCase() === 'completed');
+
+    const pillsHTML = cachedTimelineMRs.map(r => `
+      <span class="pt-pill ${r.mr === selected ? 'active' : 'inactive'}" onclick="selectTimelineMR('${r.mr}')">${r.mr} — ${r.name}</span>
+    `).join('');
+
+    const buildList = (items, emptyLabel, badgeClass, icon) => items.length ? items.map(s => `
+      <div class="check-item">
+        <div class="check-circle ${badgeClass}">${icon || ''}</div>
+        <div class="check-text">
+          <div style="font-size:15px; font-weight:700; color:#1f2937;">${s.name || s.step_name || '—'}</div>
+        </div>
+        <div class="check-status-badge cs-${badgeClass}">${s.status || '—'}</div>
+      </div>
+    `).join('') : `<div style="text-align:center; padding:16px; color:#6b7280; font-size:13px;">${emptyLabel}</div>`;
+
+    return `
+      <div class="container-card">
+        <div class="container-title"><span>Patient Procedure Timeline</span></div>
+        <div class="pill-container">${pillsHTML || '<span style="color:#6b7280;">No patients available</span>'}</div>
+        ${record ? `
+          <div style="margin:16px 0; font-weight:800; color:#0b4c33; font-size:16px;">${record.name} (${record.mr})</div>
+          <div class="checklist-v">
+            ${buildList(pending, 'No pending steps.', 'pending', '○')}
+            ${buildList(inProgress, 'No in-progress steps.', 'active', '◐')}
+            ${buildList(completed, 'No completed procedures yet.', 'completed', '✓')}
+          </div>
+        ` : '<div style="padding:24px; text-align:center; color:#6b7280;">Select a patient to view timeline.</div>'}
+      </div>
+    `;
   }
 
   /* ==================== VIEWS ==================== */
@@ -678,6 +772,7 @@
       <td>${p.apptDate || '2026-07-21'} | ${p.time}</td>
       <td><strong style="color:var(--green-med);">${p.timeIn}</strong></td>
       <td><strong style="color:var(--red);">${p.timeOut}</strong></td>
+      <td>${p.duration}</td>
       <td><span class="badge ${p.badge}">${p.status}</span></td>
       <td>
         <button class="action-link" onclick="openNextAppointmentModal('${p.mr}', '${p.name}', '${p.assignedDoctor}')" style="background:var(--green-dark); margin-right:4px;">+ Next Appt</button>
@@ -715,6 +810,7 @@
                 <th>Appt Date & Time</th>
                 <th>Time In</th>
                 <th>Time Out</th>
+                <th>Duration</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -989,6 +1085,7 @@
     if (pageId === 'dashboard') container.innerHTML = renderDashboard();
     else if (pageId === 'patient_reg') container.innerHTML = renderPatientRegistration();
     else if (pageId === 'patient_mgmt') container.innerHTML = renderPatientManagement();
+    else if (pageId === 'patient_timeline') container.innerHTML = renderPatientTimeline();
     else if (pageId === 'doctor_mgmt') container.innerHTML = renderDoctorManagement();
 
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -1008,6 +1105,7 @@
   window.onload = async () => {
     initApp();
     await loadStaffData();
+    await loadTimelineData();
     switchView('patient_mgmt');
   };
 </script>

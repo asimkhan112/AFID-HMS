@@ -46,7 +46,7 @@ def complete_procedure(proc_id: int, db: Session = Depends(get_db), _=Depends(ge
         raise HTTPException(404, "Procedure not found")
     proc.is_completed = True
     if proc.patient and not proc.patient.check_out_time:
-        proc.patient.check_out_time = datetime.utcnow()
+        proc.patient.check_out_time = datetime.now()
     db.commit()
     db.refresh(proc)
     return proc

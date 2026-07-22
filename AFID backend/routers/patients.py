@@ -45,7 +45,7 @@ def create_patient(
 ):
     if db.query(models.Patient).filter(models.Patient.mr_number == payload.mr_number).first():
         raise HTTPException(status_code=400, detail="MR number already exists")
-    patient = models.Patient(**payload.model_dump(), check_in_time=datetime.utcnow())
+    patient = models.Patient(**payload.model_dump())
     db.add(patient)
     db.commit()
     db.refresh(patient)
@@ -124,8 +124,10 @@ def update_status(
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
     patient.status = payload.status
-    if payload.status == models.PatientStatus.completed and not patient.check_out_time:
-        patient.check_out_time = datetime.utcnow()
+    if patient.status == models.PatientStatus.active and not patient.check_in_time:
+        patient.check_in_time = datetime.now()
+    if patient.status == models.PatientStatus.completed and not patient.check_out_time:
+        patient.check_out_time = datetime.now()
     db.commit()
     db.refresh(patient)
     return patient

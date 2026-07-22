@@ -79,6 +79,11 @@
     .container-card { background-color: var(--mint-container); border: 1px solid #cbd5e1; border-radius: 16px; padding: 24px; box-shadow: var(--shadow-sm); margin-bottom: 32px; }
     .container-title { font-size: 13px; font-weight: 800; color: var(--primary-green); text-transform: uppercase; margin-bottom: 18px; border-bottom: 2px solid rgba(11, 76, 51, 0.15); padding-bottom: 10px; display: flex; justify-content: space-between; }
     .inner-card { background-color: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+    .patient-details-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+    .patient-details-grid .label { color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 2px; }
+    .patient-details-grid .value { font-size: 14px; font-weight: 600; color: var(--text-main); }
+    .form-group { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 12px; font-weight: 600; color: var(--text-main); }
 
     /* Tables & Lists */
     table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
@@ -281,7 +286,11 @@
   function switchView(viewKey) {
     currentView = viewKey;
     renderNav();
-    renderView();
+    if (viewKey === 'patient_operations') {
+      loadHODOperationsData().then(() => renderPatientOperations());
+    } else {
+      renderView();
+    }
   }
 
   function renderNav() {
@@ -290,6 +299,7 @@
       { id: 'monitoring', label: 'Doctor Monitoring' },
       { id: 'staff_mgmt', label: 'Staff Management' },
       { id: 'leaves', label: 'Leave Management' },
+      { id: 'patient_operations', label: 'Patient Operations' },
       { id: 'timeline', label: 'Patient Timeline' }
     ];
 
@@ -372,6 +382,102 @@
     } catch (e) {
       console.warn('Failed to load HOD portal data:', e);
     }
+  }
+
+  let hodOperationsPatient = null;
+  let hodOperationsPatients = [];
+
+  async function loadHODOperationsData() {
+    try {
+      hodOperationsPatients = (await api.get('/patients/')) || [];
+    } catch (e) {
+      hodOperationsPatients = [];
+    }
+  }
+
+  async function hodOperationsSearch() {
+    const query = document.getElementById('hod-ops-search-input')?.value.trim();
+    if (!query) { showToast('Enter a search query'); return; }
+    try {
+      const results = await api.get(`/patients/?search=${encodeURIComponent(query)}`);
+      const patient = (results || []).find(p => p.mr_number === query || p.full_name.toLowerCase().includes(query.toLowerCase())) || (results && results[0]);
+      if (!patient) { showToast('Patient not found'); return; }
+      hodOperationsPatient = patient;
+      renderPatientOperationsWorkspace();
+    } catch (e) {
+      showToast(e.message || 'Search failed');
+    }
+  }
+
+  function renderPatientOperationsWorkspace() {
+    const p = hodOperationsPatient || {};
+    const timeIn = p.check_in_time ? new Date(p.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+    const timeOut = p.check_out_time ? new Date(p.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+    const duration = (p.check_in_time && p.check_out_time) ? `${Math.max(0, Math.round((new Date(p.check_out_time) - new Date(p.check_in_time)) / 60000))} min` : '—';
+
+    document.getElementById('view-target').innerHTML = `
+      <div class="container-card">
+        <div class="container-title"><span>Active Case Workspace</span><button class="btn btn-sm" onclick="hodOperationsPatient=null; renderView();">← Back</button></div>
+        <div style="padding:20px;">
+          <div class="patient-details-grid">
+            <div><span class="label">Patient Name</span><div class="value">${p.full_name || '—'}</div></div>
+            <div><span class="label">MR Number</span><div class="value">${p.mr_number || '—'}</div></div>
+            <div><span class="label">Status</span><div class="value">${(p.status || '—').toString().toUpperCase()}</div></div>
+            <div><span class="label">Room</span><div class="value">${p.room || '—'}</div></div>
+            <div><span class="label">Assigned Doctor</span><div class="value">${p.assigned_doctor || '—'}</div></div>
+            <div><span class="label">Procedure</span><div class="value">${p.procedure_category || '—'}</div></div>
+            <div><span class="label">Time In</span><div class="value">${timeIn}</div></div>
+            <div><span class="label">Time Out</span><div class="value">${timeOut}</div></div>
+            <div><span class="label">Duration</span><div class="value">${duration}</div></div>
+          </div>
+          <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-sm" onclick=" HodStartProcedure()">Start Procedure</button>
+            <button class="btn btn-sm" onclick="completeHODCase()">Confirm & Complete</button>
+            <button class="btn btn-sm" style="background:#6b7280;" onclick="showToast('Not implemented in HOD');">View Timeline</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function HodStartProcedure() {
+    if (!hodOperationsPatient) { showToast('No patient selected'); return; }
+    try {
+      const updated = await api.patch(`/patients/${hodOperationsPatient.id}/status`, { status: 'ACTIVE' });
+      hodOperationsPatient = updated;
+      showToast('Procedure started');
+      renderPatientOperationsWorkspace();
+    } catch (e) {
+      showToast(e.message || 'Unable to start');
+    }
+  }
+
+  async function completeHODCase() {
+    if (!hodOperationsPatient) { showToast('No patient selected'); return; }
+    try {
+      const updated = await api.patch(`/patients/${hodOperationsPatient.id}/status`, { status: 'COMPLETED' });
+      hodOperationsPatient = updated;
+      showToast('Case completed');
+      renderPatientOperationsWorkspace();
+    } catch (e) {
+      showToast(e.message || 'Unable to complete');
+    }
+  }
+
+  function renderPatientOperations() {
+    hodOperationsPatient = null;
+    document.getElementById('view-target').innerHTML = `
+      <div class="container-card">
+        <div class="container-title"><span>Patient Operations</span></div>
+        <div style="padding:20px;">
+          <div class="form-group">
+            <label class="label">Search Patient by MR Number or Name</label>
+            <input type="text" id="hod-ops-search-input" placeholder="Enter MR number or patient name..." />
+            <button class="btn" style="margin-top:8px;" onclick="hodOperationsSearch()">Search Patient</button>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function updateNotifications() {
@@ -575,6 +681,7 @@
     else if (currentView === 'monitoring') target.innerHTML = renderMonitoringView();
     else if (currentView === 'staff_mgmt') target.innerHTML = renderStaffMgmtView();
     else if (currentView === 'leaves') target.innerHTML = renderLeavesView();
+    else if (currentView === 'patient_operations') target.innerHTML = renderPatientOperations();
     else if (currentView === 'timeline') target.innerHTML = renderPatientTimelineView();
 
     updateNotifications();
