@@ -35,10 +35,10 @@ def generate_queue_excel(patients: List[Dict[str, Any]], doctor_name: str) -> st
     exports_dir = os.path.join(os.path.dirname(__file__), "exports")
     os.makedirs(exports_dir, exist_ok=True)
     
-    # Generate filename: DoctorName_YYYY-MM-DD_HH-MM.xlsx
+    # Generate filename: DoctorName_YYYY-MM-DD_HH-MM-SSS.xlsx (include seconds to avoid collisions)
     now = datetime.now()
     sanitized_doctor_name = sanitize_filename(doctor_name)
-    filename = f"{sanitized_doctor_name}_{now.strftime('%Y-%m-%d_%H-%M')}.xlsx"
+    filename = f"{sanitized_doctor_name}_{now.strftime('%Y-%m-%d_%H-%M-%S')}.xlsx"
     filepath = os.path.join(exports_dir, filename)
     
     # Note: We intentionally allow overwriting files from the same minute.

@@ -37,7 +37,14 @@ def login(payload: schemas.LoginIn, db: Session = Depends(get_db)):
 
 
 @router.post("/register", response_model=schemas.UserOut, status_code=201)
-def register(payload: schemas.UserCreate, db: Session = Depends(get_db)):
+def register(
+    payload: schemas.UserCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    # Restrict admin account creation to admins/HOD only
+    if payload.role == models.UserRole.admin and current_user.role not in (models.UserRole.admin, models.UserRole.hod):
+        raise HTTPException(status_code=403, detail="Only admin/HOD can create admin accounts")
     if db.query(models.User).filter(models.User.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
     user = models.User(
@@ -63,17 +70,10 @@ def logout(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Logout endpoint that exports the doctor's patient queue to Excel.
-    Export occurs only after successful logout.
-    If export fails, the error is logged and logout continues.
-    """
+    export_status = "no_queue"
     try:
-        # Only export queue for doctors
         if current_user.role == models.UserRole.doctor:
             try:
-                # Fetch all patients currently in this doctor's queue
-                # Queue records are patients assigned to this doctor and still waiting/active
                 doctor_name = current_user.full_name
                 patients = db.query(models.Patient).filter(
                     models.Patient.assigned_doctor == doctor_name,
@@ -82,7 +82,6 @@ def logout(
                     )
                 ).all()
                 
-                # Convert patients to list of dictionaries for Excel export
                 patient_data = []
                 for patient in patients:
                     patient_data.append({
@@ -92,30 +91,17 @@ def logout(
                         "status": patient.status.value if patient.status else "",
                         "visit_date": patient.registered_at,
                         "visit_time": patient.registered_at,
-                        "age": "N/A"  # Age not directly stored in model
+                        "age": "N/A"
                     })
                 
-                # Generate Excel file (always create file, even for empty queue)
-                filepath = generate_queue_excel(patient_data, doctor_name)
-                logger.info(
-                    f"Successfully exported patient queue for doctor {doctor_name} "
-                    f"to {filepath}. Total patients: {len(patient_data)}"
-                )
-                    
+                if patient_data:
+                    filepath = generate_queue_excel(patient_data, doctor_name)
+                    export_status = f"exported:{len(patient_data)}"
+                else:
+                    export_status = "empty_queue"
             except Exception as export_error:
-                # Log the error but don't fail the logout
-                logger.error(
-                    f"Failed to export patient queue for doctor {current_user.full_name}: "
-                    f"{str(export_error)}",
-                    exc_info=True
-                )
-        
-        # Return success response
-        return {"message": "Logout successful"}
-        
-    except Exception as e:
-        logger.error(f"Logout failed for user {current_user.id}: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Logout failed. Please try again."
-        )
+                export_status = f"error:{str(export_error)}"
+    except Exception:
+        pass
+    
+    return {"message": "Logout successful", "export_status": export_status}

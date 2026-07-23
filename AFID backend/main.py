@@ -34,6 +34,9 @@ import models  # noqa: F401
 
 from routers import auth, patients, doctors, procedures, leaves, staff, hod
 
+# Doctor allocations router
+from routers.doctors import router as allocations_router
+
 # ── Migrations ─────────────────────────────────────────────────────────────────
 def run_migrations():
     with engine.connect() as conn:
@@ -75,6 +78,7 @@ app.include_router(procedures.router)
 app.include_router(leaves.router)
 app.include_router(staff.router)
 app.include_router(hod.router)
+app.include_router(allocations_router)
 
 
 @app.get("/", tags=["Health"])

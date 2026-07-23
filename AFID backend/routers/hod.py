@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from auth import get_current_user
+from auth import get_current_user, require_role
 import models, schemas
 
 router = APIRouter(prefix="/hod", tags=["HOD Dashboard"])
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/hod", tags=["HOD Dashboard"])
 
 # ── Summary KPIs ──────────────────────────────────────────────────────────────
 @router.get("/summary", response_model=schemas.HODSummary)
-def get_summary(db: Session = Depends(get_db), _=Depends(get_current_user)):
+def get_summary(db: Session = Depends(get_db), _=Depends(get_current_user), __=Depends(require_role(models.UserRole.hod, models.UserRole.admin))):
     total_patients = db.query(models.Patient).count()
     doctors_on_duty = (
         db.query(models.DoctorProfile)
@@ -49,12 +49,12 @@ def get_summary(db: Session = Depends(get_db), _=Depends(get_current_user)):
 
 # ── Operatory Rooms ───────────────────────────────────────────────────────────
 @router.get("/rooms", response_model=List[schemas.OperatoryRoomOut])
-def list_rooms(db: Session = Depends(get_db), _=Depends(get_current_user)):
+def list_rooms(db: Session = Depends(get_db), _=Depends(get_current_user), __=Depends(require_role(models.UserRole.hod, models.UserRole.admin))):
     return db.query(models.OperatoryRoom).order_by(models.OperatoryRoom.room_name).all()
 
 
 @router.post("/rooms", response_model=schemas.OperatoryRoomOut, status_code=201)
-def create_room(payload: schemas.OperatoryRoomCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def create_room(payload: schemas.OperatoryRoomCreate, db: Session = Depends(get_db), _=Depends(get_current_user), __=Depends(require_role(models.UserRole.hod, models.UserRole.admin))):
     existing = db.query(models.OperatoryRoom).filter(models.OperatoryRoom.room_name == payload.room_name).first()
     if existing:
         raise HTTPException(400, f"Room '{payload.room_name}' already exists")
@@ -71,6 +71,7 @@ def update_room(
     payload: schemas.OperatoryRoomUpdate,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
+    __=Depends(require_role(models.UserRole.hod, models.UserRole.admin)),
 ):
     room = db.query(models.OperatoryRoom).filter(models.OperatoryRoom.id == room_id).first()
     if not room:
@@ -84,7 +85,7 @@ def update_room(
 
 # ── Doctor Monitoring Matrix ──────────────────────────────────────────────────
 @router.get("/monitoring", response_model=List[schemas.DoctorMonitorRow])
-def doctor_monitoring(db: Session = Depends(get_db), _=Depends(get_current_user)):
+def doctor_monitoring(db: Session = Depends(get_db), _=Depends(get_current_user), __=Depends(require_role(models.UserRole.hod, models.UserRole.admin))):
     doctors = (
         db.query(models.User)
         .filter(models.User.role == models.UserRole.doctor)
@@ -108,7 +109,7 @@ def doctor_monitoring(db: Session = Depends(get_db), _=Depends(get_current_user)
 
 # ── Patient Timeline ──────────────────────────────────────────────────────────
 @router.get("/timeline/{mr_number}", response_model=List[schemas.TimelineStepOut])
-def get_patient_timeline(mr_number: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def get_patient_timeline(mr_number: str, db: Session = Depends(get_db), _=Depends(get_current_user), __=Depends(require_role(models.UserRole.hod, models.UserRole.admin, models.UserRole.doctor))):
     patient = db.query(models.Patient).filter(models.Patient.mr_number == mr_number).first()
     if not patient:
         raise HTTPException(404, f"Patient with MR {mr_number} not found")
@@ -126,6 +127,7 @@ def add_timeline_step(
     payload: schemas.TimelineStepCreate,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
+    __=Depends(require_role(models.UserRole.hod, models.UserRole.admin, models.UserRole.doctor)),
 ):
     patient = db.query(models.Patient).filter(models.Patient.mr_number == mr_number).first()
     if not patient:
@@ -143,6 +145,7 @@ def update_timeline_step(
     payload: schemas.TimelineStepUpdate,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
+    __=Depends(require_role(models.UserRole.hod, models.UserRole.admin, models.UserRole.doctor)),
 ):
     step = db.query(models.PatientTimelineStep).filter(models.PatientTimelineStep.id == step_id).first()
     if not step:

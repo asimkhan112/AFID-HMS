@@ -313,24 +313,40 @@
     document.getElementById('doc-modal').classList.remove('active');
   }
 
-  function approveExtension(roomId) {
+  async function approveExtension(roomId) {
     const room = cachedRooms.find(r => r.id === roomId);
     if (room) {
-      room.approved = true;
-      showToast(`✓ Extension approved for ${room.assigned_doctor}`);
-      renderView();
+      try {
+        await api.patch(`/hod/rooms/${roomId}`, {
+          approved: true
+        });
+        room.approved = true;
+        showToast(`✓ Extension approved for ${room.assigned_doctor}`);
+        renderView();
+      } catch (e) {
+        showToast(e.message || 'Unable to approve extension');
+      }
     }
   }
 
-  function completeProcedure(roomId) {
+  async function completeProcedure(roomId) {
     const room = cachedRooms.find(r => r.id === roomId);
     if (!room) return;
-    room.status = 'available';
-    room.status_display = 'Available';
-    room.current_procedure = 'Idle / Preparing Chair';
-    room.time_in_mins = 0;
-    showToast(`Procedure completed for ${room.assigned_doctor}`);
-    renderView();
+    try {
+      await api.patch(`/hod/rooms/${roomId}`, {
+        status: 'available',
+        current_case: 'Idle / Preparing Chair',
+        queue_count: 0
+      });
+      room.status = 'available';
+      room.status_display = 'Available';
+      room.current_procedure = 'Idle / Preparing Chair';
+      room.time_in_mins = 0;
+      showToast(`Procedure completed for ${room.assigned_doctor}`);
+      renderView();
+    } catch (e) {
+      showToast(e.message || 'Unable to complete procedure');
+    }
   }
 
   async function handleLeaveResolve(id, status) {
@@ -344,8 +360,17 @@
     }
   }
 
-  function logout() {
-    if (confirm('Are you sure you want to log out?')) {
+  async function logout() {
+    if (!confirm('Are you sure you want to log out?')) {
+      return;
+    }
+    try {
+      if (typeof api !== 'undefined') {
+        await api.post('/auth/logout');
+      }
+    } catch (e) {
+      console.warn('Logout API call failed:', e);
+    } finally {
       removeToken();
       removeUser();
       window.location.replace('Login.html');
@@ -1358,7 +1383,7 @@
     }
 
     const allSteps = cachedTimelineSteps[mr] || [];
-    const completedProcedures = allSteps.filter(s => s.status === 'Completed');
+    const completedProcedures = allSteps.filter(s => (s.status || '').toLowerCase() === 'completed');
     if (badgeEl) badgeEl.innerText = `Total Performed: ${completedProcedures.length}`;
 
     let proceduresHTML = '';

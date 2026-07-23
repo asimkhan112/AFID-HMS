@@ -63,7 +63,7 @@ def seed():
             ("Ali Raza",      "Nurse",           "Active"),
             ("Maha Siddiq",   "Lab Technician",  "Active"),
             ("Umar Farooq",   "Receptionist",    "Active"),
-            ("Nadia Yousuf",  "On Leave",        "On Leave"),
+            ("Nadia Yousuf",  "Nurse",           "On Leave"),
             ("Bilal Qadir",   "Lab Technician",  "Active"),
             ("Hina Akram",    "Technician",      "Active"),
             ("Kamran Shah",   "Receptionist",    "Active"),

@@ -527,9 +527,13 @@
     function buildAnalyticsRows() {
       const currentUser = getUser();
       const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
-      return (cachedPatients || []).filter(patient => {
+      const myPatients = (cachedPatients || []).filter(patient => {
         const assignedDoctor = patient.assigned_doctor || patient.doctor || '';
         return assignedDoctor === currentName || assignedDoctor === LOGGED_IN_DOCTOR;
+      });
+      return myPatients.filter(patient => {
+        const status = (patient.status || '').toString().toUpperCase();
+        return status === 'ACTIVE' || status === 'COMPLETED';
       }).map((patient, index) => {
         const procName = patient.procedure_category || 'Clinical Assessment';
         const duration = /root|canal/i.test(procName) ? 60 : /bracket|bond/i.test(procName) ? 45 : /retainer|align/i.test(procName) ? 30 : /consult/i.test(procName) ? 15 : 25;
@@ -610,10 +614,12 @@
           const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
           const patients = await api.get(`/patients/?search=${encodeURIComponent(query)}`);
           if (patients && patients.length > 0) {
-            patient = patients.find(p => {
+            // Scope search to current doctor's patients only
+            const myPatients = patients.filter(p => {
               const assignedDoctor = p.assigned_doctor || p.doctor || '';
               return assignedDoctor === currentName || assignedDoctor === LOGGED_IN_DOCTOR;
-            }) || patients[0];
+            });
+            patient = myPatients[0] || null;
           }
         } else {
           const currentUser = getUser();
@@ -1563,22 +1569,77 @@
       }
     }
 
-    function confirmTimeOut() {
+    async function confirmTimeOut() {
       if (!currentPatient) {
         alert("No active patient selected.");
         return;
       }
       const timeOutInput = document.getElementById('patient-time-out');
       const timeOut = timeOutInput.value || '—';
-      if (confirm(`Confirm session completion with Time Out: ${timeOut}? This will save the session summary.`)) {
-        api.patch(`/patients/${currentPatient.id}/status`, { status: 'COMPLETED' })
-          .then(updated => {
-            currentPatient = updated;
-            const updatedTimeOut = updated.check_out_time ? new Date(updated.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-            timeOutInput.value = updatedTimeOut;
-            compileMasterSummary();
-          })
-          .catch(err => alert(err.message || "Unable to complete session"));
+      if (!confirm(`Confirm session completion with Time Out: ${timeOut}? This will save the session summary.`)) {
+        return;
+      }
+
+      try {
+        // 1. Save procedure session
+        const procedureTitle = document.getElementById('procedure-select').value || "Routine Clinical Assessment";
+        const proc = await api.post('/procedures/', {
+          patient_id: currentPatient.id,
+          doctor_id: null,
+          name: procedureTitle
+        });
+
+        // 2. Save checklist if any
+        // (Currently using preset notes only, no separate checklist UI)
+
+        // 3. Save materials
+        for (const m of activeMaterials) {
+          await api.post(`/procedures/${proc.id}/materials/`, {
+            material_name: m.name,
+            quantity: m.qty || 1
+          });
+        }
+
+        // 4. Save pharmacy
+        for (const p of activePharmacy) {
+          await api.post(`/procedures/${proc.id}/pharmacy/`, {
+            medication: p.med,
+            dose: p.dose,
+            frequency: p.freq
+          });
+        }
+
+        // 5. Save diagnostics
+        for (const d of activeDiagnostics) {
+          await api.post(`/procedures/${proc.id}/diagnostics/`, {
+            test_name: d.name,
+            urgency: d.urgency || 'Routine'
+          });
+        }
+
+        // 6. Save clinical notes
+        const notesValue = document.getElementById('clinical-notes-textarea').value;
+        if (notesValue && notesValue.trim()) {
+          await api.post(`/procedures/${proc.id}/notes/`, {
+            note_text: notesValue
+          });
+        }
+
+        // 7. Mark patient as completed
+        const updated = await api.patch(`/patients/${currentPatient.id}/status`, { status: 'COMPLETED' });
+        currentPatient = updated;
+        const updatedTimeOut = updated.check_out_time ? new Date(updated.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+        timeOutInput.value = updatedTimeOut;
+
+        // 8. Clear in-memory arrays
+        activeMaterials = [];
+        activePharmacy = [];
+        activeDiagnostics = [];
+
+        alert('Session completed and saved successfully.');
+        compileMasterSummary();
+      } catch (err) {
+        alert(err.message || "Unable to complete session");
       }
     }
 
