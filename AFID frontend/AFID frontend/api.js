@@ -36,12 +36,8 @@ async function apiRequest(path, options = {}) {
     try { data = await res.json(); } catch { data = {}; }
 
     if (!res.ok) {
-        // Handle 401 Unauthorized - token expired or invalid.
-        // Exclude the login endpoint itself: a 401 there means "wrong
-        // credentials", not an expired session, so we must surface the
-        // backend's error (e.g. "Incorrect email or password") on the login
-        // form instead of clearing storage and reloading the page.
-        if (res.status === 401 && !path.startsWith("/auth/login")) {
+        // Handle 401 Unauthorized - token expired or invalid
+        if (res.status === 401) {
             // Clear auth data and redirect to login
             removeToken();
             removeUser();
