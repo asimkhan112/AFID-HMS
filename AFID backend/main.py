@@ -7,7 +7,6 @@ Run with: uvicorn main:app --reload --port 8000
 import sys
 import os
 import logging
-from sqlalchemy import text
 # Ensure the backend root is always on sys.path so routers can import
 # config, database, models, schemas, auth regardless of CWD.
 sys.path.insert(0, os.path.dirname(__file__))
@@ -37,19 +36,10 @@ from routers import auth, patients, doctors, procedures, leaves, staff, hod, pre
 # Doctor allocations router
 from routers.doctors import router as allocations_router
 
-# ── Migrations ─────────────────────────────────────────────────────────────────
-def run_migrations():
-    with engine.connect() as conn:
-        for column in ("check_in_time", "check_out_time"):
-            try:
-                conn.execute(text(f"ALTER TABLE patients ADD COLUMN {column} DATETIME"))
-                conn.commit()
-            except Exception:
-                pass
-
-run_migrations()
-
 # ── Create tables ─────────────────────────────────────────────────────────────
+# Table creation is fully handled by SQLAlchemy models against PostgreSQL.
+# For schema changes to an existing database, use Alembic migrations
+# instead of ad-hoc ALTER TABLE hacks.
 Base.metadata.create_all(bind=engine)
 
 # ── App ───────────────────────────────────────────────────────────────────────

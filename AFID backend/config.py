@@ -10,7 +10,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # ── Database ──────────────────────────────────────────────────────────────
     # Default to SQLite for development; override with postgresql:// URL in production
-    DATABASE_URL: str = "sqlite:///./afid.db"
+    # PostgreSQL only. Matches .env.example / the setup steps in
+    # AFID backend/README.md -- override via .env if your credentials differ.
+    DATABASE_URL: str = "postgresql://afid_user:afid_pass@localhost:5432/afid_db"
 
     # ── JWT ───────────────────────────────────────────────────────────────────
     SECRET_KEY: str = "CHANGE_ME_IN_PRODUCTION_USE_A_LONG_RANDOM_STRING"
