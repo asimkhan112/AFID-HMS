@@ -10,6 +10,8 @@ test.describe('Reception Patient Queue', () => {
   });
 
   test('registering a patient creates a visible WAITING row with correct doctor assignment', async ({ page, request }) => {
+    await page.click('[data-page="patient_reg"]');
+
     const mr = uniqueId('QA-MR');
     const file = uniqueId('QA-F');
     await fillPatientForm(page, { mr, file, name: 'QA Patient One', cnic: '11111-1111111-1', doctor: 'Dr. Rehan M.' });
@@ -97,8 +99,9 @@ test.describe('Reception Patient Queue', () => {
   test('Doctor Management loads real allocations from API and allows creating new ones', async ({ page, request }) => {
     // The /allocations router is now registered in main.py, so the endpoint
     // should return 200 with an array (empty or populated).
-    await loginAs(page, 'receptionist');
-
+    // (No second loginAs() here -- beforeEach already logged us in, and
+    // Login.html auto-redirects an already-authenticated session away
+    // before the login form ever renders.)
     const headers = await authHeaders(page);
     const getRes = await request.get(`${API}/allocations`, { headers });
     expect(getRes.status()).toBe(200);

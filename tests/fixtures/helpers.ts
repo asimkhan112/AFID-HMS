@@ -2,6 +2,33 @@ import { type Page, type APIRequestContext } from '@playwright/test';
 
 export const API = 'http://localhost:8000';
 
+// ---------------------------------------------------------------------------
+// Ported in from the original QA scaffold's tests/fixtures.ts (a separate,
+// test.extend-based fixture file that is being retired in favor of this
+// plain-helpers module). CREDS and landingPageRegExp are added here as new,
+// standalone exports -- nothing above or below this block is changed.
+// ---------------------------------------------------------------------------
+
+export type Role = 'hod' | 'doctor' | 'receptionist';
+
+export const CREDS: Record<Role, { email: string; password: string; page: string }> = {
+  hod:          { email: 'hod@afid.mil',       password: 'admin1234',  page: 'hod.html' },
+  doctor:       { email: 'doctor@afid.mil',    password: 'doctor1234', page: 'doctor (1).html' },
+  receptionist: { email: 'reception@afid.mil', password: 'staff1234',  page: 'staff.html' },
+};
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Login.html's portalForRole() redirects the doctor role to the literal
+// filename 'doctor (1).html' -- a plain glob string can't safely match a
+// filename with a space and parentheses once the browser percent-encodes it,
+// so build a RegExp from the encoded, regex-escaped filename instead.
+export function landingPageRegExp(fileName: string): RegExp {
+  return new RegExp(escapeRegExp(encodeURI(fileName)) + '$');
+}
+
 export async function loginAs(page: Page, role: 'receptionist' | 'doctor' | 'hod' | 'admin') {
   await page.goto('/Login.html');
   
