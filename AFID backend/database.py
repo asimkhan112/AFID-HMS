@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from config import settings
 
 # ── Engine ────────────────────────────────────────────────────────────────────
-# SQLite needs check_same_thread=False for multi-threaded FastAPI
+# Remove SQLite-specific connect_args since we're using PostgreSQL
 connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False

@@ -1,79 +1,51 @@
-"""Pydantic schemas for request validation and response serialization."""
+"""
+schemas.py
+Pydantic schemas for request/response validation.
+"""
 
-from __future__ import annotations
 from datetime import datetime, date
 from typing import Optional, List
-from pydantic import BaseModel, EmailStr
-from models import UserRole, PatientStatus, LeaveStatus, LeaveType, DiagnosticUrgency, StepStatus, RoomStatus
+
+from pydantic import BaseModel, ConfigDict
 
 
-# ── Auth ──────────────────────────────────────────────────────────────────────
-class UserCreate(BaseModel):
-    full_name: str
-    email: EmailStr
-    password: str
-    role: UserRole = UserRole.receptionist
-    staff_id: Optional[str] = None
+# ── Users & Auth ──────────────────────────────────────────────────────────────
 
-class UserOut(BaseModel):
-    id: int
+class UserBase(BaseModel):
     full_name: str
     email: str
-    role: UserRole
-    staff_id: Optional[str]
+    role: str
+    staff_id: Optional[str] = None
+
+
+class UserCreate(UserBase):
+    password: str
+
+
+class UserOut(UserBase):
+    id: int
     is_active: bool
-    model_config = {"from_attributes": True}
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
+LoginIn = UserLogin
+
 
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
-class LoginIn(BaseModel):
-    email: EmailStr
-    password: str
-
-
-# ── Doctor Profile ────────────────────────────────────────────────────────────
-class DoctorProfileCreate(BaseModel):
-    department: Optional[str] = None
-    qualifications: Optional[str] = None
-    shift: Optional[str] = None
-    hod_on_call: Optional[str] = None
-    status: Optional[str] = "Available"
-
-class DoctorProfileOut(DoctorProfileCreate):
-    id: int
-    user_id: int
-    model_config = {"from_attributes": True}
-
-
-# ── Staff ─────────────────────────────────────────────────────────────────────
-class StaffCreate(BaseModel):
-    name: str
-    role: str
-    status: str = "Active"
-
-class StaffOut(StaffCreate):
-    id: int
-    created_at: datetime
-    model_config = {"from_attributes": True}
-
-
-# ── Doctor Allocations ────────────────────────────────────────────────────────
-class DoctorAllocationCreate(BaseModel):
-    doctor_name: str
-    room: str
-    department: Optional[str] = None
-    chair: Optional[str] = None
-
-class DoctorAllocationOut(DoctorAllocationCreate):
-    id: int
-    created_at: datetime
-    model_config = {"from_attributes": True}
-
 
 # ── Patients ──────────────────────────────────────────────────────────────────
-class PatientCreate(BaseModel):
+
+class PatientBase(BaseModel):
     mr_number: str
     file_number: str
     full_name: str
@@ -87,33 +59,129 @@ class PatientCreate(BaseModel):
     assigned_doctor: Optional[str] = None
     procedure_category: Optional[str] = None
 
-class PatientStatusUpdate(BaseModel):
-    status: PatientStatus
 
-class PatientOut(BaseModel):
+class PatientCreate(PatientBase):
+    pass
+
+
+class PatientOut(PatientBase):
     id: int
-    mr_number: str
-    file_number: str
-    full_name: str
-    rank: Optional[str]
-    cnic: Optional[str]
-    gender: Optional[str]
-    blood_group: Optional[str]
-    service_profile: Optional[str]
-    allergies: Optional[str]
-    room: Optional[str]
-    assigned_doctor: Optional[str]
-    procedure_category: Optional[str]
-    status: PatientStatus
+    status: str
     registered_at: datetime
+    updated_at: datetime
     check_in_time: Optional[datetime] = None
     check_out_time: Optional[datetime] = None
-    model_config = {"from_attributes": True}
+
+    model_config = ConfigDict(from_attributes=True)
 
 
-# ── Procedure History (Patient → many Procedures) ────────────────────────────
+class PatientWithProceduresOut(PatientOut):
+    procedures: List[dict] = []
+
+
+class PatientStatusUpdate(BaseModel):
+    status: str
+
+
+# ── Procedure Presets ────────────────────────────────────────────────────────
+
+class PresetMaterialIn(BaseModel):
+    name: str
+    quantity: int = 1
+
+
+class PresetPharmacyIn(BaseModel):
+    medication: str
+    dose: Optional[str] = None
+    frequency: Optional[str] = None
+
+
+class PresetDiagnosticIn(BaseModel):
+    test_name: str
+    urgency: str = "Routine"
+
+
+class ProcedurePresetCreate(BaseModel):
+    name: str
+    duration: int = 30
+    notes: Optional[str] = None
+    materials: List[PresetMaterialIn] = []
+    pharmacy: List[PresetPharmacyIn] = []
+    diagnostics: List[PresetDiagnosticIn] = []
+
+
+class PresetMaterialOut(PresetMaterialIn):
+    id: int
+    preset_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PresetPharmacyOut(PresetPharmacyIn):
+    id: int
+    preset_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PresetDiagnosticOut(PresetDiagnosticIn):
+    id: int
+    preset_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProcedurePresetOut(BaseModel):
+    id: int
+    name: str
+    duration: int
+    notes: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+    materials: List[PresetMaterialOut] = []
+    pharmacy: List[PresetPharmacyOut] = []
+    diagnostics: List[PresetDiagnosticOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PresetSummaryOut(BaseModel):
+    id: int
+    name: str
+    duration: int
+    notes: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Procedures ────────────────────────────────────────────────────────────────
+
+class ProcedureBase(BaseModel):
+    patient_id: int
+    doctor_id: Optional[int] = None
+    name: str
+    is_completed: bool = False
+
+
+class ProcedureCreate(ProcedureBase):
+    pass
+
+
+class ProcedureOut(ProcedureBase):
+    id: int
+    session_date: datetime
+    patient: Optional[PatientOut] = None
+    doctor: Optional[UserOut] = None
+    checklist: List[dict] = []
+    materials: List[dict] = []
+    pharmacy: List[dict] = []
+    diagnostics: List[dict] = []
+    notes: List[dict] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ProcedureHistoryOut(BaseModel):
-    """Summary of one procedure for display in patient history."""
     id: int
     name: str
     session_date: datetime
@@ -124,150 +192,353 @@ class ProcedureHistoryOut(BaseModel):
     pharmacy_count: int = 0
     diagnostics_count: int = 0
     notes_count: int = 0
-    model_config = {"from_attributes": True}
 
-class PatientWithProceduresOut(PatientOut):
-    """Patient record including their full procedure history."""
-    procedures: List[ProcedureHistoryOut] = []
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
-# ── Procedures ────────────────────────────────────────────────────────────────
-class ProcedureCreate(BaseModel):
-    patient_id: int
-    doctor_id: Optional[int] = None
-    name: str
+# ── Materials, Pharmacy, Diagnostics ─────────────────────────────────────────
 
-class ProcedureOut(BaseModel):
-    id: int
-    patient_id: int
-    doctor_id: Optional[int]
-    name: str
-    session_date: datetime
-    is_completed: bool
-    model_config = {"from_attributes": True}
-
-class ChecklistItemCreate(BaseModel):
-    step_text: str
-    is_checked: bool = False
-    display_order: int = 0
-
-class ChecklistItemOut(ChecklistItemCreate):
-    id: int
-    procedure_id: int
-    model_config = {"from_attributes": True}
-
-class ChecklistItemUpdate(BaseModel):
-    is_checked: bool
-
-class MaterialCreate(BaseModel):
+class ProcedureMaterialIn(BaseModel):
     material_name: str
     quantity: int = 1
 
-class MaterialOut(MaterialCreate):
+
+class ProcedureMaterialOut(BaseModel):
     id: int
     procedure_id: int
-    model_config = {"from_attributes": True}
+    material_name: str
+    quantity: int
 
-class PharmacyCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+MaterialCreate = ProcedureMaterialIn
+
+
+class ProcedurePharmacyIn(BaseModel):
     medication: str
     dose: Optional[str] = None
     frequency: Optional[str] = None
 
-class PharmacyOut(PharmacyCreate):
+
+class ProcedurePharmacyOut(BaseModel):
     id: int
     procedure_id: int
-    model_config = {"from_attributes": True}
+    medication: str
+    dose: Optional[str] = None
+    frequency: Optional[str] = None
 
-class DiagnosticCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+PharmacyCreate = ProcedurePharmacyIn
+
+
+class ProcedureDiagnosticIn(BaseModel):
     test_name: str
-    urgency: DiagnosticUrgency = DiagnosticUrgency.routine
+    urgency: str = "Routine"
 
-class DiagnosticOut(DiagnosticCreate):
+
+class ProcedureDiagnosticOut(BaseModel):
     id: int
     procedure_id: int
-    model_config = {"from_attributes": True}
+    test_name: str
+    urgency: str
 
-class ClinicalNoteCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+DiagnosticCreate = ProcedureDiagnosticIn
+
+
+class ClinicalNoteIn(BaseModel):
     note_text: str
 
-class ClinicalNoteOut(ClinicalNoteCreate):
+
+class ClinicalNoteOut(BaseModel):
     id: int
     procedure_id: int
+    note_text: str
     created_at: datetime
-    model_config = {"from_attributes": True}
+
+    model_config = ConfigDict(from_attributes=True)
 
 
-# ── Leave ─────────────────────────────────────────────────────────────────────
-class LeaveCreate(BaseModel):
-    leave_type: LeaveType
+ClinicalNoteCreate = ClinicalNoteIn
+
+
+# ── Clinical Notes ────────────────────────────────────────────────────────────
+
+class ClinicalNoteBase(BaseModel):
+    note_text: str
+
+
+class ClinicalNoteCreate(ClinicalNoteBase):
+    procedure_id: int
+
+
+# ── Leave Requests ────────────────────────────────────────────────────────────
+
+class LeaveRequestBase(BaseModel):
+    leave_type: str
     coverage_officer: Optional[str] = None
     reason: str
     start_date: date
     end_date: date
 
-class LeaveStatusUpdate(BaseModel):
-    status: LeaveStatus
-    reviewed_by: Optional[str] = None
 
-class LeaveOut(BaseModel):
+class LeaveRequestCreate(LeaveRequestBase):
+    pass
+
+
+LeaveCreate = LeaveRequestCreate
+
+
+class LeaveRequestOut(LeaveRequestBase):
     id: int
     requester_id: int
-    leave_type: LeaveType
-    coverage_officer: Optional[str]
-    reason: str
-    start_date: date
-    end_date: date
-    status: LeaveStatus
-    reviewed_by: Optional[str]
+    status: str
+    reviewed_by: Optional[str] = None
     created_at: datetime
-    model_config = {"from_attributes": True}
-
-
-# ── Timeline Steps ────────────────────────────────────────────────────────────
-class TimelineStepCreate(BaseModel):
-    step_order: int
-    step_name: str
-    status: StepStatus = StepStatus.pending
-
-class TimelineStepUpdate(BaseModel):
-    status: StepStatus
-
-class TimelineStepOut(TimelineStepCreate):
-    id: int
-    patient_id: int
     updated_at: datetime
-    model_config = {"from_attributes": True}
+    requester_name: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
-# ── Operatory Rooms ───────────────────────────────────────────────────────────
-class OperatoryRoomCreate(BaseModel):
-    room_name: str
-    assigned_doctor: Optional[str] = None
-    current_case: Optional[str] = None
-    queue_count: int = 0
-    status: RoomStatus = RoomStatus.available
+LeaveOut = LeaveRequestOut
 
-class OperatoryRoomUpdate(BaseModel):
+
+class LeaveStatusUpdate(BaseModel):
+    status: str
+
+
+# ── Staff Management ──────────────────────────────────────────────────────────
+
+class StaffMemberBase(BaseModel):
+    name: str
+    role: str
+
+
+class StaffMemberCreate(StaffMemberBase):
+    pass
+
+
+class StaffMemberOut(StaffMemberBase):
+    id: int
+    status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Room Allocations ──────────────────────────────────────────────────────────
+
+class RoomAllocationBase(BaseModel):
+    doctor_name: str
+    room: str
+    department: Optional[str] = None
+    chair: Optional[str] = None
+
+
+class RoomAllocationCreate(RoomAllocationBase):
+    pass
+
+
+DoctorAllocationCreate = RoomAllocationCreate
+
+
+class RoomAllocationOut(RoomAllocationBase):
+    id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Room Status (Operatory Rooms) ─────────────────────────────────────────────
+
+class RoomStatusUpdate(BaseModel):
+    status: Optional[str] = None
     assigned_doctor: Optional[str] = None
     current_case: Optional[str] = None
     queue_count: Optional[int] = None
-    status: Optional[RoomStatus] = None
+    approved: Optional[bool] = None
 
-class OperatoryRoomOut(OperatoryRoomCreate):
+
+# ── Timeline Steps ────────────────────────────────────────────────────────────
+
+class PatientTimelineStepBase(BaseModel):
+    step_order: int
+    step_name: str
+    status: str = "Pending"
+
+
+class PatientTimelineStepCreate(PatientTimelineStepBase):
+    patient_id: int
+
+
+class PatientTimelineStepOut(PatientTimelineStepBase):
     id: int
+    patient_id: int
     updated_at: datetime
-    model_config = {"from_attributes": True}
+
+    model_config = ConfigDict(from_attributes=True)
 
 
-# ── HOD Dashboard Summary ─────────────────────────────────────────────────────
-class DoctorMonitorRow(BaseModel):
-    name: str
-    patients_today: int
-    status: str
+TimelineStepCreate = PatientTimelineStepCreate
+TimelineStepUpdate = PatientStatusUpdate
 
-class HODSummary(BaseModel):
+
+# ── Dashboard & Monitoring ────────────────────────────────────────────────────
+
+class DashboardSummaryOut(BaseModel):
     total_patients_today: int
     doctors_on_duty: int
     doctors_on_leave: int
     active_rooms: int
+    pending_leaves: int = 0
+
+
+HODSummary = DashboardSummaryOut
+
+
+class DoctorMonitoringOut(BaseModel):
+    name: str
+    patients_today: int
+    total_active_cases: int
+    status: str
+    experience: Optional[str] = None
+    rating: Optional[str] = None
+
+
+DoctorMonitorRow = DoctorMonitoringOut
+
+
+class DoctorPresenceOut(BaseModel):
+    name: str
+    status: str
+    experience: str
+    rating: str
+    patients_today: int
+    total_active_cases: int
+
+
+# ── Doctor Profile & Allocations ──────────────────────────────────────────────
+
+class DoctorProfileBase(BaseModel):
+    department: Optional[str] = None
+    qualifications: Optional[str] = None
+    shift: Optional[str] = None
+    hod_on_call: Optional[str] = None
+    status: Optional[str] = None
+
+
+class DoctorProfileCreate(DoctorProfileBase):
+    user_id: int
+
+
+class DoctorProfileOut(DoctorProfileBase):
+    id: int
+    user_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DoctorAllocationOut(BaseModel):
+    id: int
+    doctor_name: str
+    room: str
+    department: Optional[str] = None
+    chair: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Procedure Items ───────────────────────────────────────────────────────────
+
+class ChecklistItemBase(BaseModel):
+    step_text: str
+    is_checked: bool = False
+    display_order: int = 0
+
+
+class ChecklistItemCreate(ChecklistItemBase):
+    procedure_id: int
+
+
+class ChecklistItemUpdate(BaseModel):
+    is_checked: bool
+
+
+class ChecklistItemOut(ChecklistItemBase):
+    id: int
+    procedure_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MaterialOut(BaseModel):
+    id: int
+    procedure_id: int
+    material_name: str
+    quantity: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PharmacyOut(BaseModel):
+    id: int
+    procedure_id: int
+    medication: str
+    dose: Optional[str] = None
+    frequency: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DiagnosticOut(BaseModel):
+    id: int
+    procedure_id: int
+    test_name: str
+    urgency: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Staff & Rooms ─────────────────────────────────────────────────────────────
+
+class StaffCreate(BaseModel):
+    name: str
+    role: str
+
+
+StaffOut = StaffMemberOut
+
+
+class OperatoryRoomCreate(BaseModel):
+    room_name: str
+    assigned_doctor: Optional[str] = None
+    current_case: Optional[str] = None
+    queue_count: Optional[int] = 0
+    status: Optional[str] = "Available"
+
+
+class OperatoryRoomOut(BaseModel):
+    id: int
+    room_name: str
+    assigned_doctor: Optional[str] = None
+    current_case: Optional[str] = None
+    queue_count: int
+    status: str
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+OperatoryRoomUpdate = RoomStatusUpdate
+
+
+# ── Timeline Steps ────────────────────────────────────────────────────────────
+
+TimelineStepOut = PatientTimelineStepOut

@@ -206,49 +206,10 @@
       return { label: "Complex (>50m)", class: "diff-complex", category: "Complex" };
     }
 
-    const MOCK_DOCTOR_HISTORY = [
-      { id: "HIST-101", date: "2026-07-21", doctor: "Brig Abdullah Jan", procId: 4 },
-      { id: "HIST-102", date: "2026-07-21", doctor: "Brig Abdullah Jan", procId: 1 },
-      { id: "HIST-103", date: "2026-07-21", doctor: "Brig Abdullah Jan", procId: 5 },
-      { id: "HIST-104", date: "2026-07-21", doctor: "Maj Tariq", procId: 9 },
-      { id: "HIST-105", date: "2026-07-21", doctor: "Maj Tariq", procId: 14 },
-      { id: "HIST-106", date: "2026-07-20", doctor: "Maj Tariq", procId: 3 },
-      { id: "HIST-107", date: "2026-07-20", doctor: "Dr. Asadullah Khan", procId: 13 },
-      { id: "HIST-108", date: "2026-07-20", doctor: "Dr. Asadullah Khan", procId: 2 },
-      { id: "HIST-109", date: "2026-07-20", doctor: "Dr. Asadullah Khan", procId: 12 },
-      { id: "HIST-110", date: "2026-07-21", doctor: "Dr. Asadullah Khan", procId: 1 },
-      { id: "HIST-111", date: "2026-07-21", doctor: "Dr. Asadullah Khan", procId: 4 },
-      { id: "HIST-112", date: "2026-07-19", doctor: "Dr. Asadullah Khan", procId: 5 },
-      { id: "HIST-113", date: "2026-07-19", doctor: "Dr. Asadullah Khan", procId: 10 },
-      { id: "HIST-114", date: "2026-07-18", doctor: "Dr. Asadullah Khan", procId: 15 },
-      { id: "HIST-115", date: "2026-07-18", doctor: "Dr. Asadullah Khan", procId: 8 },
-      { id: "HIST-116", date: "2026-07-17", doctor: "Dr. Asadullah Khan", procId: 3 },
-      { id: "HIST-117", date: "2026-07-16", doctor: "Dr. Asadullah Khan", procId: 11 },
-      { id: "HIST-118", date: "2026-07-15", doctor: "Dr. Asadullah Khan", procId: 7 }
-    ];
-
-    const MOCK_PATIENTS = [
-      {
-        id: 1,
-        mr_number: "MR-0201708",
-        file_number: "F-9942",
-        full_name: "Maj Zeeshan Khan",
-        service_profile: "Major (PGE-5403)",
-        gender: "Male",
-        blood_group: "A+",
-        room: "Orthodontics & Surgery",
-        created_at: new Date().toISOString(),
-        allergies: "Penicillin Alternative Required (High Sensitivity Risk)",
-        diagnostic_history: "Patient has long standing class-II malocclusion with severe deep bite limits. Prior extractions of upper first premolars performed under local anesthesia without initial respiratory resistance.",
-        systemic_status: "No history of diabetic parameters. Non-hypertensive baseline tracking logs verified.",
-        procedure_category: "Root Canal Treatment",
-        status: "Active"
-      }
-    ];
-
-    let cachedPatients = MOCK_PATIENTS;
+    let cachedPatients = [];
     let cachedMyLeaves = [];
     let currentPatient = null;
+    let cachedPresets = {};
     
     let activeMaterials = [];
     let activePharmacy = [];
@@ -273,14 +234,28 @@
 
     async function loadDashboardData() {
       try {
-        if (typeof api !== 'undefined') {
-          const [patients, leaves] = await Promise.all([
-            api.get("/patients/"),
-            api.get("/leaves/")
-          ]);
-          cachedPatients = patients || [];
-          cachedMyLeaves = leaves || [];
-        }
+        const [patients, leaves, presets] = await Promise.all([
+          api.get("/patients/"),
+          api.get("/leaves/"),
+          api.get("/presets/")
+        ]);
+        cachedPatients = patients || [];
+        cachedMyLeaves = leaves || [];
+        
+        // Build presets lookup from backend data
+        cachedPresets = {};
+        (presets || []).forEach(preset => {
+          const materials = (preset.materials || []).map(m => ({ name: m.name, qty: m.quantity })).sort(sortByProp('name'));
+          const pharmacy = (preset.pharmacy || []).map(p => ({ med: p.medication, dose: p.dose || '—', freq: p.frequency || '—' })).sort(sortByProp('med'));
+          const diagnostics = (preset.diagnostics || []).map(d => ({ name: d.test_name, urgency: d.urgency })).sort(sortByProp('name'));
+          cachedPresets[preset.name] = {
+            materials,
+            pharmacy,
+            diagnostics,
+            notes: preset.notes || `Procedure performed: ${preset.name}.`,
+            duration: preset.duration
+          };
+        });
 
         leaveTimeline = cachedMyLeaves.map(l => ({
           date: `${l.start_date} - ${l.end_date}`,
@@ -297,9 +272,10 @@
           if (roleEl) roleEl.innerText = `Role: ${(user.role || 'Senior Consultant').toUpperCase()}`;
         }
       } catch (e) {
-        console.warn("Failed to load doctor data, using fallback:", e);
+        console.warn("Failed to load doctor data:", e);
         cachedPatients = [];
         cachedMyLeaves = [];
+        cachedPresets = {};
         leaveTimeline = [];
       }
     }
@@ -687,7 +663,7 @@
     }
 
     function renderOperations() {
-      const proceduralOptions = Object.keys(PRESETS).map(key => `<option value="${key}">${key}</option>`).join('');
+      const proceduralOptions = Object.keys(cachedPresets).map(key => `<option value="${key}">${key}</option>`).join('');
 
       return `
         <!-- SCREEN 1: SEARCH / LOOKUP VIEW -->
@@ -1142,9 +1118,9 @@
     function applyProcedure() {
       const procSelect = document.getElementById('procedure-select');
       const selectedProcedure = procSelect.value;
-      if (!selectedProcedure || !PRESETS[selectedProcedure]) return;
+      if (!selectedProcedure || !cachedPresets[selectedProcedure]) return;
 
-      const data = PRESETS[selectedProcedure];
+      const data = cachedPresets[selectedProcedure];
 
       // 1. Materials
       activeMaterials = [...GLOBAL_MATERIALS, ...data.materials].sort(sortByProp('name'));
@@ -1650,8 +1626,8 @@
       const duration = parseInt(prompt("Enter procedure duration (minutes):")) || 30;
       const cleanName = procName.trim();
       
-      if (!PRESETS[cleanName]) {
-        PRESETS[cleanName] = {
+      if (!cachedPresets[cleanName]) {
+        cachedPresets[cleanName] = {
           materials: [],
           pharmacy: [],
           diagnostics: [],

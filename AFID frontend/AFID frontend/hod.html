@@ -273,6 +273,7 @@
   let cachedPatients = [];
   let cachedTimelinePatients = {};
   let cachedTimelineSteps = {};
+  let cachedPresets = {};
 
   function showToast(msg) {
     const el = document.getElementById('toast-el');
@@ -425,12 +426,13 @@
 
   async function loadPortalData() {
     try {
-      const [summary, rooms, monitoring, staff, leaves] = await Promise.all([
+      const [summary, rooms, monitoring, staff, leaves, presets] = await Promise.all([
         api.get('/hod/summary'),
         api.get('/hod/rooms'),
         api.get('/hod/monitoring'),
         api.get('/staff/'),
-        api.get('/leaves/')
+        api.get('/leaves/'),
+        api.get('/presets/')
       ]);
 
       cachedSummary = summary || cachedSummary;
@@ -454,6 +456,21 @@
         reason: l.reason || '—',
         status: l.status
       }));
+
+      // Build presets lookup from backend data
+      cachedPresets = {};
+      (presets || []).forEach(preset => {
+        const materials = (preset.materials || []).map(m => ({ name: m.name, qty: m.quantity }));
+        const pharmacy = (preset.pharmacy || []).map(p => ({ med: p.medication, dose: p.dose || '—', freq: p.frequency || '—' }));
+        const diagnostics = (preset.diagnostics || []).map(d => ({ name: d.test_name, urgency: d.urgency }));
+        cachedPresets[preset.name] = {
+          materials,
+          pharmacy,
+          diagnostics,
+          notes: preset.notes || `Procedure performed: ${preset.name}.`,
+          duration: preset.duration
+        };
+      });
 
       const patientList = (await api.get('/patients/')) || [];
       cachedPatients = patientList;
@@ -487,22 +504,6 @@
   let hodActiveMaterials = [];
   let hodActivePharmacy = [];
   let hodActiveDiagnostics = [];
-
-  const HOD_PRESETS = {
-    "Consultation": { materials: [], pharmacy: [], diagnostics: [], notes: "Initial specialist consultation conducted." },
-    "2x4, 2x6 appliance": { materials: [], pharmacy: [], diagnostics: [], notes: "Sectional archwire matrix tracking integrated successfully." },
-    "Band cementation / Banding of molars": { materials: [], pharmacy: [], diagnostics: [], notes: "Molar band trial fitting completed and cemented cleanly." },
-    "Bonding of brackets": { materials: [], pharmacy: [], diagnostics: [], notes: "Complete therapeutic bonding parameters completed." },
-    "Coil spring placement": { materials: [], pharmacy: [], diagnostics: [], notes: "Open/Closed active coil spring components structural integrity verified." },
-    "Fixed Retainer": { materials: [], pharmacy: [], diagnostics: [], notes: "Lingual bonded fixed retainer wire structured and verified." },
-    "Habit breaking appliance": { materials: [], pharmacy: [], diagnostics: [], notes: "Habit breaking interceptive appliance properly positioned." },
-    "Ligation": { materials: [], pharmacy: [], diagnostics: [], notes: "Archwire tied down cleanly utilizing specialized steel ligatures structural paths." },
-    "MARPE": { materials: [], pharmacy: [], diagnostics: [], notes: "Miniscrew-Assisted Rapid Palatal Expander logs processed." },
-    "Nance / TPA / LLA insertion": { materials: [], pharmacy: [], diagnostics: [], notes: "Nance / TPA / LLA appliance checked and structural frame safely inserted." },
-    "Orthodontic Adjustment": { materials: [], pharmacy: [], diagnostics: [], notes: "Orthodontic adjustment completed." },
-    "U/L Bracketing": { materials: [], pharmacy: [], diagnostics: [], notes: "Bracket placement completed." },
-    "Consultation": { materials: [], pharmacy: [], diagnostics: [], notes: "Initial specialist consultation conducted." }
-  };
 
   function renderOperations() {
     return `
@@ -579,7 +580,7 @@
               <div style="flex: 1.5;">
                 <select id="hod-procedure-select" onchange="hodApplyProcedure()">
                   <option value="" disabled selected>-- Select One Procedure --</option>
-                  ${Object.keys(HOD_PRESETS).map(key => `<option value="${key}">${key}</option>`).join('')}
+                  ${Object.keys(cachedPresets).map(key => `<option value="${key}">${key}</option>`).join('')}
                 </select>
               </div>
               <div>
@@ -832,9 +833,9 @@
   function hodApplyProcedure() {
     const procSelect = document.getElementById('hod-procedure-select');
     const selectedProcedure = procSelect.value;
-    if (!selectedProcedure || !HOD_PRESETS[selectedProcedure]) return;
+    if (!selectedProcedure || !cachedPresets[selectedProcedure]) return;
 
-    const data = HOD_PRESETS[selectedProcedure];
+    const data = cachedPresets[selectedProcedure];
 
     hodActiveMaterials = [...(data.materials || [])];
     hodActivePharmacy = [...(data.pharmacy || [])];
@@ -858,12 +859,13 @@
     const duration = parseInt(prompt("Enter procedure duration (minutes):")) || 30;
     const cleanName = procName.trim();
     
-    if (!HOD_PRESETS[cleanName]) {
-      HOD_PRESETS[cleanName] = {
+    if (!cachedPresets[cleanName]) {
+      cachedPresets[cleanName] = {
         materials: [],
         pharmacy: [],
         diagnostics: [],
-        notes: `Procedure performed: ${cleanName}.`
+        notes: `Procedure performed: ${cleanName}.`,
+        duration: duration
       };
     }
     
