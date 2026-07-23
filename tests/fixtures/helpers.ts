@@ -3,7 +3,7 @@ import { type Page, type APIRequestContext } from '@playwright/test';
 export const API = 'http://localhost:8000';
 
 export async function loginAs(page: Page, role: 'receptionist' | 'doctor' | 'hod' | 'admin') {
-  await page.goto('/AFID frontend/Login.html');
+  await page.goto('/Login.html');
   
   const credentials: Record<string, { email: string; password: string }> = {
     receptionist: { email: 'reception@afid.mil', password: 'staff1234' },
