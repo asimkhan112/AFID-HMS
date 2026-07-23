@@ -36,6 +36,15 @@ async function apiRequest(path, options = {}) {
     try { data = await res.json(); } catch { data = {}; }
 
     if (!res.ok) {
+        // Handle 401 Unauthorized - token expired or invalid
+        if (res.status === 401) {
+            // Clear auth data and redirect to login
+            removeToken();
+            removeUser();
+            window.location.replace("Login.html");
+            throw new Error("Session expired. Please log in again.");
+        }
+        
         // FastAPI validation errors come in data.detail (array or string)
         const detail = Array.isArray(data.detail)
             ? data.detail.map(e => e.msg).join(", ")

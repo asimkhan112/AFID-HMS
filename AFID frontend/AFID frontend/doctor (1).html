@@ -447,7 +447,15 @@
     }
 
     function renderDashboard() {
-      const rows = cachedPatients.slice(0, 10).map(p => `
+      const currentUser = getUser();
+      const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
+      
+      const myPatients = (cachedPatients || []).filter(p => {
+        const assignedDoctor = p.assigned_doctor || p.doctor || '';
+        return assignedDoctor === currentName || assignedDoctor === LOGGED_IN_DOCTOR;
+      });
+      
+      const rows = myPatients.slice(0, 10).map(p => `
         <tr>
           <td><strong>${p.mr_number}</strong></td>
           <td>${p.full_name}</td>
@@ -519,7 +527,10 @@
     function buildAnalyticsRows() {
       const currentUser = getUser();
       const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
-      return (cachedPatients || []).map((patient, index) => {
+      return (cachedPatients || []).filter(patient => {
+        const assignedDoctor = patient.assigned_doctor || patient.doctor || '';
+        return assignedDoctor === currentName || assignedDoctor === LOGGED_IN_DOCTOR;
+      }).map((patient, index) => {
         const procName = patient.procedure_category || 'Clinical Assessment';
         const duration = /root|canal/i.test(procName) ? 60 : /bracket|bond/i.test(procName) ? 45 : /retainer|align/i.test(procName) ? 30 : /consult/i.test(procName) ? 15 : 25;
         const diff = getDifficultyInfo(duration);
@@ -535,7 +546,7 @@
     }
 
     function processAndRenderDoctorAnalytics(filteredData) {
-      const rows = (filteredData || buildAnalyticsRows()).filter(item => item.doctor === (getUser()?.full_name || LOGGED_IN_DOCTOR));
+      const rows = filteredData || buildAnalyticsRows();
 
       const tbody = document.getElementById("docAnalyticsTableBody");
       if (!tbody) return;
@@ -581,6 +592,92 @@
         return item.procName.toLowerCase().includes(query) || item.id.toLowerCase().includes(query);
       });
       processAndRenderDoctorAnalytics(filtered);
+    }
+
+    async function executeSearch() {
+      const searchInput = document.getElementById('patient-search-input');
+      const query = searchInput ? searchInput.value.trim() : '';
+
+      if (!query) {
+        alert("Please enter search query details.");
+        return;
+      }
+
+      try {
+        let patient = null;
+        if (typeof api !== 'undefined') {
+          const currentUser = getUser();
+          const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
+          const patients = await api.get(`/patients/?search=${encodeURIComponent(query)}`);
+          if (patients && patients.length > 0) {
+            patient = patients.find(p => {
+              const assignedDoctor = p.assigned_doctor || p.doctor || '';
+              return assignedDoctor === currentName || assignedDoctor === LOGGED_IN_DOCTOR;
+            }) || patients[0];
+          }
+        } else {
+          const currentUser = getUser();
+          const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
+          patient = cachedPatients.find(p => {
+            const assignedDoctor = p.assigned_doctor || p.doctor || '';
+            return assignedDoctor === currentName || assignedDoctor === LOGGED_IN_DOCTOR;
+          });
+        }
+        
+        if (!patient) {
+          alert("No patient record found matching: " + query);
+          return;
+        }
+        
+        currentPatient = patient;
+        
+        if ((patient.status || '').toString().toUpperCase() === 'WAITING' && typeof api !== 'undefined') {
+          try {
+            const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'ACTIVE' });
+            currentPatient = updated;
+            patient = updated;
+            alert(`Patient ${patient.full_name} checked in at ${new Date(updated.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+          } catch (err) {
+            alert('Auto check-in failed: ' + (err.message || 'Unknown error'));
+          }
+        }
+        
+        document.getElementById('view-search-screen').classList.remove('active');
+        document.getElementById('view-workspace-screen').classList.add('active');
+        
+        const badgeEl = document.getElementById('active-patient-badge');
+        if (badgeEl) badgeEl.innerText = `Active Patient: ${patient.full_name} (${patient.mr_number})`;
+
+        const values = document.querySelectorAll('#view-workspace-screen .value');
+        if (values[0]) values[0].innerText = patient.full_name;
+        if (values[1]) values[1].innerText = patient.mr_number + (patient.file_number ? ' / ' + patient.file_number : '');
+        if (values[2]) values[2].innerText = patient.service_profile || '—';
+        if (values[3]) values[3].innerText = `${patient.gender || '—'} / ${patient.blood_group || '—'}`;
+        if (values[4]) values[4].innerText = patient.room || '—';
+        
+        updateAllergyAlertBox(patient.allergies);
+
+        const recordAllergyInput = document.getElementById('record-allergy-input');
+        if (recordAllergyInput) recordAllergyInput.value = patient.allergies || "";
+
+        const recordDiagHistory = document.getElementById('record-diagnostic-history');
+        if (recordDiagHistory) recordDiagHistory.value = patient.diagnostic_history || "";
+
+        const recordSystemic = document.getElementById('record-systemic-status');
+        if (recordSystemic) recordSystemic.value = patient.systemic_status || "";
+
+        const timeInEl = document.getElementById('patient-time-in');
+        if (timeInEl) timeInEl.value = patient.check_in_time ? new Date(patient.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+        const timeOutEl = document.getElementById('patient-time-out');
+        if (timeOutEl) timeOutEl.value = patient.check_out_time ? new Date(patient.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+
+        document.getElementById('step-3-container').style.display = 'none';
+        document.getElementById('procedure-select').value = "";
+        document.getElementById('master-summary-injection-point').innerHTML = '';
+
+      } catch (err) {
+        alert("Error executing record search: " + err.message);
+      }
     }
 
     function renderOperations() {
@@ -870,6 +967,14 @@
                 <input type="text" id="leave-coverage-officer" placeholder="e.g. Maj. T. Farooq" required />
               </div>
               <div class="form-group">
+                <label class="label">Leave Type</label>
+                <select id="leave-type" required>
+                  <option value="Casual Leave">Casual Leave</option>
+                  <option value="Annual Leave">Annual Leave</option>
+                  <option value="Medical Allocation">Medical Allocation</option>
+                </select>
+              </div>
+              <div class="form-group">
                 <label class="label">Reason for Leave</label>
                 <textarea id="leave-reason" rows="3" placeholder="Specify context or justification for the HOD..." required></textarea>
               </div>
@@ -900,9 +1005,11 @@
         return;
       }
 
+      const leaveType = document.getElementById('leave-type')?.value || 'Casual Leave';
+      
       try {
         const newLeave = await api.post('/leaves/', {
-          leave_type: 'Casual Leave',
+          leave_type: leaveType,
           coverage_officer: officer,
           reason,
           start_date: start,
@@ -986,79 +1093,6 @@
       }
     }
 
-    async function executeSearch() {
-      const searchInput = document.getElementById('patient-search-input');
-      const query = searchInput ? searchInput.value.trim() : '';
-
-      if (!query) {
-        alert("Please enter search query details.");
-        return;
-      }
-
-      try {
-        let patient = null;
-        if (typeof api !== 'undefined') {
-          const patients = await api.get(`/patients/?search=${encodeURIComponent(query)}`);
-          if (patients && patients.length > 0) patient = patients[0];
-        } else {
-          patient = cachedPatients.find(p => p.mr_number.toLowerCase().includes(query.toLowerCase()) || p.full_name.toLowerCase().includes(query.toLowerCase()));
-        }
-        
-        if (!patient) {
-          alert("No patient record found matching: " + query);
-          return;
-        }
-        
-        currentPatient = patient;
-        
-        if ((patient.status || '').toString().toUpperCase() === 'WAITING' && typeof api !== 'undefined') {
-          try {
-            const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'ACTIVE' });
-            currentPatient = updated;
-            patient = updated;
-            alert(`Patient ${patient.full_name} checked in at ${new Date(updated.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
-          } catch (err) {
-            alert('Auto check-in failed: ' + (err.message || 'Unknown error'));
-          }
-        }
-        
-        document.getElementById('view-search-screen').classList.remove('active');
-        document.getElementById('view-workspace-screen').classList.add('active');
-        
-        const badgeEl = document.getElementById('active-patient-badge');
-        if (badgeEl) badgeEl.innerText = `Active Patient: ${patient.full_name} (${patient.mr_number})`;
-
-        const values = document.querySelectorAll('#view-workspace-screen .value');
-        if (values[0]) values[0].innerText = patient.full_name;
-        if (values[1]) values[1].innerText = patient.mr_number + (patient.file_number ? ' / ' + patient.file_number : '');
-        if (values[2]) values[2].innerText = patient.service_profile || '—';
-        if (values[3]) values[3].innerText = `${patient.gender || '—'} / ${patient.blood_group || '—'}`;
-        if (values[4]) values[4].innerText = patient.room || '—';
-        
-        updateAllergyAlertBox(patient.allergies);
-
-        const recordAllergyInput = document.getElementById('record-allergy-input');
-        if (recordAllergyInput) recordAllergyInput.value = patient.allergies || "";
-
-        const recordDiagHistory = document.getElementById('record-diagnostic-history');
-        if (recordDiagHistory) recordDiagHistory.value = patient.diagnostic_history || "";
-
-        const recordSystemic = document.getElementById('record-systemic-status');
-        if (recordSystemic) recordSystemic.value = patient.systemic_status || "";
-
-        const timeInEl = document.getElementById('patient-time-in');
-        if (timeInEl) timeInEl.value = patient.check_in_time ? new Date(patient.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-        const timeOutEl = document.getElementById('patient-time-out');
-        if (timeOutEl) timeOutEl.value = patient.check_out_time ? new Date(patient.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-
-        document.getElementById('step-3-container').style.display = 'none';
-        document.getElementById('procedure-select').value = "";
-        document.getElementById('master-summary-injection-point').innerHTML = '';
-
-      } catch (err) {
-        alert("Error executing record search: " + err.message);
-      }
-    }
 
     function updateAllergyAlertBox(allergyText) {
       const allergyBox = document.getElementById('allergy-alert-box');
@@ -1388,14 +1422,21 @@
         return;
       }
 
-      let results = (cachedPatients || []).filter(p => {
+      const currentUser = getUser();
+      const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
+      const myPatients = (cachedPatients || []).filter(p => {
+        const assignedDoctor = p.assigned_doctor || p.doctor || '';
+        return assignedDoctor === currentName || assignedDoctor === LOGGED_IN_DOCTOR;
+      });
+
+      let results = myPatients.filter(p => {
         if (!p) return false;
         const val = (p[filterType] || '').toString().toLowerCase();
         return val.includes(query);
       });
 
       if (!results.length && filterType !== 'mr_number') {
-        results = (cachedPatients || []).filter(p => (p.mr_number || '').toLowerCase().includes(query));
+        results = myPatients.filter(p => (p.mr_number || '').toLowerCase().includes(query));
       }
 
       tbody.innerHTML = results.length ? results.map(p => `
@@ -1425,9 +1466,9 @@
       }
 
       const allSteps = cachedTimelineSteps[mr] || [];
-      const completedProcedures = allSteps.filter(s => s.status === 'Completed');
+      const completedProcedures = allSteps.filter(s => (s.status || '').toLowerCase() === 'completed');
       const pending = allSteps.filter(s => (s.status || '').toLowerCase() === 'pending');
-      const inProgress = allSteps.filter(s => (s.status || '').toLowerCase() === 'in_progress');
+      const inProgress = allSteps.filter(s => (s.status || '').toLowerCase() === 'in progress');
       if (badgeEl) badgeEl.innerText = `Total Performed: ${completedProcedures.length}`;
 
       const buildList = (items, emptyLabel, badgeClass, icon) => items.length ? items.map(s => `
@@ -1553,15 +1594,20 @@
           materials: [],
           pharmacy: [],
           diagnostics: [],
-          notes: `Procedure performed: ${cleanName}.`
+          notes: `Procedure performed: ${cleanName}.`,
+          duration: duration
         };
       }
       
-      const newOption = document.createElement('option');
-      newOption.value = cleanName;
-      newOption.text = cleanName;
+      // Check if option already exists in dropdown to avoid duplicates
       const select = document.getElementById('procedure-select');
-      select.appendChild(newOption);
+      const existingOptions = Array.from(select.options).map(opt => opt.value);
+      if (!existingOptions.includes(cleanName)) {
+        const newOption = document.createElement('option');
+        newOption.value = cleanName;
+        newOption.text = cleanName;
+        select.appendChild(newOption);
+      }
       select.value = cleanName;
       applyProcedure();
     }

@@ -1236,8 +1236,8 @@
                   <td>${l.start_date} to ${l.end_date}</td>
                   <td>${l.reason}</td>
                   <td>
-                    <button class="btn-action btn-approve" onclick="handleLeaveResolve(${l.id}, 'Approved')">Approve</button>
-                    <button class="btn-action btn-reject" onclick="handleLeaveResolve(${l.id}, 'Rejected')">Reject</button>
+                    <button class="btn-action btn-approve" onclick="handleLeaveResolve(${l.id}, 'APPROVED')">Approve</button>
+                    <button class="btn-action btn-reject" onclick="handleLeaveResolve(${l.id}, 'REJECTED')">Reject</button>
                   </td>
                 </tr>
               `).join('') : '<tr><td colspan="4" style="text-align:center; color:#6b7280;">No pending leave requests.</td></tr>'}

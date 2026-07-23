@@ -41,6 +41,10 @@ def generate_queue_excel(patients: List[Dict[str, Any]], doctor_name: str) -> st
     filename = f"{sanitized_doctor_name}_{now.strftime('%Y-%m-%d_%H-%M')}.xlsx"
     filepath = os.path.join(exports_dir, filename)
     
+    # Note: We intentionally allow overwriting files from the same minute.
+    # The logout endpoint may be called multiple times within the same minute,
+    # and each call should update the same file with the current queue state.
+    
     # Create workbook and worksheet
     wb = Workbook()
     ws = wb.active
@@ -137,3 +141,23 @@ def generate_queue_excel(patients: List[Dict[str, Any]], doctor_name: str) -> st
     wb.save(filepath)
     
     return filepath
+
+
+def get_exported_file_path(doctor_name: str) -> str:
+    """
+    Get the expected filepath for a doctor's queue export.
+    Used to check if a file was created for the current minute.
+    
+    Args:
+        doctor_name: Name of the doctor
+        
+    Returns:
+        str: Expected filepath for the export
+    """
+    exports_dir = os.path.join(os.path.dirname(__file__), "exports")
+    os.makedirs(exports_dir, exist_ok=True)
+    
+    now = datetime.now()
+    sanitized_doctor_name = sanitize_filename(doctor_name)
+    filename = f"{sanitized_doctor_name}_{now.strftime('%Y-%m-%d_%H-%M')}.xlsx"
+    return os.path.join(exports_dir, filename)

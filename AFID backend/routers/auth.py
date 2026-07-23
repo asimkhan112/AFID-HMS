@@ -95,18 +95,12 @@ def logout(
                         "age": "N/A"  # Age not directly stored in model
                     })
                 
-                # Generate Excel file
-                if patient_data:
-                    filepath = generate_queue_excel(patient_data, doctor_name)
-                    logger.info(
-                        f"Successfully exported patient queue for doctor {doctor_name} "
-                        f"to {filepath}. Total patients: {len(patient_data)}"
-                    )
-                else:
-                    logger.info(
-                        f"No patients in queue for doctor {doctor_name}. "
-                        "No export file generated."
-                    )
+                # Generate Excel file (always create file, even for empty queue)
+                filepath = generate_queue_excel(patient_data, doctor_name)
+                logger.info(
+                    f"Successfully exported patient queue for doctor {doctor_name} "
+                    f"to {filepath}. Total patients: {len(patient_data)}"
+                )
                     
             except Exception as export_error:
                 # Log the error but don't fail the logout
