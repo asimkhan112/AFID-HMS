@@ -6,8 +6,8 @@ JWT creation/verification and password hashing utilities.
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -17,13 +17,19 @@ from database import get_db
 import models
 
 # ── Password hashing ──────────────────────────────────────────────────────────
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+# Use the `bcrypt` library directly. (passlib 1.7.4 is unmaintained and crashes
+# against bcrypt >= 4.1, so we avoid that dependency entirely.)
+# bcrypt hard-limits secrets to 72 bytes, so we truncate before hashing/verifying.
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain)
+    pw = plain.encode("utf-8")[:72]
+    return bcrypt.hashpw(pw, bcrypt.gensalt()).decode("utf-8")
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    pw = plain.encode("utf-8")[:72]
+    try:
+        return bcrypt.checkpw(pw, hashed.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
 
 
 # ── JWT helpers ───────────────────────────────────────────────────────────────

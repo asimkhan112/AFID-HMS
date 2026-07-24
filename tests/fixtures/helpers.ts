@@ -31,7 +31,18 @@ export function landingPageRegExp(fileName: string): RegExp {
 
 export async function loginAs(page: Page, role: 'receptionist' | 'doctor' | 'hod' | 'admin') {
   await page.goto('/Login.html');
-  
+
+  // Clear any prior session first: Login.html redirects an already-authenticated
+  // session straight to its portal before the login form ever renders, so a
+  // second loginAs() (e.g. switching roles within one test) would otherwise
+  // find no #login-email field. Wipe storage and reload to guarantee the form.
+  await page.evaluate(() => {
+    localStorage.removeItem('afid_token');
+    localStorage.removeItem('afid_user');
+  });
+  await page.goto('/Login.html');
+  await page.waitForSelector('#login-email');
+
   const credentials: Record<string, { email: string; password: string }> = {
     receptionist: { email: 'reception@afid.mil', password: 'staff1234' },
     doctor: { email: 'doctor@afid.mil', password: 'doctor1234' },
@@ -74,8 +85,11 @@ export async function fillPatientForm(page: Page, data: {
   await page.fill('#p-cnic', data.cnic);
   
   if (data.doctor) {
+    // #p-doctor options carry a room suffix in their visible label
+    // (e.g. "Dr. Rehan M. (Room 11)") while their VALUE is the plain
+    // doctor name, so match by value rather than by label.
     const doctorSelect = page.locator('#p-doctor');
-    await doctorSelect.selectOption({ label: data.doctor });
+    await doctorSelect.selectOption(data.doctor);
   }
 }
 
