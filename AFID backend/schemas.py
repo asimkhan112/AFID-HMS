@@ -7,6 +7,7 @@ from datetime import datetime, date
 from typing import Optional, List
 
 from pydantic import BaseModel, ConfigDict
+import models
 
 
 # ── Users & Auth ──────────────────────────────────────────────────────────────
@@ -80,7 +81,7 @@ class PatientWithProceduresOut(PatientOut):
 
 
 class PatientStatusUpdate(BaseModel):
-    status: str
+    status: models.PatientStatus
 
 
 # ── Procedure Presets ────────────────────────────────────────────────────────
@@ -236,7 +237,7 @@ PharmacyCreate = ProcedurePharmacyIn
 
 class ProcedureDiagnosticIn(BaseModel):
     test_name: str
-    urgency: str = "Routine"
+    urgency: models.DiagnosticUrgency = models.DiagnosticUrgency.routine
 
 
 class ProcedureDiagnosticOut(BaseModel):
@@ -280,7 +281,7 @@ class ClinicalNoteCreate(ClinicalNoteBase):
 # ── Leave Requests ────────────────────────────────────────────────────────────
 
 class LeaveRequestBase(BaseModel):
-    leave_type: str
+    leave_type: models.LeaveType
     coverage_officer: Optional[str] = None
     reason: str
     start_date: date
@@ -310,8 +311,7 @@ LeaveOut = LeaveRequestOut
 
 
 class LeaveStatusUpdate(BaseModel):
-    status: str
-    reviewed_by: Optional[str] = None
+    status: models.LeaveStatus
 
 
 # ── Staff Management ──────────────────────────────────────────────────────────
@@ -359,7 +359,7 @@ class RoomAllocationOut(RoomAllocationBase):
 # ── Room Status (Operatory Rooms) ─────────────────────────────────────────────
 
 class RoomStatusUpdate(BaseModel):
-    status: Optional[str] = None
+    status: Optional[models.RoomStatus] = None
     assigned_doctor: Optional[str] = None
     current_case: Optional[str] = None
     queue_count: Optional[int] = None
@@ -371,7 +371,7 @@ class RoomStatusUpdate(BaseModel):
 class PatientTimelineStepBase(BaseModel):
     step_order: int
     step_name: str
-    status: str = "Pending"
+    status: models.StepStatus = models.StepStatus.pending
 
 
 class PatientTimelineStepCreate(PatientTimelineStepBase):
@@ -525,7 +525,7 @@ class OperatoryRoomCreate(BaseModel):
     assigned_doctor: Optional[str] = None
     current_case: Optional[str] = None
     queue_count: Optional[int] = 0
-    status: Optional[str] = "Available"
+    status: Optional[models.RoomStatus] = models.RoomStatus.available
 
 
 class OperatoryRoomOut(BaseModel):
