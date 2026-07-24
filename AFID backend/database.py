@@ -24,9 +24,12 @@ Base = declarative_base()
 
 # ── FastAPI dependency ────────────────────────────────────────────────────────
 def get_db():
-    """Yield a database session and ensure it is closed after use."""
+    """Yield a database session, rolling back on exceptions."""
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

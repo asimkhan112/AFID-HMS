@@ -102,6 +102,7 @@ def doctor_monitoring(db: Session = Depends(get_db), _=Depends(get_current_user)
         rows.append(schemas.DoctorMonitorRow(
             name=doc.full_name,
             patients_today=patient_count,
+            total_active_cases=patient_count,
             status=profile.status if profile else "Available",
         ))
     return rows
