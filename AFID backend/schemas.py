@@ -311,6 +311,7 @@ LeaveOut = LeaveRequestOut
 
 class LeaveStatusUpdate(BaseModel):
     status: str
+    reviewed_by: Optional[str] = None
 
 
 # ── Staff Management ──────────────────────────────────────────────────────────
@@ -385,7 +386,10 @@ class PatientTimelineStepOut(PatientTimelineStepBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-TimelineStepCreate = PatientTimelineStepCreate
+# The /hod/timeline/{mr_number}/steps endpoint takes patient_id from the URL
+# (resolved via mr_number), so it must NOT be required in the request body --
+# use the base schema (step_order/step_name/status) to avoid a spurious 422.
+TimelineStepCreate = PatientTimelineStepBase
 TimelineStepUpdate = PatientStatusUpdate
 
 

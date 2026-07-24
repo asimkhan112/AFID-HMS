@@ -99,9 +99,18 @@ def doctor_monitoring(db: Session = Depends(get_db), _=Depends(get_current_user)
             .filter(models.Patient.assigned_doctor == doc.full_name)
             .count()
         )
+        active_cases = (
+            db.query(models.Patient)
+            .filter(
+                models.Patient.assigned_doctor == doc.full_name,
+                models.Patient.status == models.PatientStatus.active,
+            )
+            .count()
+        )
         rows.append(schemas.DoctorMonitorRow(
             name=doc.full_name,
             patients_today=patient_count,
+            total_active_cases=active_cases,
             status=profile.status if profile else "Available",
         ))
     return rows
