@@ -1,4 +1,4 @@
-import { type Page, type APIRequestContext } from '@playwright/test';
+import { test as base, expect, type Page, type APIRequestContext } from '@playwright/test';
 
 export const API = 'http://localhost:8000';
 
@@ -96,3 +96,80 @@ export async function fillPatientForm(page: Page, data: {
 export function rowFor(page: Page, mr: string) {
   return page.locator(`tr:has(td:has-text("${mr}"))`);
 }
+
+// ---------------------------------------------------------------------------
+// Suite-wide QA-patient cleanup.
+//
+// Nearly every spec file seeds ACTIVE/WAITING patients (mr_number is always
+// uniqueId('QA-MR-...') via the helper above) against a handful of shared
+// doctor identities (most commonly CREDS.doctor's 'Dr. Asadullah Khan'), but
+// very few of those files ever transition what they seed to COMPLETED
+// afterward -- POST /auth/logout, for example, only ever *exports* the
+// queue, it never changes patient status. Within one sequential
+// --workers=1 suite run, that means patients seeded by an EARLIER spec file
+// are still WAITING/ACTIVE when a LATER spec file runs and asserts on
+// doctor queue counts, "Total Completed Procedures" totals, or the logout
+// export queue -- tests/doctor/my-analytics.spec.ts and
+// tests/auth/logout-export.spec.ts have both broken this way in practice.
+//
+// Rather than have every spec file hand-track and clean up its own seeded
+// patient IDs, every test in the suite now gets this sweep automatically:
+// after each test finishes (pass or fail), complete every still-WAITING or
+// -ACTIVE patient whose mr_number carries the QA-seeded prefix. This is an
+// "auto" fixture on the `test` object exported below -- Playwright runs it
+// around every test that uses THIS test object, with no per-test opt-in
+// needed. To take effect, every spec file must import `test`/`expect` from
+// this module instead of directly from '@playwright/test' (already true for
+// every other named helper here, e.g. loginAs/uniqueId/CREDS).
+//
+// This intentionally does NOT delete rows (unlike
+// AFID backend/cleanup_qa_test_data.py, which remains the tool for a full
+// periodic reset across RUNS) -- it just neutralizes WAITING/ACTIVE-ness so
+// counts and queues seen by whatever test runs next stay accurate, cheaply,
+// after every single test rather than only when someone remembers to run
+// the standalone script. Wrapped in try/catch throughout and never rethrows,
+// so a cleanup hiccup (e.g. a token expiring) can never fail or mask the
+// result of the test that just ran -- it's best-effort, not load-bearing.
+export const test = base.extend<{ qaPatientCleanup: void }>({
+  qaPatientCleanup: [
+    async ({ request }, use) => {
+      await use();
+
+      try {
+        const loginRes = await request.post(`${API}/auth/login`, {
+          data: { email: CREDS.doctor.email, password: CREDS.doctor.password },
+        });
+        if (!loginRes.ok()) return;
+        const { access_token } = await loginRes.json();
+        const headers = { Authorization: `Bearer ${access_token}` };
+
+        const [waitingRes, activeRes] = await Promise.all([
+          request.get(`${API}/patients/?status=WAITING`, { headers }),
+          request.get(`${API}/patients/?status=ACTIVE`, { headers }),
+        ]);
+        if (!waitingRes.ok() || !activeRes.ok()) return;
+        const waiting = await waitingRes.json();
+        const active = await activeRes.json();
+
+        const all = [...waiting, ...active];
+        const toComplete = all.filter(
+          (p: any) => typeof p.mr_number === 'string' && p.mr_number.startsWith('QA-MR-')
+        );
+        if (toComplete.length === 0) return;
+
+        await Promise.all(
+          toComplete.map((p: any) =>
+            request
+              .patch(`${API}/patients/${p.id}/status`, { headers, data: { status: 'COMPLETED' } })
+              .catch(() => {})
+          )
+        );
+      } catch {
+        // best-effort -- never fail or mask the result of the test that just ran
+      }
+    },
+    { auto: true },
+  ],
+});
+
+export { expect };

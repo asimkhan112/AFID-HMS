@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/helpers';
 import { CREDS, Role, landingPageRegExp } from '../fixtures/helpers';
 
 const roles: Role[] = ['hod', 'doctor', 'receptionist'];

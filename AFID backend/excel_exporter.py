@@ -35,15 +35,18 @@ def generate_queue_excel(patients: List[Dict[str, Any]], doctor_name: str) -> st
     exports_dir = os.path.join(os.path.dirname(__file__), "exports")
     os.makedirs(exports_dir, exist_ok=True)
     
-    # Generate filename: DoctorName_YYYY-MM-DD_HH-MM-SSS.xlsx (include seconds to avoid collisions)
+    # Generate filename: DoctorName_YYYY-MM-DD_HH-MM-SS-ffffff.xlsx
+    # Second-level precision alone is NOT collision-proof: two logouts for the
+    # same doctor within the same clock second (a double-click, two open tabs,
+    # a retried request) previously produced the identical filename, so the
+    # second wb.save() silently overwrote the first export with no error and
+    # no trace the first one ever existed. Microsecond precision makes every
+    # export's filename effectively unique, so every export attempt is kept
+    # as its own distinct file instead of silently clobbering a prior one.
     now = datetime.now()
     sanitized_doctor_name = sanitize_filename(doctor_name)
-    filename = f"{sanitized_doctor_name}_{now.strftime('%Y-%m-%d_%H-%M-%S')}.xlsx"
+    filename = f"{sanitized_doctor_name}_{now.strftime('%Y-%m-%d_%H-%M-%S-%f')}.xlsx"
     filepath = os.path.join(exports_dir, filename)
-    
-    # Note: We intentionally allow overwriting files from the same minute.
-    # The logout endpoint may be called multiple times within the same minute,
-    # and each call should update the same file with the current queue state.
     
     # Create workbook and worksheet
     wb = Workbook()

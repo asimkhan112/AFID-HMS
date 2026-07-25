@@ -77,7 +77,15 @@ class PatientOut(PatientBase):
 
 
 class PatientWithProceduresOut(PatientOut):
-    procedures: List[dict] = []
+    # Forward ref: ProcedureHistoryOut is defined further down (under
+    # "Procedures"). This used to be typed List[dict], but
+    # get_patient_with_procedures() in routers/patients.py builds real
+    # ProcedureHistoryOut model instances, not dicts -- Pydantic v2 does not
+    # silently coerce a model instance into a dict-typed field, so every
+    # call to GET /patients/{id}/procedures 500'd with a ValidationError
+    # ("Input should be a valid dictionary"). model_rebuild() below resolves
+    # this string forward reference once ProcedureHistoryOut exists.
+    procedures: List["ProcedureHistoryOut"] = []
 
 
 class PatientStatusUpdate(BaseModel):
@@ -197,6 +205,11 @@ class ProcedureHistoryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# Resolve the "ProcedureHistoryOut" forward reference used by
+# PatientWithProceduresOut.procedures above, now that this class exists.
+PatientWithProceduresOut.model_rebuild()
+
+
 # ── Materials, Pharmacy, Diagnostics ─────────────────────────────────────────
 
 class ProcedureMaterialIn(BaseModel):
@@ -265,17 +278,17 @@ class ClinicalNoteOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# NOTE: procedure_id is NOT part of the create payload -- POST
+# /procedures/{proc_id}/notes takes it from the URL path and injects it
+# explicitly (models.ClinicalNote(procedure_id=proc_id, **payload.model_dump())
+# in routers/procedures.py), so requiring it in the body here would both
+# force clients to send a redundant field AND crash that call with
+# "got multiple values for keyword argument 'procedure_id'" if they did.
+# (A second ClinicalNoteCreate used to be redefined further down under
+# "Clinical Notes" with a required procedure_id field, silently shadowing
+# this one and breaking every note save with a 422 "Field required" --
+# removed; nothing else in the codebase referenced that second definition.)
 ClinicalNoteCreate = ClinicalNoteIn
-
-
-# ── Clinical Notes ────────────────────────────────────────────────────────────
-
-class ClinicalNoteBase(BaseModel):
-    note_text: str
-
-
-class ClinicalNoteCreate(ClinicalNoteBase):
-    procedure_id: int
 
 
 # ── Leave Requests ────────────────────────────────────────────────────────────

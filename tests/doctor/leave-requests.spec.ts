@@ -1,13 +1,29 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/helpers';
 import { loginAs, authHeaders, uniqueId } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
 
 // Grounded in a fresh read of doctor (1).html's handleLeaveSubmit() against
-// the CURRENT checkout -- unchanged from the old scaffold's checkout in
-// every respect that matters here: leave_type is still silently hardcoded to
-// 'Casual Leave' (there is still no #leave-type control anywhere in the
-// DOM), routers/leaves.py still 400s a backwards date range with the same
+// the CURRENT checkout. Two things changed since this file was last
+// grounded, both confirmed against the live source rather than assumed:
+//
+// 1. The form now has a real #leave-type <select> (Casual Leave / Annual
+//    Leave / Medical Allocation) whose value flows straight through to
+//    POST /leaves/'s leave_type field, and models.LeaveType's enum values
+//    match those three option strings exactly -- the old "silently
+//    hardcoded to Casual Leave" bug is fixed. The test that used to assert
+//    this control didn't exist has been rewritten to prove it now works.
+//
+// 2. handleLeaveSubmit() is async and awaits its POST /leaves/ call before
+//    ever calling alert(...). page.click() resolves once the click is
+//    dispatched -- it does NOT wait for that async handler to finish -- so
+//    a plain expect() checked immediately afterward can race ahead of the
+//    alert firing and see dialogMessage still at its initial ''. Tests
+//    here now register page.waitForEvent('dialog') before the click and
+//    await it afterward, instead of a bare page.once('dialog', ...) +
+//    immediate assert.
+//
+// routers/leaves.py still 400s a backwards date range with the same
 // message, and every form field still carries `required`, so the browser's
 // own constraint validation still blocks submission of an incomplete form
 // before handleLeaveSubmit()'s own blank-field alert can ever fire.
@@ -29,14 +45,13 @@ test('submitting a leave request through the UI posts to /leaves/ and lands at t
   const officer = uniqueId('Maj. QA Officer');
   const reason = uniqueId('QA leave reason');
 
-  let dialogMessage = '';
-  page.once('dialog', async (dialog) => {
-    dialogMessage = dialog.message();
-    await dialog.accept();
-  });
-
   await fillLeaveForm(page, { start: '2026-09-01', end: '2026-09-05', officer, reason });
+
+  const dialogPromise = page.waitForEvent('dialog');
   await page.click('button:has-text("Submit Request to HOD")');
+  const dialog = await dialogPromise;
+  const dialogMessage = dialog.message();
+  await dialog.accept();
 
   expect(dialogMessage).toBe('Leave request successfully sent to the HOD.');
 
@@ -57,37 +72,40 @@ test('submitting a leave request through the UI posts to /leaves/ and lands at t
   expect(created.status).toBe('PENDING');
 });
 
-test('the leave-type is silently hardcoded to "Casual Leave" -- the UI has no control to request Annual Leave or Medical Allocation at all', async ({ page, request }) => {
+test('the leave-type dropdown offers Casual Leave, Annual Leave, and Medical Allocation, and whichever one the doctor picks round-trips correctly to the backend', async ({ page, request }) => {
   await loginAs(page, 'doctor');
   await page.click('[data-page="leave"]');
 
-  await expect(page.locator('select#leave-type')).toHaveCount(0);
-  await expect(page.locator('[id*="leave-type" i]')).toHaveCount(0);
-  await expect(page.locator('form:has(#leave-reason)')).not.toContainText(/annual leave/i);
-  await expect(page.locator('form:has(#leave-reason)')).not.toContainText(/medical allocation/i);
+  // models.LeaveType's three enum values, in the exact strings the backend
+  // expects -- confirmed against a fresh read of AFID backend/models.py.
+  const leaveTypeSelect = page.locator('select#leave-type');
+  await expect(leaveTypeSelect).toBeVisible();
+  const optionLabels = await leaveTypeSelect.locator('option').allTextContents();
+  expect(optionLabels).toEqual(['Casual Leave', 'Annual Leave', 'Medical Allocation']);
 
   const reason = uniqueId('QA leave-type reason');
-  page.once('dialog', (dialog) => dialog.accept());
   await fillLeaveForm(page, { start: '2026-09-10', end: '2026-09-11', officer: 'Maj. T. Farooq', reason });
+  // Deliberately pick a NON-default option -- if leave_type were still
+  // silently hardcoded to 'Casual Leave' under the hood, this is what would
+  // expose it.
+  await leaveTypeSelect.selectOption('Annual Leave');
+
+  const dialogPromise = page.waitForEvent('dialog');
   await page.click('button:has-text("Submit Request to HOD")');
+  const dialog = await dialogPromise;
+  await dialog.accept();
   await expect(page.locator('tbody tr', { hasText: reason })).toBeVisible();
 
   const headers = await authHeaders(page);
   const res = await request.get(`${API}/leaves/`, { headers });
   const leaves = await res.json();
   const created = leaves.find((l: any) => l.reason === reason);
-  expect(created.leave_type).toBe('Casual Leave');
+  expect(created.leave_type).toBe('Annual Leave');
 });
 
 test('an end date before the start date is rejected by the backend, and the doctor only finds out via a raw alert with the server\'s error text', async ({ page }) => {
   await loginAs(page, 'doctor');
   await page.click('[data-page="leave"]');
-
-  let dialogMessage = '';
-  page.once('dialog', async (dialog) => {
-    dialogMessage = dialog.message();
-    await dialog.accept();
-  });
 
   await fillLeaveForm(page, {
     start: '2026-09-20',
@@ -95,7 +113,12 @@ test('an end date before the start date is rejected by the backend, and the doct
     officer: 'Maj. T. Farooq',
     reason: uniqueId('QA backwards-range reason'),
   });
+
+  const dialogPromise = page.waitForEvent('dialog');
   await page.click('button:has-text("Submit Request to HOD")');
+  const dialog = await dialogPromise;
+  const dialogMessage = dialog.message();
+  await dialog.accept();
 
   expect(dialogMessage).toBe('Error submitting leave request: End date must be on or after start date');
 });

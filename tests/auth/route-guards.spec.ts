@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/helpers';
 import { loginAs, CREDS } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
@@ -15,14 +15,23 @@ async function apiLogin(request: import('@playwright/test').APIRequestContext, r
 }
 
 // Grounded in a fresh read of routers/hod.py and routers/staff.py against
-// the CURRENT checkout: every endpoint on both routers now sits behind
-// `Depends(require_role(models.UserRole.hod, models.UserRole.admin))`
-// (`/hod/timeline/*` additionally allows `doctor`). The old scaffold found
-// all of this completely unguarded -- any authenticated role could read and
-// write HOD/staff data. That gap is fixed here: a receptionist or doctor
-// token now gets a real 403 from all of it, matching the leave-approval
-// endpoint's existing (and still-correct) role check, which used to be the
-// lone exception and is now the model the rest of the app follows.
+// the CURRENT checkout: every endpoint on both routers sits behind
+// `Depends(require_role(models.UserRole.hod, models.UserRole.admin))`,
+// with two narrow read-only carve-outs on GET /hod/timeline/{mr}: `doctor`
+// (a doctor needs to check their own patients' timelines) and
+// `receptionist` (staff.html's reception portal has its own Patient
+// Timeline page that reads from this exact endpoint -- see
+// tests/timeline/patient-timeline.spec.ts. Blocking receptionist here used
+// to silently break that page, since the frontend's try/catch swallowed
+// every 403 into an empty timeline, indistinguishable from a patient with
+// genuinely no steps). The POST/PATCH timeline-step endpoints stay
+// hod/admin/doctor-only -- receptionists can view timelines but not create
+// or edit steps. The old scaffold found all of this completely unguarded --
+// any authenticated role could read and write HOD/staff data. That gap is
+// fixed here: a receptionist or doctor token now gets a real 403 from
+// everything else, matching the leave-approval endpoint's existing (and
+// still-correct) role check, which used to be the lone exception and is
+// now the model the rest of the app follows.
 //
 // The frontend still has no on-load guard of its own (grep of hod.html /
 // staff.html / doctor (1).html confirms this hasn't changed) -- the portal
@@ -100,7 +109,7 @@ test('API: a receptionist token can no longer CRUD the staff directory -- POST /
   expect(createRes.status()).toBe(403);
 });
 
-test('API: a doctor token can still reach GET /hod/timeline/{mr} -- that one endpoint deliberately also allows the doctor role, unlike the rest of /hod, but a receptionist still gets 403 from it', async ({ page, request }) => {
+test('API: GET /hod/timeline/{mr} deliberately allows doctor AND receptionist too, unlike the rest of /hod -- both the doctor and reception portals have their own Patient Timeline page that reads from it', async ({ page, request }) => {
   await loginAs(page, 'receptionist');
   const seedHeaders = await apiLogin(request, 'receptionist');
   const patientRes = await request.post(`${API}/patients/`, {
@@ -121,8 +130,14 @@ test('API: a doctor token can still reach GET /hod/timeline/{mr} -- that one end
   const timelineRes = await request.get(`${API}/hod/timeline/${encodeURIComponent(patient.mr_number)}`, { headers: doctorHeaders });
   expect(timelineRes.status()).toBe(200);
 
+  // Receptionist genuinely needs this too -- staff.html's own reception-side
+  // "Patient Timeline" page reads from this exact endpoint. This used to
+  // 403 unconditionally, which the frontend's try/catch silently swallowed
+  // into an empty timeline -- indistinguishable from a patient with
+  // genuinely no steps (see tests/timeline/patient-timeline.spec.ts for the
+  // test that caught this).
   const receptionistTimelineRes = await request.get(`${API}/hod/timeline/${encodeURIComponent(patient.mr_number)}`, { headers: seedHeaders });
-  expect(receptionistTimelineRes.status()).toBe(403);
+  expect(receptionistTimelineRes.status()).toBe(200);
 });
 
 test('contrast/positive control: PATCH /leaves/{id}/status still correctly 403s a receptionist -- this check was already correct before, and is now the model the endpoints above follow', async ({ request }) => {

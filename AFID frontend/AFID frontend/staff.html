@@ -893,7 +893,7 @@
         ${p.status === 'WAITING' ? `
           <button class="action-link" onclick="startProcedure(${index})" style="background:#0f6244;">Start</button>
         ` : p.status === 'ACTIVE' ? `
-          <span style="color:#9ca3af; font-size:11px; font-weight:700;">In Progress</span>
+          <button class="action-link" onclick="completeProcedure(${index})" style="background:var(--amber);">Complete</button>
         ` : `
           <span style="color:#9ca3af; font-size:11px; font-weight:700;">Done</span>
         `}
@@ -1158,6 +1158,26 @@
     }
   }
 
+  // Mirrors startProcedure() above: PATCH /patients/{id}/status is the exact
+  // same backend endpoint, just with 'COMPLETED' instead of 'ACTIVE'. The
+  // backend (routers/patients.py update_status()) already stamps
+  // check_out_time the moment status becomes COMPLETED -- the UI simply
+  // never had a control to send that request, so an ACTIVE patient could
+  // never actually be marked done from the queue.
+  async function completeProcedure(index) {
+    const patient = patientLogs[index];
+    if (!patient) return;
+
+    try {
+      const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'COMPLETED' });
+      patientLogs[index] = normalizePatient(updated);
+      switchView('patient_mgmt');
+      showToast(`Time Out recorded`);
+    } catch (error) {
+      showToast(error.message || 'Unable to complete procedure');
+    }
+  }
+
   async function addDoctorAllocation(e) {
     e.preventDefault();
     const name = document.getElementById('d-name').value;
@@ -1193,10 +1213,23 @@
     });
   }
 
+  // Guards against a race condition: if the user (or a fast automated
+  // click) navigates to a page before the initial loadStaffData()/
+  // loadTimelineData() awaits below resolve, the unconditional
+  // switchView('patient_mgmt') that used to run afterwards would blow away
+  // whatever they had just navigated to. userNavigate() marks that a real
+  // navigation has happened so the initial forced switchView is skipped
+  // once that's the case.
+  let userHasNavigated = false;
+  function userNavigate(pageId) {
+    userHasNavigated = true;
+    switchView(pageId);
+  }
+
   function initApp() {
     const navContainer = document.getElementById('nav-container');
     navContainer.innerHTML = PAGES.map(p => `
-      <button class="nav-btn" data-page="${p.id}" onclick="switchView('${p.id}')">
+      <button class="nav-btn" data-page="${p.id}" onclick="userNavigate('${p.id}')">
         <span>${p.label}</span>
       </button>
     `).join('');
@@ -1206,7 +1239,9 @@
     initApp();
     await loadStaffData();
     await loadTimelineData();
-    switchView('patient_mgmt');
+    if (!userHasNavigated) {
+      switchView('patient_mgmt');
+    }
   };
 </script>
 

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/helpers';
 import { loginAs, authHeaders, uniqueId } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';

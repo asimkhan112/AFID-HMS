@@ -1123,6 +1123,11 @@
       const data = cachedPresets[selectedProcedure];
 
       // 1. Materials
+      // NOTE: cachedPresets is already normalized to the app-internal
+      // { name, qty } / { med, dose, freq } / { name, urgency } shapes back
+      // in loadDashboardData() (see the .map() calls there) -- data.materials
+      // / data.pharmacy / data.diagnostics here are ALREADY in that shape,
+      // not the raw backend field names. Do not re-map them here.
       activeMaterials = [...GLOBAL_MATERIALS, ...data.materials].sort(sortByProp('name'));
       renderMaterialsList();
 
@@ -1570,7 +1575,7 @@
 
         // 3. Save materials
         for (const m of activeMaterials) {
-          await api.post(`/procedures/${proc.id}/materials/`, {
+          await api.post(`/procedures/${proc.id}/materials`, {
             material_name: m.name,
             quantity: m.qty || 1
           });
@@ -1578,7 +1583,7 @@
 
         // 4. Save pharmacy
         for (const p of activePharmacy) {
-          await api.post(`/procedures/${proc.id}/pharmacy/`, {
+          await api.post(`/procedures/${proc.id}/pharmacy`, {
             medication: p.med,
             dose: p.dose,
             frequency: p.freq
@@ -1587,7 +1592,7 @@
 
         // 5. Save diagnostics
         for (const d of activeDiagnostics) {
-          await api.post(`/procedures/${proc.id}/diagnostics/`, {
+          await api.post(`/procedures/${proc.id}/diagnostics`, {
             test_name: d.name,
             urgency: d.urgency || 'Routine'
           });
@@ -1596,7 +1601,7 @@
         // 6. Save clinical notes
         const notesValue = document.getElementById('clinical-notes-textarea').value;
         if (notesValue && notesValue.trim()) {
-          await api.post(`/procedures/${proc.id}/notes/`, {
+          await api.post(`/procedures/${proc.id}/notes`, {
             note_text: notesValue
           });
         }
@@ -1649,15 +1654,58 @@
       applyProcedure();
     }
 
+    // Guards against a race condition: if the user (or a fast automated
+    // click) navigates to a page before the initial loadDashboardData()/
+    // loadTimelineData() awaits below resolve, the unconditional
+    // switchView('dashboard') that used to run afterwards would blow away
+    // whatever they had just navigated to. userNavigate() marks that a real
+    // navigation has happened so the initial forced switchView is skipped
+    // once that's the case.
+    let userHasNavigated = false;
+    function userNavigate(pageId) {
+      userHasNavigated = true;
+      switchView(pageId);
+    }
+
+    // A second, narrower consequence of the same race as above: even once
+    // the forced switchView('dashboard') is correctly skipped, a view the
+    // user navigated to early (e.g. Operations, My Analytics) already
+    // rendered off whatever cachedPresets/cachedPatients held at that
+    // instant -- which is empty until loadDashboardData() finishes. Those
+    // views are never re-rendered on their own once real data arrives, so
+    // the procedure dropdown / analytics table are left permanently empty.
+    // Patch the two known cases in place (without blowing away any UI
+    // state, e.g. an in-progress patient search) once fresh data is in.
+    function refreshStaleViewData() {
+      const procedureSelect = document.getElementById('procedure-select');
+      if (procedureSelect) {
+        const existingOptions = new Set(Array.from(procedureSelect.options).map(opt => opt.value));
+        Object.keys(cachedPresets).forEach(key => {
+          if (!existingOptions.has(key)) {
+            const newOption = document.createElement('option');
+            newOption.value = key;
+            newOption.text = key;
+            procedureSelect.appendChild(newOption);
+          }
+        });
+      }
+      if (document.getElementById('docAnalyticsTableBody')) {
+        processAndRenderDoctorAnalytics();
+      }
+    }
+
     document.addEventListener("DOMContentLoaded", async () => {
       const navContainer = document.getElementById('nav-container');
       navContainer.innerHTML = PAGES.map(p => `
-        <button class="nav-item" data-page="${p.id}" onclick="switchView('${p.id}')">${p.label}</button>
+        <button class="nav-item" data-page="${p.id}" onclick="userNavigate('${p.id}')">${p.label}</button>
       `).join('');
 
       await loadDashboardData();
+      refreshStaleViewData();
       await loadTimelineData();
-      switchView('dashboard');
+      if (!userHasNavigated) {
+        switchView('dashboard');
+      }
     });
   </script>
 </body>

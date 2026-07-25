@@ -23,10 +23,12 @@ export default defineConfig({
   ],
   webServer: [
     {
-      // Invoke the backend venv's own python and run uvicorn as a module --
-      // works regardless of the invoking terminal's PATH/activation state.
-      // Uses a POSIX venv layout (.venv/bin); on Windows use .venv\\Scripts\\python.exe.
-      command: '.venv/bin/python -m uvicorn main:app --reload --port 8000',
+      // Invoke the backend venv's own python.exe by absolute, quoted path and
+      // run uvicorn as a module -- works regardless of the invoking terminal's
+      // PATH/activation state. This machine uses a Windows venv layout
+      // (.venv\\Scripts\\python.exe), not the POSIX .venv/bin/python layout --
+      // if this project is ever run on macOS/Linux, swap back accordingly.
+      command: '"C:\\Users\\HP\\Documents\\AFID-HMS\\AFID backend\\.venv\\Scripts\\python.exe" -m uvicorn main:app --reload --port 8000',
       cwd: './AFID backend',
       url: 'http://127.0.0.1:8000/',
       reuseExistingServer: true,

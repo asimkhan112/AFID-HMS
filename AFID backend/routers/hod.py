@@ -117,8 +117,17 @@ def doctor_monitoring(db: Session = Depends(get_db), _=Depends(get_current_user)
 
 
 # ── Patient Timeline ──────────────────────────────────────────────────────────
+# NOTE: receptionist is deliberately included here (unlike the POST/PATCH
+# timeline-step endpoints below, which stay hod/admin/doctor-only) --
+# staff.html's reception portal has its own "Patient Timeline" page that
+# reads from this exact endpoint. Before this fix, a receptionist's call
+# always 403'd, and the frontend's try/catch silently treated that as "no
+# steps", making a patient with a real, populated timeline indistinguishable
+# from one with none at all -- the read side needs to be open to whichever
+# roles have a legitimate UI that displays it; only the write side
+# (creating/editing steps) should stay restricted.
 @router.get("/timeline/{mr_number}", response_model=List[schemas.TimelineStepOut])
-def get_patient_timeline(mr_number: str, db: Session = Depends(get_db), _=Depends(get_current_user), __=Depends(require_role(models.UserRole.hod, models.UserRole.admin, models.UserRole.doctor))):
+def get_patient_timeline(mr_number: str, db: Session = Depends(get_db), _=Depends(get_current_user), __=Depends(require_role(models.UserRole.hod, models.UserRole.admin, models.UserRole.doctor, models.UserRole.receptionist))):
     patient = db.query(models.Patient).filter(models.Patient.mr_number == mr_number).first()
     if not patient:
         raise HTTPException(404, f"Patient with MR {mr_number} not found")

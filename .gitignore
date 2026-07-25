@@ -3,3 +3,19 @@ node_modules/
 __pycache__/
 playwright-report/
 test-results/
+
+# secrets -- .env holds a live DB connection string + JWT SECRET_KEY; never commit it.
+# git log --all --full-history confirmed it has never been committed so far -- keep it that way.
+.env
+
+# generated / runtime artifacts
+AFID backend/.venv/
+AFID backend/app.log
+AFID backend/exports/
+AFID backend/_to_delete/
+
+# IDE project settings (personal, not shared config)
+.idea/
+
+# ad-hoc Playwright run logs dumped at the repo root during QA sessions
+playwright-run-*.txt

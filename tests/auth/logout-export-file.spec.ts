@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as XLSX from 'xlsx';
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/helpers';
 import { CREDS, uniqueId } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
@@ -41,6 +41,21 @@ function listExportFiles(): string[] {
   return fs.readdirSync(dir);
 }
 
+// The backend process writes the export file to disk asynchronously from
+// this Node test process's point of view -- POST /auth/logout can return
+// export_status: "exported:N" (proving the write happened) a moment before
+// this process's fs.readdirSync() actually observes the new file. A single
+// immediate check occasionally raced this and saw zero new files even
+// though the export genuinely succeeded. Poll instead of checking once.
+async function waitForNewExportFile(before: Set<string>): Promise<string[]> {
+  let found: string[] = [];
+  await expect.poll(() => {
+    found = listExportFiles().filter((f) => !before.has(f));
+    return found.length;
+  }, { timeout: 10000 }).toBeGreaterThan(0);
+  return found;
+}
+
 async function loginAsDoctorViaApi(request: import('@playwright/test').APIRequestContext) {
   const res = await request.post(`${API}/auth/login`, {
     data: { email: CREDS.doctor.email, password: CREDS.doctor.password },
@@ -49,6 +64,17 @@ async function loginAsDoctorViaApi(request: import('@playwright/test').APIReques
   return { Authorization: `Bearer ${access_token}` };
 }
 
+// NOTE: this file used to hand-track every patient ID it seeded and
+// complete them in its own afterEach, because POST /auth/logout only ever
+// *exports* the WAITING/ACTIVE queue -- it never changes patient status --
+// so without cleanup, patients seeded here stayed ACTIVE in the shared dev
+// database and inflated counts/queues in other spec files that ran later in
+// the same suite (e.g. tests/doctor/my-analytics.spec.ts,
+// tests/auth/logout-export.spec.ts). That per-file tracking is now
+// superseded by the suite-wide auto-cleanup fixture in
+// tests/fixtures/helpers.ts, which sweeps every still-WAITING/ACTIVE
+// QA-prefixed patient after every test in every spec file automatically --
+// no local tracking needed here anymore.
 async function seedPatient(
   request: import('@playwright/test').APIRequestContext,
   headers: Record<string, string>,
@@ -112,8 +138,7 @@ test('logging out with real patients in the queue writes a real .xlsx file with 
   const body = await res.json();
   expect(body.export_status).toMatch(/^exported:\d+$/);
 
-  const newFiles = listExportFiles().filter((f) => !before.has(f));
-  expect(newFiles).toHaveLength(1);
+  const newFiles = await waitForNewExportFile(before);
   expect(newFiles[0].startsWith(`${DOCTOR_NAME}_`)).toBe(true);
   expect(newFiles[0].endsWith('.xlsx')).toBe(true);
 
@@ -142,9 +167,16 @@ test('a COMPLETED patient is correctly left out of the exported queue', async ({
   await seedPatient(request, headers, { fullName: uniqueId('QA Export Active Patient'), status: 'ACTIVE' });
 
   const before = new Set(listExportFiles());
-  await request.post(`${API}/auth/logout`, { headers });
-  const newFiles = listExportFiles().filter((f) => !before.has(f));
-  expect(newFiles).toHaveLength(1);
+  const res = await request.post(`${API}/auth/logout`, { headers });
+  // Assert export_status BEFORE checking the filesystem -- routers/auth.py's
+  // logout() swallows any exception from generate_queue_excel() into
+  // export_status = "error:..." and still returns 200, so if the export
+  // silently fails, "0 new files" is the only symptom you'd otherwise see.
+  // This surfaces the backend's real error text instead.
+  const body = await res.json();
+  expect(body.export_status, `logout response: ${JSON.stringify(body)}`).toMatch(/^exported:\d+$/);
+
+  const newFiles = await waitForNewExportFile(before);
 
   const { rows } = readWorkbookRows(path.join(exportsDir(), newFiles[0]));
   const exportedIds = rows.map((r) => r[1]);
@@ -158,10 +190,15 @@ test('two logouts spaced more than a second apart each get their own distinct ex
   await seedPatient(request, headers, { fullName: firstOnlyPatient, status: 'ACTIVE' });
 
   const beforeFirst = new Set(listExportFiles());
-  await request.post(`${API}/auth/logout`, { headers });
+  const firstRes = await request.post(`${API}/auth/logout`, { headers });
+  // See the comment in the "COMPLETED patient" test above: check
+  // export_status first so a silently-swallowed backend export error shows
+  // up here instead of masquerading as "0 new files".
+  const firstBody = await firstRes.json();
+  expect(firstBody.export_status, `logout response: ${JSON.stringify(firstBody)}`).toMatch(/^exported:\d+$/);
+
+  const firstNew = await waitForNewExportFile(beforeFirst);
   const afterFirst = listExportFiles();
-  const firstNew = afterFirst.filter((f) => !beforeFirst.has(f));
-  expect(firstNew).toHaveLength(1);
   const firstFilePath = path.join(exportsDir(), firstNew[0]);
   const firstSnapshot = readWorkbookRows(firstFilePath);
   expect(firstSnapshot.rows.some((r) => r[2] === firstOnlyPatient)).toBe(true);
@@ -174,13 +211,14 @@ test('two logouts spaced more than a second apart each get their own distinct ex
   await seedPatient(request, headers, { fullName: secondPatient, status: 'ACTIVE' });
 
   const beforeSecond = new Set(afterFirst);
-  await request.post(`${API}/auth/logout`, { headers });
-  const afterSecond = listExportFiles();
-  const secondNew = afterSecond.filter((f) => !beforeSecond.has(f));
+  const secondRes = await request.post(`${API}/auth/logout`, { headers });
+  const secondBody = await secondRes.json();
+  expect(secondBody.export_status, `logout response: ${JSON.stringify(secondBody)}`).toMatch(/^exported:\d+$/);
+
+  const secondNew = await waitForNewExportFile(beforeSecond);
 
   // A genuinely new, second file now appears -- unlike the old behavior,
   // this second logout is NOT invisible from the filesystem's point of view.
-  expect(secondNew).toHaveLength(1);
   expect(secondNew[0]).not.toBe(firstNew[0]);
 
   // And the first file is untouched -- it still reflects only its own

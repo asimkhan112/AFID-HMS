@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/helpers';
 import { loginAs, authHeaders, uniqueId, CREDS } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
@@ -191,6 +191,21 @@ test('completing a session now genuinely persists everything entered -- the proc
 
   await page.click('text=Confirm Time & Complete Session');
   expect(dialogMessages.some((m) => /this will save the session summary/i.test(m))).toBe(true);
+
+  // confirmTimeOut() doesn't await the click -- it fires off a real chain
+  // of sequential POST /procedures/, then .../materials, .../pharmacy,
+  // .../diagnostics, .../notes, then a PATCH to COMPLETED, before finally
+  // alerting success. page.click() only waits for the click event (and the
+  // synchronous confirm() dialog it triggers) to be handled, not for that
+  // async chain to finish, so asserting on the second dialog immediately
+  // after the click races the network calls and fails every time. Poll
+  // instead of asserting synchronously, so the save chain has time to run.
+  //
+  // dialogMessages already has 2 entries by the time this chain starts
+  // (the "checked in at ..." alert from executeSearch(), then this
+  // confirm() dialog itself), so we poll for a 3RD message (index 2) --
+  // the success alert -- rather than just "length > 1".
+  await expect.poll(() => dialogMessages.length, { timeout: 10000 }).toBeGreaterThan(2);
   expect(dialogMessages.some((m) => /session completed and saved successfully/i.test(m))).toBe(true);
 
   await expect(page.locator('#patient-time-out')).not.toHaveValue('—');

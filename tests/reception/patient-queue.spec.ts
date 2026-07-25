@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/helpers';
 import { loginAs, authHeaders, uniqueId, fillPatientForm, rowFor } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
@@ -28,14 +28,13 @@ test.describe('Reception Patient Queue', () => {
     const res = await request.get(`${API}/patients/lookup/mr/${encodeURIComponent(mr)}`, { headers });
     const patient = await res.json();
     expect(patient.status).toBe('WAITING');
-    // create_patient() in routers/patients.py stamps check_in_time immediately
-    // at registration -- before the patient has actually been seen by anyone.
-    // "Time In" on the table reflects this, so it's populated even for a
-    // patient still sitting in the WAITING queue, not just ones a doctor has
-    // actually started on.
-    expect(patient.check_in_time).toBeTruthy();
+    // create_patient() never touches check_in_time -- it's only stamped in
+    // update_status() when the patient transitions to ACTIVE (see "Start"
+    // below). A freshly-registered WAITING patient correctly has no check-in
+    // yet; this is the deferred-check-in behavior the QA findings guide
+    // noted as already fixed relative to an earlier copy of this app.
+    expect(patient.check_in_time).toBeNull();
     expect(patient.check_out_time).toBeNull();
-    await expect(row).not.toContainText('— —'); // sanity: Time In column isn't blank
   });
 
   test('Start then Complete moves a patient from WAITING to ACTIVE to COMPLETED and stamps check-out', async ({ page, request }) => {

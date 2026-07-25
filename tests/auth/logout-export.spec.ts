@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/helpers';
 import { loginAs, authHeaders, uniqueId } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
@@ -23,6 +23,8 @@ const API = 'http://localhost:8000';
 //      "HOD logout never reaches the backend at all" gap is fixed. The
 //      confirm-dialog UX inconsistency itself remains unchanged.
 
+const DOCTOR_NAME = 'Dr. Asadullah Khan';
+
 async function seedPatientForDoctor(
   page: import('@playwright/test').Page,
   request: import('@playwright/test').APIRequestContext,
@@ -37,7 +39,7 @@ async function seedPatientForDoctor(
       full_name: 'QA Logout-Export Patient',
       cnic: '77777-7777777-7',
       room: 'Room 12',
-      assigned_doctor: 'Dr. Asadullah Khan',
+      assigned_doctor: DOCTOR_NAME,
       procedure_category: 'Consultation',
     },
   });
@@ -53,6 +55,18 @@ async function seedPatientForDoctor(
   return patient;
 }
 
+/** The real WAITING/ACTIVE queue for DOCTOR_NAME right now. The shared dev
+ *  database is NOT guaranteed to be empty for this doctor -- it can carry
+ *  real, non-QA baseline patients that no cleanup script or fixture should
+ *  ever touch -- so tests must never assume a hardcoded starting count. */
+async function realQueueForDoctor(request: import('@playwright/test').APIRequestContext, headers: Record<string, string>) {
+  const [waiting, active] = await Promise.all([
+    request.get(`${API}/patients/?status=WAITING`, { headers }).then((r) => r.json()),
+    request.get(`${API}/patients/?status=ACTIVE`, { headers }).then((r) => r.json()),
+  ]);
+  return [...waiting, ...active].filter((p: any) => p.assigned_doctor === DOCTOR_NAME);
+}
+
 test('a doctor with a WAITING/ACTIVE patient in their queue gets export_status "exported:<N>" from /auth/logout, proving the export genuinely ran', async ({ page, request }) => {
   await loginAs(page, 'doctor');
   await seedPatientForDoctor(page, request, 'ACTIVE');
@@ -66,16 +80,37 @@ test('a doctor with a WAITING/ACTIVE patient in their queue gets export_status "
   expect(Number(body.export_status.split(':')[1])).toBeGreaterThan(0);
 });
 
-test('a doctor with zero WAITING/ACTIVE patients (only a COMPLETED one on file) gets export_status "empty_queue"', async ({ page, request }) => {
+test('a COMPLETED-only patient added does not inflate the queue -- export_status reflects only the real pre-existing WAITING/ACTIVE count, which may not be zero', async ({ page, request }) => {
   await loginAs(page, 'doctor');
-  await seedPatientForDoctor(page, request, 'COMPLETED');
   const headers = await authHeaders(page);
+
+  // Ground truth taken BEFORE this test touches anything. This used to
+  // hardcode an expectation of exactly "empty_queue", which assumed this
+  // doctor's WAITING/ACTIVE queue in the shared dev database starts at
+  // genuinely zero. In practice it doesn't: this database carries a small
+  // number of real, non-QA baseline patients (not created by any test, so
+  // never touched by AFID backend/cleanup_qa_test_data.py or the suite-wide
+  // qaPatientCleanup fixture in tests/fixtures/helpers.ts -- both correctly
+  // leave real data alone), and some of those are assigned to this doctor.
+  // The actual thing this test verifies -- a COMPLETED patient contributes
+  // nothing to the export -- still holds regardless of that baseline; it
+  // just has to compare against the real count instead of assuming zero.
+  const before = await realQueueForDoctor(request, headers);
+
+  await seedPatientForDoctor(page, request, 'COMPLETED');
 
   const res = await request.post(`${API}/auth/logout`, { headers });
   expect(res.status()).toBe(200);
   const body = await res.json();
   expect(body.message).toBe('Logout successful');
-  expect(body.export_status).toBe('empty_queue');
+
+  if (before.length === 0) {
+    expect(body.export_status).toBe('empty_queue');
+  } else {
+    // The COMPLETED patient we just seeded must NOT be counted -- the queue
+    // size should be exactly what it was before, no more.
+    expect(body.export_status).toBe(`exported:${before.length}`);
+  }
 });
 
 test('non-doctor roles hitting /auth/logout skip the export branch entirely and get export_status "no_queue"', async ({ page, request }) => {
