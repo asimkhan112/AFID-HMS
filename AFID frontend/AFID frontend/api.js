@@ -37,13 +37,32 @@ function removeUser()      { localStorage.removeItem("afid_user"); }
  * @returns {Promise<any>} parsed JSON response
  * @throws  {Error}  with a human-readable message on HTTP errors
  */
+/**
+ * Drops a trailing slash from the path portion of a request (keeping any query
+ * string intact): "/patients/?search=x" -> "/patients?search=x".
+ *
+ * The edge proxy only rewrites cleanly when the path has no trailing slash --
+ * "/api/patients/" 404s at the edge while "/api/patients" proxies correctly.
+ * Normalising here means every call site can keep its natural
+ * FastAPI-style "/patients/" spelling while the wire request stays in the form
+ * the proxy actually handles. The backend resolves the bare collection path
+ * without redirecting (see CollectionSlashMiddleware in main.py) -- important,
+ * because a backend redirect would be cross-origin from the browser's point of
+ * view and would strip the Authorization header.
+ */
+function normalizeApiPath(path) {
+    const [rawPath, ...rest] = String(path).split("?");
+    const trimmed = rawPath.length > 1 ? rawPath.replace(/\/+$/, "") : rawPath;
+    return rest.length ? `${trimmed}?${rest.join("?")}` : trimmed;
+}
+
 async function apiRequest(path, options = {}) {
     const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
 
     const token = getToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+    const res = await fetch(`${BASE_URL}${normalizeApiPath(path)}`, { ...options, headers });
 
     if (res.status === 204) return null;          // No Content
 
