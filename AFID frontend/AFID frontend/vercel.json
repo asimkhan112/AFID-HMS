@@ -1,18 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": false,
-  "trailingSlash": false,
   "rewrites": [
-    { "source": "/auth/:path*",        "destination": "https://afid-hms-production.up.railway.app/auth/:path*" },
-    { "source": "/patients/:path*",    "destination": "https://afid-hms-production.up.railway.app/patients/:path*" },
-    { "source": "/doctors/:path*",     "destination": "https://afid-hms-production.up.railway.app/doctors/:path*" },
-    { "source": "/procedures/:path*",  "destination": "https://afid-hms-production.up.railway.app/procedures/:path*" },
-    { "source": "/leaves/:path*",      "destination": "https://afid-hms-production.up.railway.app/leaves/:path*" },
-    { "source": "/staff/:path*",       "destination": "https://afid-hms-production.up.railway.app/staff/:path*" },
-    { "source": "/hod/:path*",         "destination": "https://afid-hms-production.up.railway.app/hod/:path*" },
-    { "source": "/presets",            "destination": "https://afid-hms-production.up.railway.app/presets" },
-    { "source": "/presets/:path*",     "destination": "https://afid-hms-production.up.railway.app/presets/:path*" },
-    { "source": "/allocations",        "destination": "https://afid-hms-production.up.railway.app/allocations" },
-    { "source": "/allocations/:path*", "destination": "https://afid-hms-production.up.railway.app/allocations/:path*" }
+    {
+      "source": "/api/:path*",
+      "destination": "https://afid-hms-production.up.railway.app/:path*"
+    }
   ]
 }

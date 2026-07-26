@@ -634,7 +634,7 @@
 
   // Removed Next Appointment tab from sidebar navigation list
   const PAGES = [
-    { id: 'dashboard', label: 'Executive Dashboard' },
+    { id: 'dashboard', label: 'Reception Dashboard' },
     { id: 'patient_reg', label: 'Patient Registration' },
     { id: 'patient_mgmt', label: 'Patient Management' },
     { id: 'patient_timeline', label: 'Patient Timeline' },
@@ -654,6 +654,38 @@
   function allocationRoomFor(doctorName) {
     const match = doctorAllocations.find(a => a.name === doctorName);
     return match ? match.room : '';
+  }
+
+  // The department's procedure catalogue, matching the list the doctor portal
+  // offers. Reception previously had only "Consultation" and "Follow-up
+  // Treatment", so common visit types -- Oral Exam above all -- could not be
+  // recorded at the desk at all.
+  const PROCEDURE_CATEGORIES = [
+    'Consultation',
+    'ORAL EXAM',
+    'Follow-up Treatment',
+    'U/L Bracketing',
+    'Bonding of brackets',
+    'Fixed retainer',
+    'De bonding',
+    'Fixed adjustment (Wire/Bends/IPR/Traction/Implant)',
+    'Loose band / Button / Bracket / Tubes',
+    'Molar bands / VFR',
+    'Impression / O/E / Separator / Removable adj',
+    'Treatment planning / File analysis / Tracing',
+    'Space maintainer / Photography / Digital Scan',
+    'Nance LLA / Hyrax / Quad Helix / TPA / Pendulum',
+    'Fixed functional appliance Adj / EOT / Face mask',
+    'NAM (First time prep + First time app)',
+    'Cast Surgery / Prediction / VTO / Morphing',
+    'Root Canal Treatment',
+    'Surgical exposure of impacted tooth',
+  ];
+
+  function procedureCategoryOptions(selected) {
+    return PROCEDURE_CATEGORIES
+      .map(c => `<option value="${c}"${c === selected ? ' selected' : ''}>${c}</option>`)
+      .join('');
   }
 
   function normalizePatient(p) {
@@ -679,6 +711,7 @@
       // widest column in the register and forced a four-line header.
       apptDateShort: (p.registered_at ? new Date(p.registered_at) : new Date())
         .toLocaleDateString(undefined, { day: '2-digit', month: 'short' }),
+      registeredAt: p.registered_at || null,
       timeIn: timeInStr,
       timeOut: timeOutStr,
       duration,
@@ -877,26 +910,95 @@
 
   /* ==================== VIEWS ==================== */
 
+  // A real front-desk overview.
+  //
+  // This page previously showed a panel titled "Staff Registration Information"
+  // containing three read-only fields (operator name, a hard-coded terminal ID,
+  // and an access-level dropdown that did nothing). It registered nothing and
+  // reported nothing -- it just looked like a form that was missing its submit
+  // button. Replaced with the numbers a receptionist actually needs, plus
+  // shortcuts to the things this portal can do.
   function renderDashboard() {
+    const today = new Date().toDateString();
+    const registeredToday = patientLogs.filter(p => {
+      const d = p.registeredAt ? new Date(p.registeredAt) : null;
+      return d && d.toDateString() === today;
+    }).length;
+    const waiting = patientLogs.filter(p => p.status === 'WAITING').length;
+    const active = patientLogs.filter(p => p.status === 'ACTIVE').length;
+    const completed = patientLogs.filter(p => p.status === 'COMPLETED').length;
+    const unassigned = patientLogs.filter(p => !p.assignedDoctor || p.assignedDoctor === '—').length;
+    const allocated = doctorDirectory.filter(d => allocationRoomFor(d.full_name)).length;
+
+    const card = (value, label, tone) => `
+      <div style="background:#fff; border:1px solid var(--border); border-left:6px solid ${tone};
+                  border-radius:12px; padding:20px 22px; box-shadow:var(--shadow-sm);">
+        <div style="font-size:34px; font-weight:800; color:var(--green-dark); line-height:1;">${value}</div>
+        <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-top:8px;
+                    text-transform:uppercase; letter-spacing:.5px;">${label}</div>
+      </div>`;
+
+    const queueByDoctor = doctorDirectory.map(d => {
+      const q = patientLogs.filter(p => p.assignedDoctor === d.full_name);
+      return {
+        name: d.full_name,
+        room: allocationRoomFor(d.full_name) || '—',
+        waiting: q.filter(p => p.status === 'WAITING').length,
+        active: q.filter(p => p.status === 'ACTIVE').length,
+      };
+    });
+
     return `
-    <div class="dashboard-huge-container">
-      <div class="panel panel-dashboard-huge">
-        <div class="panel-header panel-header-huge">Staff Registration Information</div>
-        <div class="panel-body panel-body-huge">
-          <div class="form-row form-row-huge">
-            <label>Active Staff Operator</label>
-            <input type="text" id="staff-operator-name" class="input-huge" value="—" readonly />
+    <div class="header-group">
+      <h1>Reception Dashboard</h1>
+      <p>Live front-desk overview for ${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}.</p>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-bottom:24px;">
+      ${card(registeredToday, 'Registered Today', 'var(--green-med)')}
+      ${card(waiting, 'Waiting', 'var(--amber)')}
+      ${card(active, 'In Procedure', 'var(--green-accent)')}
+      ${card(completed, 'Completed', '#0369a1')}
+      ${card(`${allocated}/${doctorDirectory.length}`, 'Doctors Allocated', 'var(--green-dark)')}
+    </div>
+
+    ${unassigned ? `
+      <div style="background:var(--amber-soft); border-left:6px solid var(--amber); border-radius:10px;
+                  padding:14px 18px; margin-bottom:24px; font-size:13px; font-weight:600; color:var(--amber);">
+        ⚠️ ${unassigned} patient${unassigned === 1 ? '' : 's'} ${unassigned === 1 ? 'has' : 'have'} no assigned dentist.
+      </div>` : ''}
+
+    <div class="grid-split" style="flex:none;">
+      <div class="panel" style="height:auto;">
+        <div class="panel-header">Quick Actions</div>
+        <div class="panel-body" style="overflow:visible; display:flex; flex-direction:column; gap:10px;">
+          <button class="btn-primary" onclick="userNavigate('patient_reg')">＋ Register New Patient</button>
+          <button class="btn-primary" onclick="userNavigate('doctor_mgmt')" style="background:var(--green-med);">＋ Register / Allocate Doctor</button>
+          <button class="btn-secondary" onclick="userNavigate('patient_mgmt')">Open Patient Queue</button>
+          <button class="btn-secondary" onclick="userNavigate('patient_timeline')">Look Up Patient Timeline</button>
+          <div style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--border); font-size:12px; color:var(--text-muted);">
+            Signed in as <strong id="staff-operator-name" style="color:var(--text-dark);">—</strong>
           </div>
-          <div class="form-row form-row-huge">
-            <label>Operational Duty Terminal ID</label>
-            <input type="text" class="input-huge" value="TERM-AFID-9942" readonly />
-          </div>
-          <div class="form-row form-row-huge">
-            <label>Authorized Access Level</label>
-            <select id="staff-auth-level" class="input-huge">
-              <option value="receptionist" selected>Receptionist (Senior Operational Staff)</option>
-              <option value="other">Other</option>
-            </select>
+        </div>
+      </div>
+
+      <div class="panel" style="height:auto;">
+        <div class="panel-header">Queue By Dentist</div>
+        <div class="panel-body">
+          <div class="table-container">
+            <table class="table-wide">
+              <thead><tr><th>Dentist</th><th>Room</th><th>Waiting</th><th>In Procedure</th></tr></thead>
+              <tbody>
+                ${queueByDoctor.length ? queueByDoctor.map(d => `
+                  <tr>
+                    <td><strong>${d.name}</strong></td>
+                    <td>${d.room}</td>
+                    <td><span class="badge badge-waiting">${d.waiting} Waiting</span></td>
+                    <td><span class="badge badge-active">${d.active} Active</span></td>
+                  </tr>`).join('')
+                : '<tr><td colspan="4" style="text-align:center; color:#9ca3af;">No doctor accounts registered yet.</td></tr>'}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1000,10 +1102,7 @@
             </div>
             <div class="form-row">
               <label>Procedure Category</label>
-              <select id="p-procedure" required>
-                <option value="Consultation" selected>Consultation</option>
-                <option value="Follow-up Treatment">Follow-up Treatment</option>
-              </select>
+              <select id="p-procedure" required>${procedureCategoryOptions('Consultation')}</select>
             </div>
             <div class="form-row">
               <label>Assigned Dentist</label>
@@ -1249,12 +1348,7 @@
 
             <div class="form-row">
               <label>Procedure Category</label>
-              <select id="appt-procedure" required>
-                <option value="Follow-up Treatment" selected>Follow-up Treatment</option>
-                <option value="Consultation">Consultation</option>
-                <option value="Root Canal Stage 2">Root Canal Stage 2</option>
-                <option value="Scaling & Polishing">Scaling & Polishing</option>
-              </select>
+              <select id="appt-procedure" required>${procedureCategoryOptions('Follow-up Treatment')}</select>
             </div>
 
             <div class="form-row">
@@ -1555,7 +1649,8 @@
     // `refreshing` breaks the recursion (this repaint calls switchView again),
     // and the pristine-form check stops a refresh that lands while the
     // receptionist is typing from wiping their input.
-    if ((pageId === 'doctor_mgmt' || pageId === 'patient_reg') && refreshedForPage !== pageId) {
+    if ((pageId === 'doctor_mgmt' || pageId === 'patient_reg' || pageId === 'dashboard')
+        && refreshedForPage !== pageId) {
       // Latch BEFORE the await and keep it latched across the repaint below --
       // the repaint re-enters switchView(), so clearing the flag first would
       // make it refresh again, forever, and the constantly-replaced DOM would
@@ -1627,8 +1722,11 @@
       const role = (user?.role || 'staff').toString();
       roleEl.innerText = `Role: ${role.charAt(0).toUpperCase()}${role.slice(1)}`;
     }
-    const operatorInput = document.getElementById('staff-operator-name');
-    if (operatorInput) operatorInput.value = user?.full_name || '—';
+    // The dashboard renders this as a <strong>, not an <input> -- setting
+    // .value on a non-form element is silently ignored, which left it showing
+    // the "—" placeholder.
+    const operatorEl = document.getElementById('staff-operator-name');
+    if (operatorEl) operatorEl.textContent = user?.full_name || '—';
   }
 
   function initApp() {

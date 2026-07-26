@@ -107,12 +107,19 @@ def doctor_monitoring(db: Session = Depends(get_db), _=Depends(get_current_user)
         .filter(models.User.role == models.UserRole.doctor)
         .all()
     )
+    start_of_today = datetime.combine(date.today(), dtime.min)
     rows = []
     for doc in doctors:
         profile = db.query(models.DoctorProfile).filter(models.DoctorProfile.user_id == doc.id).first()
+        # "Patients Today" means patients registered to this doctor TODAY. This
+        # counted every patient ever assigned to them, so the column grew
+        # without bound and never matched its own heading.
         patient_count = (
             db.query(models.Patient)
-            .filter(models.Patient.assigned_doctor == doc.full_name)
+            .filter(
+                models.Patient.assigned_doctor == doc.full_name,
+                models.Patient.registered_at >= start_of_today,
+            )
             .count()
         )
         active_cases = (

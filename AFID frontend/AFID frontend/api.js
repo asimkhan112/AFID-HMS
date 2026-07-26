@@ -5,9 +5,21 @@
  */
 
 // Same-origin: API calls go to the host serving these pages, which forwards
-// them to the backend — via the Vite dev proxy locally, and via Vercel
-// rewrites in production (see vercel.json). No hard-coded backend URL, no CORS.
-const BASE_URL = "";
+// them to the backend — via the Vite dev proxy locally, and via the Vercel
+// rewrite in production (see vercel.json). No hard-coded backend URL, no CORS.
+//
+// Everything is funnelled through a single "/api" prefix so the proxy rule is
+// always "/api/:path*", i.e. it ALWAYS matches at least one path segment.
+//
+// The previous setup mapped each resource prefix separately ("/doctors/:path*",
+// "/presets/:path*", …). Those patterns matched a bare "/doctors" with ZERO
+// segments, and in that case Vercel answers with a 307 REDIRECT to the backend
+// (over http://, no less) instead of proxying. Browsers strip the Authorization
+// header on a cross-origin redirect, so those calls arrived unauthenticated and
+// came back 401 — which the handler below then read as an expired session and
+// used to wipe the user's login. Symptomatically: "no doctor accounts found",
+// an empty doctor matrix, and random logouts.
+const BASE_URL = "/api";
 
 // ── Token / User storage ──────────────────────────────────────────────────────
 function getToken()        { return localStorage.getItem("afid_token"); }

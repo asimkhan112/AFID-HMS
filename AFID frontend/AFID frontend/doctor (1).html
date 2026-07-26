@@ -156,9 +156,12 @@
         <!-- Injected via JavaScript initialization Engine -->
       </div>
     </div>
+    <!-- Placeholders only. Filled in by applySignedInIdentity() the moment the
+         page loads -- never hard-code a name here: it used to read
+         "Dr. Asadullah Khan" for whoever was signed in. -->
     <div class="sidebar-footer">
-      <div class="user-info">Dr. Asadullah Khan</div>
-      <div style="font-size:11px; color:#a3b8b0;">Role: Senior Consultant</div>
+      <div class="user-info" id="sidebar-user-name">—</div>
+      <div id="sidebar-user-role" style="font-size:11px; color:#a3b8b0;">—</div>
       <button onclick="handleLogout()" style="background:none; border:none; color:#fca5a5; font-size:11px; margin-top:10px; cursor:pointer; font-weight:600;">Logout Session</button>
     </div>
   </div>
@@ -249,6 +252,26 @@
       return (getUser()?.full_name || '').trim();
     }
 
+    // Paints the signed-in user into the sidebar. Called on DOMContentLoaded
+    // BEFORE any network work, and again after data loads.
+    //
+    // This used to live at the tail of loadDashboardData()'s try block, so any
+    // failing request in that Promise.all (e.g. the /presets call that 401'd in
+    // production) jumped to the catch and left the sidebar showing whatever was
+    // hard-coded in the HTML -- i.e. signing in as Dr. Tariq still displayed
+    // "Dr. Asadullah Khan". Identity comes from localStorage, not the network,
+    // so it must never depend on a request succeeding.
+    function applySignedInIdentity() {
+      const user = getUser();
+      const nameEl = document.getElementById('sidebar-user-name');
+      const roleEl = document.getElementById('sidebar-user-role');
+      if (nameEl) nameEl.innerText = user?.full_name || 'Unknown User';
+      if (roleEl) {
+        const role = (user?.role || 'doctor').toString();
+        roleEl.innerText = `Role: ${role.charAt(0).toUpperCase()}${role.slice(1)}`;
+      }
+    }
+
     // Patients belong to exactly the doctor named on the record. This used to
     // also accept the hard-coded LOGGED_IN_DOCTOR constant as a match, which
     // meant every signed-in doctor additionally saw Dr. Asadullah Khan's
@@ -332,13 +355,7 @@
 
         leaveTimeline = mapLeaveTimeline(cachedMyLeaves);
 
-        const user = getUser();
-        if (user) {
-          const userInfoEl = document.querySelector('.sidebar-footer .user-info');
-          if (userInfoEl) userInfoEl.innerText = user.full_name || LOGGED_IN_DOCTOR;
-          const roleEl = document.querySelector('.sidebar-footer div:nth-child(2)');
-          if (roleEl) roleEl.innerText = `Role: ${(user.role || 'Senior Consultant').toUpperCase()}`;
-        }
+        applySignedInIdentity();
       } catch (e) {
         console.warn("Failed to load doctor data:", e);
         cachedPatients = [];
@@ -1140,11 +1157,15 @@
           <div class="meta-tag">${currentDoctorName() || 'Clinical Staff'}</div>
         </div>
         <div class="panel">
-          <div class="panel-header">My Active Leave & Coverage Log</div>
+          <div class="panel-header">My Leave Requests — ${currentDoctorName() || 'You'}</div>
           <div class="panel-body" style="padding:0;">
+            <!-- GET /leaves/ is scoped server-side to the caller for any
+                 non-HOD/admin role, so this table only ever contains this
+                 doctor's own requests. "Covering Officer" names a colleague
+                 because that is who would stand in -- it is not their leave. -->
             <table>
               <thead>
-                <tr><th>Date Range</th><th>Type</th><th>Coverage Officer</th><th>Reason / Log</th><th>Status</th></tr>
+                <tr><th>Date Range</th><th>Type</th><th>Covering For Me</th><th>Reason / Log</th><th>Status</th></tr>
               </thead>
               <tbody id="leave-log-body">${rows}</tbody>
             </table>
@@ -2164,6 +2185,9 @@
       navContainer.innerHTML = PAGES.map(p => `
         <button class="nav-item" data-page="${p.id}" onclick="userNavigate('${p.id}')">${p.label}</button>
       `).join('');
+
+      // Identity first, from localStorage -- independent of any request.
+      applySignedInIdentity();
 
       initialDataReady = loadDashboardData();
       await initialDataReady;

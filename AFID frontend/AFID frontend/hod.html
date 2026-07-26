@@ -252,27 +252,12 @@
   </main>
 </div>
 
-<!-- Doctor Profile Modal -->
-<div class="modal-overlay" id="doc-modal">
-  <div class="modal-card">
-    <div class="modal-header">
-      <div>
-        <h3 id="modal-doc-name">Doctor Profile</h3>
-        <div style="font-size:11px; opacity: 0.85;" id="modal-doc-specialty">Orthodontics Specialist</div>
-      </div>
-      <button style="background:none; border:none; color:white; font-size:18px; cursor:pointer;" onclick="closeDocModal()">✕</button>
-    </div>
-    <div style="padding:24px;" id="modal-doc-body"></div>
-  </div>
-</div>
-
 <div class="toast" id="toast-el"></div>
 
 <script>
   window.api = window.api || { get: async () => null, patch: async () => null };
 
   let currentView = 'overview';
-  let selectedMRKey = 'MR-2026-0848';
   let filterStaffRole = '';
 
   let cachedSummary = { total_patients_today: 0, doctors_on_duty: 0, doctors_on_leave: 0, active_rooms: 0 };
@@ -281,8 +266,6 @@
   let cachedStaff = [];
   let cachedLeaves = [];
   let cachedPatients = [];
-  let cachedTimelinePatients = {};
-  let cachedTimelineSteps = {};
 
   function showToast(msg) {
     const el = document.getElementById('toast-el');
@@ -293,34 +276,6 @@
 
   function toggleNotifPanel() {
     document.getElementById('notif-panel').classList.toggle('active');
-  }
-
-  function openDocModal(docName) {
-    const doc = cachedDoctors.find(d => d.name === docName);
-    if (!doc) return;
-
-    document.getElementById('modal-doc-name').innerText = doc.name;
-    document.getElementById('modal-doc-body').innerHTML = `
-      <div style="display:flex; justify-content:space-between; background:#e6f0eb; padding:12px; border-radius:8px; margin-bottom:16px;">
-        <div><span style="font-size:11px; color:#6b7280;">STATUS</span><div style="font-weight:800;">${doc.status}</div></div>
-        <div><span style="font-size:11px; color:#6b7280;">RATING / EXP</span><div style="font-weight:800; color:#10b981;">${doc.rating} (${doc.experience})</div></div>
-      </div>
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-        <div style="background:#f3f7f5; padding:16px; text-align:center; border-radius:8px;">
-          <div style="font-size:24px; font-weight:800; color:var(--primary-green);">${doc.patients_today}</div>
-          <div style="font-size:11px; font-weight:700; color:#6b7280;">Patients Today</div>
-        </div>
-        <div style="background:#f3f7f5; padding:16px; text-align:center; border-radius:8px;">
-          <div style="font-size:24px; font-weight:800; color:var(--primary-green);">${doc.total_active_cases}</div>
-          <div style="font-size:11px; font-weight:700; color:#6b7280;">Total Active Cases</div>
-        </div>
-      </div>
-    `;
-    document.getElementById('doc-modal').classList.add('active');
-  }
-
-  function closeDocModal() {
-    document.getElementById('doc-modal').classList.remove('active');
   }
 
   async function approveExtension(roomId) {
@@ -441,7 +396,7 @@
   function switchView(viewKey) {
     currentView = viewKey;
     renderNav();
-    if (viewKey === 'patient_operations') {
+    if (viewKey === 'patient_records') {
       document.getElementById('view-target').innerHTML = renderOperations();
     } else {
       renderView();
@@ -461,10 +416,13 @@
       title: 'Staff Management',      subtitle: 'Clinical support staff directory' },
     { id: 'leaves',             label: 'Leave Management',
       title: 'Leave Management',      subtitle: 'Review and resolve leave requests from department staff' },
-    { id: 'patient_operations', label: 'Patient Operations',
-      title: 'Patient Operations',    subtitle: 'Read-only oversight of doctor-recorded patient cases' },
-    { id: 'timeline',           label: 'Patient Timeline',
-      title: 'Patient Timeline',      subtitle: 'Doctor-verified procedure history per patient' }
+    // "Patient Operations" and "Patient Timeline" used to be separate tabs that
+    // did the same thing -- search for a patient, then read their record. Now
+    // that Patient Operations is read-only oversight, the only difference was
+    // which half of the record each one showed. Merged into one page that shows
+    // the whole record: profile, procedure timeline, and recorded procedures.
+    { id: 'patient_records',    label: 'Patient Records',
+      title: 'Patient Records',       subtitle: 'Look up a patient: profile, procedure timeline and doctor-recorded sessions' }
   ];
 
   function renderNav() {
@@ -517,7 +475,11 @@
       cachedDoctors = (monitoring || []).map(doc => ({
         name: doc.name,
         patients_today: doc.patients_today || 0,
-        total_active_cases: doc.patients_today || 0,
+        // Read the ACTIVE-case count the API actually returns. This re-used
+        // doc.patients_today, so "Today" and "Active Load" printed the same
+        // number for every doctor and the active workload was never shown at
+        // all -- the one column the matrix exists to surface.
+        total_active_cases: doc.total_active_cases || 0,
         status: doc.status || 'Available',
         experience: 'Live availability',
         rating: '—'
@@ -525,22 +487,11 @@
       cachedStaff = staff || [];
       cachedLeaves = dedupeLeaves(leaves || []).map(normalizeLeave);
 
-      const patientList = (await api.get('/patients/')) || [];
-      cachedPatients = patientList;
-
-      // Only build the MR → name lookup here. This used to additionally fire a
-      // sequential /hod/timeline/{mr} request for EVERY patient on every page
-      // load -- an N+1 round trip whose results hodSelectTimelinePatient throws
-      // away and re-fetches anyway when a patient is actually opened.
-      const timelineMap = {};
-      for (const patient of patientList) {
-        if (patient.mr_number) {
-          timelineMap[patient.mr_number] = { full_name: patient.full_name, status: patient.status };
-        }
-      }
-      cachedTimelinePatients = timelineMap;
-      cachedTimelineSteps = {};
-      if (Object.keys(cachedTimelinePatients).length) selectedMRKey = Object.keys(cachedTimelinePatients)[0];
+      // Timeline steps are fetched on demand for the one patient being opened
+      // (hodLoadTimeline). This used to additionally fire a sequential
+      // /hod/timeline/{mr} request for EVERY patient on every page load -- an
+      // N+1 round trip whose results were then discarded and re-fetched anyway.
+      cachedPatients = (await api.get('/patients/')) || [];
     } catch (e) {
       console.warn('Failed to load HOD portal data:', e);
     }
@@ -635,6 +586,16 @@
                 <label class="label" style="font-weight: 700; color: var(--primary-green); font-size: 11px;">⏰ Patient Time Out</label>
                 <input type="text" id="hod-patient-time-out" readonly style="background:#f3f4f6; color:#374151;" />
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROCEDURE TIMELINE (folded in from the old separate tab) -->
+        <div class="panel">
+          <div class="panel-header">Procedure Timeline</div>
+          <div class="panel-body">
+            <div id="hod-timeline-steps">
+              <div style="color:#6b7280; font-size:13px; text-align:center; padding:12px;">Select a patient to view their timeline.</div>
             </div>
           </div>
         </div>
@@ -750,7 +711,10 @@
       if (timeOutEl) timeOutEl.value = patient.check_out_time ? new Date(patient.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
 
       document.getElementById('hod-master-summary-injection-point').innerHTML = '';
-      await hodLoadRecordedProcedures(patient);
+      await Promise.all([
+        hodLoadRecordedProcedures(patient),
+        hodLoadTimeline(patient.mr_number),
+      ]);
 
     } catch (err) {
       await uiError("Error executing record search: " + err.message);
@@ -954,7 +918,7 @@
   }
 
   function openHODPatientCase(mr) {
-    switchView('patient_operations');
+    switchView('patient_records');
     setTimeout(() => {
       const input = document.getElementById('hod-patient-search-input');
       if (input) {
@@ -1061,7 +1025,7 @@
         <div class="container-title">Doctor Workload Matrix</div>
         <div class="inner-card">
           <table>
-            <thead><tr><th>Doctor</th><th>Today</th><th>Active Load</th><th>Status</th><th>Profile</th></tr></thead>
+            <thead><tr><th>Doctor</th><th>Today</th><th>Active Load</th><th>Status</th></tr></thead>
             <tbody>
               ${cachedDoctors.map(d => `
                 <tr>
@@ -1069,7 +1033,6 @@
                   <td>${d.patients_today}</td>
                   <td>${d.total_active_cases} cases</td>
                   <td><span class="status-pill ${d.status.includes('Busy') ? 'status-busy' : 'status-avail'}">${d.status}</span></td>
-                  <td><button class="btn-action" style="background:#e2e8f0;" onclick="openDocModal('${d.name}')">👁 View</button></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -1140,155 +1103,60 @@
     `;
   }
 
-  function renderPatientTimelineView() {
-    return `
-      <div class="container-card">
-        <div class="container-title">
-          <span>Completed Procedures Log</span>
-          <span style="font-size:11px; color:#059669; font-weight:700;">📡 Live Doctor Event Sync Enabled</span>
-        </div>
-        <div class="panel-body">
-          <div class="timeline-search-row">
-            <div style="flex: 1;">
-              <select id="hod-timeline-filter-type">
-                <option value="mr_number">MR Number</option>
-                <option value="file_number">File Number</option>
-                <option value="name">Name</option>
-              </select>
-            </div>
-            <div style="flex: 2;">
-              <input type="text" id="hod-timeline-search-input" placeholder="Search patient..." onkeydown="if(event.key==='Enter') hodTimelineSearch()" />
-            </div>
-            <div class="btn-holder">
-              <button class="btn" onclick="hodTimelineSearch()" style="height:45px;">Search</button>
-            </div>
-          </div>
-          <div class="inner-card">
-            <table class="timeline-results-table">
-              <thead><tr><th>MR Number</th><th>File Number</th><th>Name</th><th>Status</th><th>Action</th></tr></thead>
-              <tbody id="hod-timeline-results-body">
-                <tr><td colspan="5" style="text-align:center; color:#6b7280;">Use the search above to find a patient.</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div id="hod-timeline-detail-area" style="margin-top:24px; display:none;">
-            <div class="timeline-detail-card">
-              <div class="timeline-detail-header">
-                <div>
-                  <h2 class="timeline-detail-title" id="hod-timeline-patient-title">Patient</h2>
-                  <p class="timeline-detail-subtitle">Displaying doctor-verified treatment history</p>
-                </div>
-                <span class="timeline-badge" id="hod-timeline-total-badge">Total Performed: 0</span>
-              </div>
-              <div class="timeline-steps-list" id="hod-timeline-steps-list"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
+  // Renders the patient's procedure timeline inside the merged Patient Records
+  // page. Replaces renderPatientTimelineView() / hodTimelineSearch() /
+  // hodSelectTimelinePatient(), which duplicated the search-and-open flow that
+  // Patient Operations already provided.
+  async function hodLoadTimeline(mrNumber) {
+    const box = document.getElementById('hod-timeline-steps');
+    if (!box) return;
+    box.innerHTML = '<div style="color:#6b7280; font-size:13px; text-align:center; padding:12px;">Loading…</div>';
 
-  async function hodTimelineSearch() {
+    let steps = [];
     try {
-      const patients = await api.get('/patients/');
-      if (patients && patients.length) {
-        cachedPatients = patients;
-      }
+      steps = (await api.get(`/hod/timeline/${encodeURIComponent(mrNumber)}`)) || [];
     } catch (e) {
-      console.warn('Failed to refresh patient data for timeline search:', e);
-    }
-
-    const filterType = document.getElementById('hod-timeline-filter-type')?.value || 'mr_number';
-    const query = document.getElementById('hod-timeline-search-input')?.value.trim().toLowerCase() || '';
-    const tbody = document.getElementById('hod-timeline-results-body');
-    const detailArea = document.getElementById('hod-timeline-detail-area');
-    if (!tbody) return;
-
-    if (!query) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#6b7280;">Enter a search term.</td></tr>';
-      if (detailArea) detailArea.style.display = 'none';
+      box.innerHTML = `<div style="color:#991b1b; font-size:13px; text-align:center; padding:12px;">Could not load timeline: ${e.message}</div>`;
       return;
     }
 
-    // Map the dropdown value to the real field name. "name" was used directly
-    // as a property key, but the API returns full_name -- so a name search
-    // never matched anything.
-    const FIELD_MAP = { mr_number: 'mr_number', file_number: 'file_number', name: 'full_name' };
-    const field = FIELD_MAP[filterType] || 'mr_number';
-
-    let results = (cachedPatients || []).filter(p =>
-      p && (p[field] || '').toString().toLowerCase().includes(query));
-
-    if (!results.length) {
-      results = (cachedPatients || []).filter(p => p && ['mr_number', 'file_number', 'full_name', 'cnic', 'rank']
-        .some(f => (p[f] || '').toString().toLowerCase().includes(query)));
+    if (!steps.length) {
+      box.innerHTML = `
+        <div style="text-align:center; padding:28px 20px; color:#6b7280; font-size:14px;
+                    background:#fff; border-radius:8px; border:1px dashed var(--border-color);">
+          No timeline steps recorded for this patient yet. Steps appear here as the
+          attending doctor completes them.
+        </div>`;
+      return;
     }
 
-    tbody.innerHTML = results.length ? results.map(p => `
-      <tr style="cursor:pointer;" onclick="hodSelectTimelinePatient('${p.mr_number}')">
-        <td><strong>${p.mr_number}</strong></td>
-        <td>${p.file_number || '—'}</td>
-        <td>${p.full_name}</td>
-        <td><span class="status-pill status-${(p.status || '').toString().toLowerCase()}">${(p.status || '—').toString().toUpperCase()}</span></td>
-        <td><button class="btn-action" style="background:#0b4c33; color:white;" onclick="event.stopPropagation(); hodSelectTimelinePatient('${p.mr_number}')">View Timeline</button></td>
-      </tr>
-    `).join('') : '<tr><td colspan="5" style="text-align:center; color:#6b7280;">No patients found.</td></tr>';
-  }
+    const done = steps.filter(st => (st.status || '').toLowerCase() === 'completed').length;
+    const cls = (st) => {
+      const v = (st || '').toLowerCase();
+      return v === 'completed' ? 'completed' : v === 'in progress' ? 'active' : 'pending';
+    };
+    const icon = { completed: '✓', active: '◐', pending: '○' };
 
-  async function hodSelectTimelinePatient(mr) {
-    selectedMRKey = mr;
-    const record = cachedTimelinePatients[mr] || null;
-    const detailArea = document.getElementById('hod-timeline-detail-area');
-    const titleEl = document.getElementById('hod-timeline-patient-title');
-    const badgeEl = document.getElementById('hod-timeline-total-badge');
-    const stepsList = document.getElementById('hod-timeline-steps-list');
-
-    if (detailArea) detailArea.style.display = 'block';
-    if (titleEl) titleEl.innerText = record ? `${record.full_name} (${mr})` : `${mr}`;
-
-    try {
-      const steps = await api.get(`/hod/timeline/${encodeURIComponent(mr)}`);
-      cachedTimelineSteps[mr] = steps || [];
-    } catch (e) {
-      cachedTimelineSteps[mr] = [];
-    }
-
-    const allSteps = cachedTimelineSteps[mr] || [];
-    const completedProcedures = allSteps.filter(s => (s.status || '').toLowerCase() === 'completed');
-    if (badgeEl) badgeEl.innerText = `Total Performed: ${completedProcedures.length}`;
-
-    // Surface the patient's live case status next to the timeline, so a
-    // checked-out case is never left looking like it is still in the queue.
-    const patientRecord = (cachedPatients || []).find(p => p.mr_number === mr);
-    const subtitleEl = document.querySelector('#hod-timeline-detail-area .timeline-detail-subtitle');
-    if (subtitleEl && patientRecord) {
-      const st = (patientRecord.status || 'WAITING').toString().toUpperCase();
-      subtitleEl.innerHTML = `Case status: <strong style="color:${hodStatusColour(st)};">${st}</strong> · Doctor-verified treatment history`;
-    }
-
-    let proceduresHTML = '';
-    if (completedProcedures.length > 0) {
-      proceduresHTML = completedProcedures.map(s => `
-        <div class="check-item">
-          <div class="check-circle completed">✓</div>
-          <div class="check-text">
-            <div style="font-size: 15px; font-weight: 700; color: #1f2937;">${s.name || s.step_name || '—'}</div>
-            <div style="font-size: 12px; color: #10b981; font-weight: 700; margin-top: 2px;">
-              Performed & Verified by ${s.completed_by || 'Assigned Doctor'}
-            </div>
-          </div>
-          <div class="check-status-badge cs-completed">Completed</div>
-        </div>
-      `).join('');
-    } else {
-      proceduresHTML = `
-        <div style="text-align: center; padding: 40px 20px; color: #6b7280; font-size: 14px; background: #fff; border-radius: 8px; border: 1px dashed var(--border-color);">
-          ℹ️ No performed procedures logged for this patient yet. Procedures will appear automatically once marked completed by the attending doctor.
-        </div>
-      `;
-    }
-
-    if (stepsList) stepsList.innerHTML = proceduresHTML;
+    box.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <span style="font-size:12px; font-weight:700; color:#6b7280; text-transform:uppercase;">
+          ${steps.length} step${steps.length === 1 ? '' : 's'}
+        </span>
+        <span class="timeline-badge">Total Performed: ${done}</span>
+      </div>
+      <div class="checklist-v">
+        ${steps.map(st => {
+          const c = cls(st.status);
+          return `
+            <div class="check-item">
+              <div class="check-circle ${c}">${icon[c]}</div>
+              <div class="check-text">
+                <div style="font-size:15px; font-weight:700; color:#1f2937;">${st.step_name || '—'}</div>
+              </div>
+              <div class="check-status-badge cs-${c}">${st.status || '—'}</div>
+            </div>`;
+        }).join('')}
+      </div>`;
   }
 
   function renderView() {
@@ -1297,8 +1165,7 @@
     else if (currentView === 'monitoring') target.innerHTML = renderMonitoringView();
     else if (currentView === 'staff_mgmt') target.innerHTML = renderStaffMgmtView();
     else if (currentView === 'leaves') target.innerHTML = renderLeavesView();
-    else if (currentView === 'patient_operations') target.innerHTML = renderOperations();
-    else if (currentView === 'timeline') target.innerHTML = renderPatientTimelineView();
+    else if (currentView === 'patient_records') target.innerHTML = renderOperations();
 
     updateNotifications();
   }

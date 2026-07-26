@@ -48,6 +48,40 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# ── Collection-path slash normalisation ───────────────────────────────────────
+# Routers expose their list/create endpoints at "/patients/", "/leaves/", … but
+# clients (and edge proxies that normalise URLs) frequently send the bare
+# "/patients". Starlette's default answer is a 307 redirect to the slashed form.
+#
+# That redirect is actively harmful here: the browser talks to the Vercel edge,
+# so a redirect pointing at the Railway origin is CROSS-ORIGIN, and browsers
+# strip the Authorization header on cross-origin redirects. The retried request
+# arrives unauthenticated, comes back 401, and api.js reads that as an expired
+# session and logs the user out.
+#
+# Rewriting the path in the ASGI scope resolves both spellings to the same
+# endpoint with no redirect at all.
+_COLLECTION_PATHS = frozenset({
+    "/patients", "/procedures", "/leaves", "/staff", "/presets",
+})
+
+
+class CollectionSlashMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http" and scope.get("path") in _COLLECTION_PATHS:
+            scope = dict(scope)
+            scope["path"] = scope["path"] + "/"
+            raw = scope.get("raw_path")
+            if raw:
+                scope["raw_path"] = raw + b"/"
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(CollectionSlashMiddleware)
+
 # ── CORS – allow all origins for local development ────────────────────────────
 app.add_middleware(
     CORSMiddleware,
