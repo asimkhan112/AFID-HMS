@@ -1,32 +1,41 @@
 import { test, expect } from '../fixtures/helpers';
-import { loginAs, authHeaders, uniqueId } from '../fixtures/helpers';
+import { loginAs, authHeaders, uniqueId, DIALOG, acceptDialog, dialogText } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
 
 // Grounded in a fresh read of doctor (1).html's handleLeaveSubmit() against
-// the CURRENT checkout. Two things changed since this file was last
-// grounded, both confirmed against the live source rather than assumed:
+// the CURRENT checkout. What changed since this file was last grounded:
 //
-// 1. The form now has a real #leave-type <select> (Casual Leave / Annual
-//    Leave / Medical Allocation) whose value flows straight through to
-//    POST /leaves/'s leave_type field, and models.LeaveType's enum values
-//    match those three option strings exactly -- the old "silently
-//    hardcoded to Casual Leave" bug is fixed. The test that used to assert
-//    this control didn't exist has been rewritten to prove it now works.
+// 1. Feedback is no longer window.alert(). A successful submission shows an
+//    in-page toast and repaints the leave log; a rejected one shows the
+//    in-page `.afid-dlg` dialog (api.js uiAlert/uiError). Native dialogs were
+//    replaced because the browser prefixes them with the page origin
+//    ("localhost:5173 says…"), which reads as a browser warning rather than
+//    part of the application.
 //
-// 2. handleLeaveSubmit() is async and awaits its POST /leaves/ call before
-//    ever calling alert(...). page.click() resolves once the click is
-//    dispatched -- it does NOT wait for that async handler to finish -- so
-//    a plain expect() checked immediately afterward can race ahead of the
-//    alert firing and see dialogMessage still at its initial ''. Tests
-//    here now register page.waitForEvent('dialog') before the click and
-//    await it afterward, instead of a bare page.once('dialog', ...) +
-//    immediate assert.
+// 2. A start date in the past is now refused -- both by a `min` attribute on
+//    #leave-start-date and by routers/leaves.py. Tests therefore build their
+//    dates relative to today rather than hardcoding calendar dates.
 //
-// routers/leaves.py still 400s a backwards date range with the same
-// message, and every form field still carries `required`, so the browser's
-// own constraint validation still blocks submission of an incomplete form
-// before handleLeaveSubmit()'s own blank-field alert can ever fire.
+// 3. The backend refuses a second PENDING request that OVERLAPS an existing
+//    one from the same requester (that duplicate-suppression is what stops one
+//    request appearing repeatedly in the HOD's approval queue). Each test here
+//    consequently books a distinct, non-overlapping window.
+//
+// 4. Only the leave-log TABLE is repainted after a refresh, never the whole
+//    view -- a full re-render landing mid-typing would wipe the form.
+//
+// The leave-type <select> and its three models.LeaveType values are unchanged,
+// as is the backwards-date-range rejection, and every field still carries
+// `required` so the browser's own constraint validation blocks an incomplete
+// form before handleLeaveSubmit() runs.
+
+/** A date `offsetDays` from today, as YYYY-MM-DD. */
+function dayOffset(offsetDays: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 async function fillLeaveForm(
   page: import('@playwright/test').Page,
@@ -45,18 +54,17 @@ test('submitting a leave request through the UI posts to /leaves/ and lands at t
   const officer = uniqueId('Maj. QA Officer');
   const reason = uniqueId('QA leave reason');
 
-  await fillLeaveForm(page, { start: '2026-09-01', end: '2026-09-05', officer, reason });
+  // Unique, far-out window so repeat runs never collide with the backend's
+  // overlapping-pending-request guard.
+  const offset = 200 + Math.floor(Math.random() * 400);
+  await fillLeaveForm(page, { start: dayOffset(offset), end: dayOffset(offset + 4), officer, reason });
 
-  const dialogPromise = page.waitForEvent('dialog');
   await page.click('button:has-text("Submit Request to HOD")');
-  const dialog = await dialogPromise;
-  const dialogMessage = dialog.message();
-  await dialog.accept();
 
-  expect(dialogMessage).toBe('Leave request successfully sent to the HOD.');
+  // Success is an in-page toast, and the log table is repainted from the
+  // server -- no native dialog is involved any more.
+  await expect(page.locator(DIALOG)).toHaveCount(0);
 
-  // handleLeaveSubmit() re-renders the "leave" view after the alert closes,
-  // prepending the new leave to cachedMyLeaves.
   const row = page.locator('tbody tr', { hasText: reason });
   await expect(row).toBeVisible();
   await expect(row).toContainText(officer);
@@ -84,17 +92,15 @@ test('the leave-type dropdown offers Casual Leave, Annual Leave, and Medical All
   expect(optionLabels).toEqual(['Casual Leave', 'Annual Leave', 'Medical Allocation']);
 
   const reason = uniqueId('QA leave-type reason');
-  await fillLeaveForm(page, { start: '2026-09-10', end: '2026-09-11', officer: 'Maj. T. Farooq', reason });
+  const offset = 700 + Math.floor(Math.random() * 400);
+  await fillLeaveForm(page, { start: dayOffset(offset), end: dayOffset(offset + 1), officer: 'Maj. T. Farooq', reason });
   // Deliberately pick a NON-default option -- if leave_type were still
   // silently hardcoded to 'Casual Leave' under the hood, this is what would
   // expose it.
   await leaveTypeSelect.selectOption('Annual Leave');
 
-  const dialogPromise = page.waitForEvent('dialog');
   await page.click('button:has-text("Submit Request to HOD")');
-  const dialog = await dialogPromise;
-  await dialog.accept();
-  await expect(page.locator('tbody tr', { hasText: reason })).toBeVisible();
+  await expect(page.locator('tbody tr', { hasText: reason })).toBeVisible({ timeout: 15000 });
 
   const headers = await authHeaders(page);
   const res = await request.get(`${API}/leaves/`, { headers });
@@ -103,24 +109,61 @@ test('the leave-type dropdown offers Casual Leave, Annual Leave, and Medical All
   expect(created.leave_type).toBe('Annual Leave');
 });
 
-test('an end date before the start date is rejected by the backend, and the doctor only finds out via a raw alert with the server\'s error text', async ({ page }) => {
+test('an end date before the start date is rejected, and the doctor is told so in an in-page dialog rather than a native alert', async ({ page }) => {
   await loginAs(page, 'doctor');
   await page.click('[data-page="leave"]');
 
+  let nativeDialogFired = false;
+  page.on('dialog', async (d) => { nativeDialogFired = true; await d.dismiss(); });
+
   await fillLeaveForm(page, {
-    start: '2026-09-20',
-    end: '2026-09-15', // before the start date
+    start: dayOffset(20),
+    end: dayOffset(15), // before the start date
     officer: 'Maj. T. Farooq',
     reason: uniqueId('QA backwards-range reason'),
   });
 
-  const dialogPromise = page.waitForEvent('dialog');
   await page.click('button:has-text("Submit Request to HOD")');
-  const dialog = await dialogPromise;
-  const dialogMessage = dialog.message();
-  await dialog.accept();
 
-  expect(dialogMessage).toBe('Error submitting leave request: End date must be on or after start date');
+  await expect(page.locator(DIALOG)).toBeVisible({ timeout: 10000 });
+  expect(await dialogText(page)).toContain('End date must be on or after the start date');
+  await acceptDialog(page);
+
+  // No "<origin> says" browser popup.
+  expect(nativeDialogFired).toBe(false);
+});
+
+test('a start date that has already passed is refused instead of being accepted as a live request', async ({ page }) => {
+  await loginAs(page, 'doctor');
+  await page.click('[data-page="leave"]');
+
+  // The picker itself now carries a lower bound.
+  expect(await page.locator('#leave-start-date').getAttribute('min')).toBe(dayOffset(0));
+
+  // Force a past value the way a determined user could, and confirm it is
+  // still rejected rather than filed.
+  await page.evaluate(() => {
+    const el = document.getElementById('leave-start-date') as HTMLInputElement;
+    el.removeAttribute('min');
+    el.value = '2020-01-01';
+  });
+  const reason = uniqueId('QA past-start reason');
+  await fillLeaveForm(page, { end: dayOffset(5), officer: 'Maj. T. Farooq', reason });
+
+  let leavePostSeen = false;
+  page.on('request', (req) => {
+    if (req.method() === 'POST' && req.url().endsWith('/leaves/')) leavePostSeen = true;
+  });
+
+  await page.click('button:has-text("Submit Request to HOD")');
+
+  await expect(page.locator(DIALOG)).toBeVisible({ timeout: 10000 });
+  expect(await dialogText(page)).toContain('already passed');
+  await acceptDialog(page);
+
+  // Rejected client-side -- it never even reaches the backend.
+  expect(leavePostSeen).toBe(false);
+  await expect(page.locator('tbody tr', { hasText: reason })).toHaveCount(0);
 });
 
 test('leaving a required field blank never even reaches handleLeaveSubmit() -- native HTML5 validation silently blocks the whole form, so the "Please complete all leave fields" alert can never actually fire', async ({ page }) => {
@@ -135,7 +178,7 @@ test('leaving a required field blank never even reaches handleLeaveSubmit() -- n
   });
 
   const officer = uniqueId('Maj. QA Never-Submitted');
-  await fillLeaveForm(page, { start: '2026-09-25', end: '2026-09-26', officer }); // reason left blank
+  await fillLeaveForm(page, { start: dayOffset(25), end: dayOffset(26), officer }); // reason left blank
   await page.click('button:has-text("Submit Request to HOD")');
   await page.waitForTimeout(500);
 

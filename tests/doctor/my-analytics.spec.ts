@@ -86,7 +86,7 @@ test('a patient who is still WAITING (nothing ever completed) is correctly exclu
 
   const personalCard = page.locator('#docAnalytics-personalCard');
   const beforeText = await personalCard.innerText();
-  const totalBefore = Number(beforeText.match(/Total Completed Procedures:\s*(\d+)/)?.[1]);
+  const totalBefore = Number(beforeText.match(/Total Procedures Handled:\s*(\d+)/)?.[1]);
   expect(Number.isFinite(totalBefore)).toBe(true);
 
   // Now add a genuinely ACTIVE patient for this doctor and reload the page
@@ -116,7 +116,7 @@ test('a patient who is still WAITING (nothing ever completed) is correctly exclu
   await expect(page.locator('#docAnalyticsTableBody')).not.toContainText(waitingProc);
 
   const afterText = await personalCard.innerText();
-  const totalAfter = Number(afterText.match(/Total Completed Procedures:\s*(\d+)/)?.[1]);
+  const totalAfter = Number(afterText.match(/Total Procedures Handled:\s*(\d+)/)?.[1]);
   // Exactly one new row counted -- the still-WAITING patient contributed nothing.
   expect(totalAfter).toBe(totalBefore + 1);
 });
@@ -170,7 +170,53 @@ test('the search box filters by keyword -- and, now that filterDoctorAnalytics()
   await page.locator('#docAnalyticsSearch').pressSequentially(otherProc);
 
   await expect(page.locator('#docAnalyticsTableBody')).not.toContainText(otherProc);
-  await expect(page.locator('#docAnalyticsTableBody tr')).toHaveCount(0);
+  // An empty result set now renders an explicit empty-state row instead of a
+  // blank table body, so assert on that rather than on a zero row count.
+  await expect(page.locator('#docAnalyticsTableBody')).toContainText('No procedures recorded in this period.');
+  await expect(page.locator('#docAnalyticsTableBody tr')).toHaveCount(1);
+});
+
+test('the reporting period is stated explicitly and is selectable', async ({ page }) => {
+  await loginAs(page, 'doctor');
+  await page.click('[data-page="doctor-analytics"]');
+
+  // The summary used to give bare totals with no period at all, so there was
+  // no way to tell whether they covered a week, a month, or all time.
+  const periodSelect = page.locator('#docAnalyticsPeriod');
+  await expect(periodSelect).toBeVisible();
+  const options = await periodSelect.locator('option').allTextContents();
+  expect(options).toEqual([
+    'This Week (last 7 days)',
+    'This Month (last 30 days)',
+    'Last 90 Days',
+    'All Time',
+  ]);
+
+  const card = page.locator('#docAnalytics-personalCard');
+  await expect(card).toContainText('Reporting Period');
+  await expect(card).toContainText('This Month (last 30 days)');
+
+  await periodSelect.selectOption('week');
+  await expect(card).toContainText('This Week (last 7 days)');
+
+  await periodSelect.selectOption('all');
+  await expect(card).toContainText('All recorded activity to date');
+});
+
+test('the history log is keyed on the patient MR number, not a generated CASE-nnn label', async ({ page, request }) => {
+  const proc = uniqueId('QA-MR-Keyed');
+  const patient = await seedPatientAsRole(page, request, 'receptionist', {
+    assignedDoctor: 'Dr. Asadullah Khan', procedureCategory: proc, active: true,
+  });
+
+  await loginAs(page, 'doctor');
+  await page.click('[data-page="doctor-analytics"]');
+
+  const row = page.locator('#docAnalyticsTableBody tr', { hasText: proc });
+  await expect(row).toContainText(patient.mr_number);
+  // The old first column was a sequential label invented at render time that
+  // corresponds to nothing else in the system.
+  await expect(page.locator('#docAnalyticsTableBody')).not.toContainText(/CASE-\d{3}/);
 });
 
 test('a patient registered after the doctor\'s session already loaded never appears in "My Analytics" -- cachedPatients is still only ever fetched once, at login', async ({ page, request }) => {

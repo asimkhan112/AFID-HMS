@@ -55,6 +55,15 @@ def decode_token(token: str) -> dict:
         )
 
 
+# A second, non-erroring copy of the bearer scheme. The default one above has
+# auto_error=True, so it raises 401 the moment an Authorization header is
+# missing -- which makes it impossible to write an endpoint that behaves one
+# way for anonymous callers and another way for logged-in ones (see
+# routers/auth.py register(), where the login page must be able to self-register
+# without a token while an authenticated caller still gets role checks applied).
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
+
 # ── FastAPI dependencies ──────────────────────────────────────────────────────
 def get_current_user(
     token: str = Depends(oauth2_scheme),
@@ -68,6 +77,23 @@ def get_current_user(
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User not found or inactive")
     return user
+
+
+def get_current_user_optional(
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db),
+) -> Optional[models.User]:
+    """Resolve the caller if a valid token was supplied, else return None.
+
+    Never raises -- an absent, malformed or expired token all yield None so the
+    endpoint can decide what an anonymous caller is allowed to do.
+    """
+    if not token:
+        return None
+    try:
+        return get_current_user(token=token, db=db)
+    except HTTPException:
+        return None
 
 
 def require_role(*roles: models.UserRole):

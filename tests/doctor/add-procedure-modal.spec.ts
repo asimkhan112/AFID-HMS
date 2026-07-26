@@ -1,46 +1,34 @@
 import { test, expect } from '../fixtures/helpers';
-import { loginAs, authHeaders, uniqueId, CREDS } from '../fixtures/helpers';
+import {
+  loginAs, authHeaders, uniqueId, CREDS,
+  DIALOG, acceptDialog, dismissDialog, dismissDialogIfOpen,
+} from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
 
 // Grounded in a fresh read of doctor (1).html's openAddProcedureModal()
 // against the CURRENT checkout:
 //
-//   function openAddProcedureModal() {
-//     const procName = prompt("Enter new procedure name:");
+//   async function openAddProcedureModal() {
+//     const procName = await uiPrompt("Name of the procedure to add:", ...);
 //     if (!procName || procName.trim() === "") return;
-//     const duration = parseInt(prompt("Enter procedure duration (minutes):")) || 30;
-//     const cleanName = procName.trim();
-//     if (!cachedPresets[cleanName]) {
-//       cachedPresets[cleanName] = { materials: [], pharmacy: [], diagnostics: [],
-//                                     notes: `Procedure performed: ${cleanName}.`, duration };
-//     }
-//     const select = document.getElementById('procedure-select');
-//     const existingOptions = Array.from(select.options).map(opt => opt.value);
-//     if (!existingOptions.includes(cleanName)) {
-//       const newOption = document.createElement('option');
-//       newOption.value = cleanName; newOption.text = cleanName;
-//       select.appendChild(newOption);
-//     }
-//     select.value = cleanName;
-//     applyProcedure();
+//     const durationInput = await uiPrompt("Approximate duration in minutes:", ...);
+//     if (durationInput === null) return;
+//     const duration = parseInt(durationInput, 10) || 30;
+//     ...
 //   }
 //
-// Two things changed from the old scaffold's checkout: procedure presets are
-// now loaded from the real backend (GET /presets/, the new procedure_presets
-// feature) into `cachedPresets` instead of a hardcoded JS object, and the
-// dropdown append now DOES check `existingOptions.includes(cleanName)`
-// before appending -- so the old "duplicate <option> on every call" bug is
-// fixed. `duration` is still parsed from the second prompt and stored on the
-// in-memory preset object, but nothing in the workspace UI ever reads
-// data.duration back out -- that part of the old finding still holds.
+// The two prompts are now the in-page `.afid-dlg` dialog from api.js rather
+// than window.prompt(), so these tests drive DOM buttons via the shared
+// acceptDialog()/dismissDialog() helpers instead of page.on('dialog').
+// Native dialogs are prefixed by the browser with the page origin
+// ("localhost:5173 says…"), which is exactly what that change removed.
 //
-// Because presets now come from the backend and cachedPresets is a
-// load-once snapshot taken at login, "an existing preset" is seeded here via
-// POST /presets/ with a unique name (logged in via the API before the
-// browser session logs in) rather than assumed to already exist under a
-// fixed curated name -- this doesn't depend on whether seed_presets.py has
-// been run against this checkout's database.
+// Otherwise unchanged: procedure presets come from the real backend
+// (GET /presets/) merged over a built-in fallback catalogue, the dropdown
+// append still guards on existingOptions.includes(cleanName) so no duplicate
+// <option> is added, and `duration` is still parsed and stored on the
+// in-memory preset object without any workspace UI ever reading it back out.
 
 async function seedPatient(request: import('@playwright/test').APIRequestContext, headers: Record<string, string>) {
   const res = await request.post(`${API}/patients/`, {
@@ -78,38 +66,49 @@ async function seedPreset(
 }
 
 async function openWorkspace(page: import('@playwright/test').Page, mrNumber: string) {
-  const acceptAll = (dialog: import('@playwright/test').Dialog) => dialog.accept();
-  page.on('dialog', acceptAll);
   await page.click('[data-page="operations"]');
   await page.fill('#patient-search-input', mrNumber);
   await page.click('text=Search & Continue');
-  await page.waitForTimeout(200);
-  page.off('dialog', acceptAll);
+  // Check-in feedback is now a toast, but an unexpected error would still
+  // surface as an in-page dialog -- clear it rather than blocking on it.
+  await page.waitForSelector('#view-workspace-screen.active', { timeout: 15000 });
+  await dismissDialogIfOpen(page);
 }
 
+/**
+ * Drives the two-step Add Procedure flow and returns the prompt text actually
+ * shown, so tests can still assert which prompts appeared (and, crucially,
+ * that the second one does NOT appear when the first is cancelled).
+ */
 async function addCustomProcedure(
   page: import('@playwright/test').Page,
   name: string | null,
   duration?: string
 ): Promise<string[]> {
   const seen: string[] = [];
-  const handler = async (dialog: import('@playwright/test').Dialog) => {
-    seen.push(dialog.message());
-    if (dialog.message().startsWith('Enter new procedure name')) {
-      if (name === null) await dialog.dismiss();
-      else await dialog.accept(name);
-    } else if (dialog.message().startsWith('Enter procedure duration')) {
-      await dialog.accept(duration ?? '30');
-    } else {
-      await dialog.accept();
-    }
-  };
-  page.on('dialog', handler);
+
   await page.click('button:has-text("Add Procedure")');
-  await page.waitForTimeout(300);
-  page.off('dialog', handler);
+  await page.waitForSelector(DIALOG, { timeout: 10000 });
+  seen.push((await page.locator(`${DIALOG} .afid-dlg-body`).innerText()).trim());
+
+  if (name === null) {
+    await dismissDialog(page);
+  } else {
+    await acceptDialog(page, name);
+    // A blank/whitespace-only name short-circuits before the duration prompt.
+    if (name.trim() !== '') {
+      await page.waitForSelector(DIALOG, { timeout: 10000 });
+      seen.push((await page.locator(`${DIALOG} .afid-dlg-body`).innerText()).trim());
+      await acceptDialog(page, duration ?? '30');
+    }
+  }
+
+  await page.waitForTimeout(200);
   return seen;
 }
+
+const NAME_PROMPT = 'Name of the procedure to add:';
+const DURATION_PROMPT = 'Approximate duration in minutes:';
 
 test('adding a brand-new custom procedure only fills the GLOBAL_MATERIALS baseline, with empty pharmacy/diagnostics and a generic auto-generated note', async ({ page, request }) => {
   await loginAs(page, 'doctor');
@@ -119,7 +118,7 @@ test('adding a brand-new custom procedure only fills the GLOBAL_MATERIALS baseli
 
   const procName = uniqueId('QA Custom Procedure');
   const seen = await addCustomProcedure(page, procName, '45');
-  expect(seen).toEqual(['Enter new procedure name:', 'Enter procedure duration (minutes):']);
+  expect(seen).toEqual([NAME_PROMPT, DURATION_PROMPT]);
 
   await expect(page.locator('#procedure-select')).toHaveValue(procName);
   await expect(page.locator(`#procedure-select option[value="${procName}"]`)).toHaveCount(1);
@@ -143,7 +142,7 @@ test('cancelling the procedure-name prompt aborts the whole flow -- the duration
   const beforeCount = await page.locator('#procedure-select option').count();
   const seen = await addCustomProcedure(page, null);
 
-  expect(seen).toEqual(['Enter new procedure name:']);
+  expect(seen).toEqual([NAME_PROMPT]);
   await expect(page.locator('#procedure-select option')).toHaveCount(beforeCount);
 });
 
@@ -156,7 +155,7 @@ test('a whitespace-only procedure name is treated exactly like cancelling -- pro
   const beforeCount = await page.locator('#procedure-select option').count();
   const seen = await addCustomProcedure(page, '   ');
 
-  expect(seen).toEqual(['Enter new procedure name:']);
+  expect(seen).toEqual([NAME_PROMPT]);
   await expect(page.locator('#procedure-select option')).toHaveCount(beforeCount);
 });
 

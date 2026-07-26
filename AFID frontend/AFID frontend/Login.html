@@ -33,6 +33,13 @@
       <button id="btn-register" onclick="switchMode('register')" class="flex-1 py-4 font-bold text-gray-400 hover:text-gray-600 transition">Registration</button>
     </div>
 
+    <!-- Registration success lives OUTSIDE both forms. It used to sit inside
+         #form-register, which handleRegister() hides a line later when it
+         switches back to the login tab -- so the confirmation was created and
+         immediately hidden, and the user was never actually told the account
+         had been created. -->
+    <div id="reg-success" class="hidden mx-6 mt-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2"></div>
+
     <!-- ── LOGIN FORM ─────────────────────────────────────────────────────── -->
     <form id="form-login" class="p-6 space-y-4" onsubmit="handleLogin(event)">
       
@@ -100,11 +107,14 @@
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-1">Role</label>
+          <!-- Admin and HOD are deliberately absent: the backend only lets an
+               already-authenticated admin/HOD create those, so offering them
+               here would just produce a guaranteed 403. They are provisioned
+               from inside the HOD portal instead. -->
           <select id="reg-role" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none">
             <option value="doctor">Doctor</option>
             <option value="nurse">Nurse</option>
             <option value="receptionist">Receptionist</option>
-            <option value="admin">Admin</option>
           </select>
         </div>
       </div>
@@ -115,9 +125,9 @@
           minlength="8" required>
       </div>
 
-      <!-- error / success banners -->
+      <!-- error banner (the success banner is rendered outside this form, so
+           switching back to the login tab does not hide it) -->
       <div id="reg-error"   class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2"></div>
-      <div id="reg-success" class="hidden text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2"></div>
 
       <button type="submit" id="reg-btn"
         class="w-full bg-brand hover:bg-brand-hover text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2">
@@ -249,11 +259,14 @@
         });
 
         setLoading('reg-btn', 'reg-spinner', 'reg-btn-text', false, 'Create Account →');
-        document.getElementById('reg-success').textContent =
-          'Account created successfully! You can now log in with your credentials.';
-        document.getElementById('reg-success').classList.remove('hidden');
         document.getElementById('form-register').reset();
         switchMode('login');
+        // Shown after the tab switch, and pre-filled with the new email so the
+        // user can sign in straight away.
+        document.getElementById('login-email').value = email;
+        document.getElementById('reg-success').textContent =
+          `Account created for ${email}. You can now log in with your credentials.`;
+        document.getElementById('reg-success').classList.remove('hidden');
 
       } catch (err) {
         setLoading('reg-btn', 'reg-spinner', 'reg-btn-text', false, 'Create Account →');

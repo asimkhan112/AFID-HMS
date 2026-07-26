@@ -39,11 +39,17 @@ def get_summary(db: Session = Depends(get_db), _=Depends(get_current_user), __=D
         .filter(models.OperatoryRoom.status != models.RoomStatus.available)
         .count()
     )
+    pending_leaves = (
+        db.query(models.LeaveRequest)
+        .filter(models.LeaveRequest.status == models.LeaveStatus.pending)
+        .count()
+    )
     return schemas.HODSummary(
         total_patients_today=total_patients,
         doctors_on_duty=doctors_on_duty,
         doctors_on_leave=doctors_on_leave,
         active_rooms=active_rooms,
+        pending_leaves=pending_leaves,
     )
 
 
@@ -150,7 +156,21 @@ def add_timeline_step(
     patient = db.query(models.Patient).filter(models.Patient.mr_number == mr_number).first()
     if not patient:
         raise HTTPException(404, f"Patient with MR {mr_number} not found")
-    step = models.PatientTimelineStep(patient_id=patient.id, **payload.model_dump())
+
+    data = payload.model_dump()
+    # Callers that just want to append a step (e.g. the doctor portal logging a
+    # completed procedure) shouldn't have to know how many steps already exist,
+    # so step_order 0 means "next in sequence".
+    if not data.get("step_order"):
+        highest = (
+            db.query(models.PatientTimelineStep.step_order)
+            .filter(models.PatientTimelineStep.patient_id == patient.id)
+            .order_by(models.PatientTimelineStep.step_order.desc())
+            .first()
+        )
+        data["step_order"] = (highest[0] if highest else 0) + 1
+
+    step = models.PatientTimelineStep(patient_id=patient.id, **data)
     db.add(step)
     db.commit()
     db.refresh(step)

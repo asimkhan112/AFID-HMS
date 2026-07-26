@@ -72,18 +72,130 @@ export function uniqueId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// ---------------------------------------------------------------------------
+// Leave-request fixtures.
+//
+// routers/leaves.py now enforces two rules that make hardcoded calendar dates
+// unusable in tests:
+//   * a start date in the past is refused outright, so any fixed date
+//     eventually rots as real time passes;
+//   * a second PENDING request that OVERLAPS an existing one from the same
+//     requester is refused -- that duplicate-suppression is what stops a single
+//     request appearing repeatedly in the HOD's approval queue, and it also
+//     means a re-run of the same test would collide with its own leftovers.
+// ---------------------------------------------------------------------------
+
+/** A date `offsetDays` from today as YYYY-MM-DD (local, no timezone drift). */
+export function dayOffset(offsetDays: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** A future, non-past leave window suitable for POST /leaves/. */
+export function futureLeaveWindow(lengthDays = 2): { start_date: string; end_date: string } {
+  const start = 30 + Math.floor(Math.random() * 900);
+  return { start_date: dayOffset(start), end_date: dayOffset(start + lengthDays) };
+}
+
+/**
+ * Deletes the caller's own PENDING leave requests so a fresh one cannot be
+ * refused as an overlap of a previous run's leftovers.
+ *
+ * Pass DOCTOR/RECEPTIONIST headers only -- GET /leaves/ returns every user's
+ * requests for an HOD/admin token, and this would then clear the whole queue.
+ */
+export async function clearOwnPendingLeaves(
+  request: APIRequestContext,
+  headers: Record<string, string>
+) {
+  const res = await request.get(`${API}/leaves/`, { headers });
+  if (!res.ok()) return;
+  for (const leave of await res.json()) {
+    if (String(leave.status || '').toUpperCase() === 'PENDING') {
+      await request.delete(`${API}/leaves/${leave.id}`, { headers });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// In-page dialogs (api.js: uiAlert / uiConfirm / uiPrompt).
+//
+// The portals no longer call window.alert/confirm/prompt -- the browser
+// prefixes those with the page origin ("localhost:5173 says…"), which reads as
+// a browser warning rather than part of the application. They are replaced by
+// an in-page dialog rendered as `.afid-dlg`, so tests drive DOM elements here
+// instead of Playwright's page.on('dialog') handler.
+// ---------------------------------------------------------------------------
+
+export const DIALOG = '.afid-dlg';
+
+/** Text of the currently-open in-page dialog, or null when none is open. */
+export async function dialogText(page: Page): Promise<string | null> {
+  const box = page.locator(`${DIALOG} .afid-dlg-body`);
+  if (await box.count() === 0) return null;
+  return (await box.first().innerText()).trim();
+}
+
+// Waits for THIS dialog element to go away, not merely for the `.afid-dlg`
+// selector to stop matching. A flow that chains two prompts (Add Procedure
+// asks for a name, then a duration) opens the next dialog in the same tick the
+// previous one closes, so a selector-based detach wait would never be satisfied.
+async function closeDialog(page: Page, click: (dlg: ReturnType<Page['locator']>) => Promise<void>) {
+  await page.waitForSelector(DIALOG, { timeout: 10000 });
+  const handle = await page.locator(DIALOG).first().elementHandle();
+  await click(page.locator(DIALOG).first());
+  if (handle) {
+    await page.waitForFunction((el) => !el.isConnected, handle, { timeout: 10000 });
+    await handle.dispose();
+  }
+}
+
+/** Confirm/accept the open dialog. `value` fills a prompt dialog's input. */
+export async function acceptDialog(page: Page, value?: string) {
+  await closeDialog(page, async (dlg) => {
+    if (value !== undefined) await dlg.locator('.afid-dlg-input').fill(value);
+    await dlg.locator('.afid-dlg-btn.primary').click();
+  });
+}
+
+/** Cancel/dismiss the open dialog. */
+export async function dismissDialog(page: Page) {
+  await closeDialog(page, async (dlg) => {
+    const ghost = dlg.locator('.afid-dlg-btn.ghost');
+    if (await ghost.count()) await ghost.click();
+    else await page.keyboard.press('Escape');
+  });
+}
+
+/** Dismiss a dialog only if one happens to be open; never throws. */
+export async function dismissDialogIfOpen(page: Page) {
+  if (await page.locator(DIALOG).count()) {
+    await dismissDialog(page).catch(() => {});
+  }
+}
+
 export async function fillPatientForm(page: Page, data: {
   mr: string;
   file: string;
   name: string;
   cnic: string;
   doctor?: string;
+  gender?: string;
+  bloodGroup?: string;
+  serviceProfile?: string;
 }) {
   await page.fill('#p-mr', data.mr);
   await page.fill('#p-file', data.file);
   await page.fill('#p-name', data.name);
   await page.fill('#p-cnic', data.cnic);
-  
+
+  // Gender / blood group / service profile are now part of the registration
+  // form and are required, so fill sensible defaults unless overridden.
+  await page.selectOption('#p-gender', data.gender ?? 'Male');
+  await page.selectOption('#p-blood', data.bloodGroup ?? 'O+');
+  await page.selectOption('#p-service-profile', data.serviceProfile ?? 'Serving Officer');
+
   if (data.doctor) {
     // #p-doctor options carry a room suffix in their visible label
     // (e.g. "Dr. Rehan M. (Room 11)") while their VALUE is the plain

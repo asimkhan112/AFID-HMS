@@ -4,6 +4,8 @@ Leave requests: submit, list, approve/reject (HOD).
 """
 
 from typing import List, Optional
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
@@ -57,6 +59,38 @@ def submit_leave(
 ):
     if payload.end_date < payload.start_date:
         raise HTTPException(status_code=400, detail="End date must be on or after start date")
+
+    # Leave is applied for, not recorded retroactively -- a start date that has
+    # already passed used to sail straight through and land in the HOD queue.
+    today = date.today()
+    if payload.start_date < today:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Start date cannot be in the past (earliest allowed is {today.isoformat()})",
+        )
+
+    # Guard against the same request being filed twice (double submit, impatient
+    # re-click, browser retry). Without this the HOD's approval queue fills up
+    # with identical duplicate rows of one real request.
+    overlapping = (
+        db.query(models.LeaveRequest)
+        .filter(
+            models.LeaveRequest.requester_id == current_user.id,
+            models.LeaveRequest.status == models.LeaveStatus.pending,
+            models.LeaveRequest.start_date <= payload.end_date,
+            models.LeaveRequest.end_date >= payload.start_date,
+        )
+        .first()
+    )
+    if overlapping:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"You already have a pending leave request covering "
+                f"{overlapping.start_date.isoformat()} to {overlapping.end_date.isoformat()}."
+            ),
+        )
+
     leave = models.LeaveRequest(requester_id=current_user.id, **payload.model_dump())
     db.add(leave)
     db.commit()

@@ -226,7 +226,15 @@ class ProcedureMaterialOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ProcedureMaterialUpdate(BaseModel):
+    """Body of PATCH /procedures/{proc_id}/materials/{item_id} -- lets a
+    already-logged material's quantity be corrected in place instead of forcing
+    the caller to log a duplicate row for the same item."""
+    quantity: int
+
+
 MaterialCreate = ProcedureMaterialIn
+MaterialUpdate = ProcedureMaterialUpdate
 
 
 class ProcedurePharmacyIn(BaseModel):
@@ -382,7 +390,9 @@ class RoomStatusUpdate(BaseModel):
 # ── Timeline Steps ────────────────────────────────────────────────────────────
 
 class PatientTimelineStepBase(BaseModel):
-    step_order: int
+    # 0 = "append to the end"; the /hod/timeline/{mr}/steps handler resolves it
+    # to the next free position so callers don't have to count existing steps.
+    step_order: int = 0
     step_name: str
     status: models.StepStatus = models.StepStatus.pending
 
@@ -399,11 +409,24 @@ class PatientTimelineStepOut(PatientTimelineStepBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PatientTimelineStepUpdate(BaseModel):
+    """Body of PATCH /hod/timeline/steps/{id}.
+
+    A timeline step's status is a StepStatus (Pending / In Progress /
+    Completed), NOT a PatientStatus (WAITING / ACTIVE / COMPLETED). This used
+    to be aliased to PatientStatusUpdate, so the only values the endpoint would
+    accept were the three patient ones -- every legitimate "Completed" update
+    422'd, and anything that did get through wrote a patient status string into
+    a step-status column.
+    """
+    status: models.StepStatus
+
+
 # The /hod/timeline/{mr_number}/steps endpoint takes patient_id from the URL
 # (resolved via mr_number), so it must NOT be required in the request body --
 # use the base schema (step_order/step_name/status) to avoid a spurious 422.
 TimelineStepCreate = PatientTimelineStepBase
-TimelineStepUpdate = PatientStatusUpdate
+TimelineStepUpdate = PatientTimelineStepUpdate
 
 
 # ── Dashboard & Monitoring ────────────────────────────────────────────────────

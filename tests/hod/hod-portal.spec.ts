@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/helpers';
-import { loginAs, authHeaders, uniqueId } from '../fixtures/helpers';
+import { loginAs, authHeaders, uniqueId, futureLeaveWindow, clearOwnPendingLeaves, DIALOG, dialogText, acceptDialog } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
 
@@ -41,14 +41,17 @@ const API = 'http://localhost:8000';
 async function submitLeaveAsDoctor(page: import('@playwright/test').Page, request: import('@playwright/test').APIRequestContext, reason: string) {
   await loginAs(page, 'doctor');
   const headers = await authHeaders(page);
+  // Clear this doctor's own leftovers first: the backend refuses a new PENDING
+  // request that overlaps an existing one, so a re-run would otherwise collide
+  // with the request the previous run left behind.
+  await clearOwnPendingLeaves(request, headers);
   const res = await request.post(`${API}/leaves/`, {
     headers,
     data: {
       leave_type: 'Casual Leave',
       coverage_officer: 'Maj. T. Farooq',
       reason,
-      start_date: '2026-08-01',
-      end_date: '2026-08-03',
+      ...futureLeaveWindow(2),
     },
   });
   return { leave: await res.json(), doctorHeaders: headers };
@@ -104,14 +107,15 @@ test('clicking "Approve" on a leave request now succeeds -- hod.html sends an al
   await expect(row).toBeVisible();
   await row.locator('button', { hasText: 'Approve' }).click();
 
-  // handleLeaveResolve() shows its "Updating..." toast optimistically,
-  // BEFORE awaiting the PATCH -- so waiting on #toast-el is not a reliable
-  // signal that the request has actually completed, and racing it against
-  // a separate API assertion is flaky. cachedLeaves is only filtered (and
-  // the row removed) AFTER a successful await, so wait on the row's
-  // disappearance instead -- the real completion signal, with expect()'s
-  // auto-retry giving the request time to finish.
-  await expect(page.locator('tbody tr', { hasText: reason })).toHaveCount(0);
+  // Approving is now a confirmed action -- it names the requester and the
+  // dates so the HOD can see what they are signing off before it is applied.
+  await expect(page.locator(DIALOG)).toBeVisible({ timeout: 10000 });
+  expect(await dialogText(page)).toContain('Approve the leave request from');
+  await acceptDialog(page);
+
+  // The pending queue is re-read from the server after the PATCH resolves, so
+  // the row's disappearance is the reliable completion signal.
+  await expect(page.locator('tbody tr', { hasText: reason })).toHaveCount(0, { timeout: 15000 });
 
   const res = await request.get(`${API}/leaves/${leave.id}`, { headers: hodHeaders });
   const approved = await res.json();

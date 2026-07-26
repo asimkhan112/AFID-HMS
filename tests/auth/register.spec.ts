@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/helpers';
+import { uniqueId } from '../fixtures/helpers';
 import { CREDS } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
@@ -48,34 +49,95 @@ async function apiLogin(request: import('@playwright/test').APIRequestContext, r
   return { Authorization: `Bearer ${access_token}` };
 }
 
-test('the public Registration tab on Login.html is broken: submitting it with no session never creates an account or shows the success banner', async ({ page, request }) => {
+test('the public Registration tab on Login.html creates a real account that can immediately log in', async ({ page, request }) => {
+  // /auth/register's authentication is optional by design: the login page has
+  // no session to attach, so requiring one made this tab impossible to use --
+  // and because api.js treats any 401 as an expired session, the page silently
+  // wiped local storage and bounced back to itself. Accounts "registered" this
+  // way were never created, which is why they could never be logged in with.
   const email = uniqueEmail('qa-newuser');
   const password = 'password123';
 
   await page.goto('/Login.html');
   await page.click('#btn-register');
   await fillRegisterForm(page, {
-    firstName: 'QA', lastName: 'NewUser', email, staffId: 'HMS-9001', role: 'receptionist', password,
+    firstName: 'QA', lastName: 'NewUser', email, staffId: uniqueId('HMS-QA'), role: 'receptionist', password,
   });
   await page.click('#reg-btn');
-  await page.waitForTimeout(1000);
 
-  await expect(page.locator('#reg-success')).toBeHidden();
+  // The confirmation survives the automatic switch back to the login tab --
+  // it used to live inside #form-register, which that switch hides, so it was
+  // shown and immediately hidden and the user never saw it.
+  await expect(page.locator('#reg-success')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('#reg-success')).toContainText(`Account created for ${email}`);
+  // …and the login form is pre-filled with the new address, ready to sign in.
+  await expect(page.locator('#login-email')).toHaveValue(email);
 
-  // The durable, non-racy proof: no account for this email was ever created.
+  // The durable, non-racy proof: the account really exists.
   const loginRes = await request.post(`${API}/auth/login`, { data: { email, password } });
-  expect(loginRes.status()).toBe(401);
+  expect(loginRes.status()).toBe(200);
 });
 
-test('directly confirms /auth/register now requires authentication -- an anonymous POST (no Authorization header) is rejected with 401, which is the root cause of the UI regression above', async ({ request }) => {
+test('an anonymous POST /auth/register creates an ordinary account, but cannot self-provision admin or HOD', async ({ request }) => {
   const email = uniqueEmail('qa-anon-register');
   const res = await request.post(`${API}/auth/register`, {
     data: { full_name: 'QA Anon', email, password: 'password123', role: 'receptionist', staff_id: null },
   });
-  expect(res.status()).toBe(401);
+  expect(res.status()).toBe(201);
 
   const loginRes = await request.post(`${API}/auth/login`, { data: { email, password: 'password123' } });
-  expect(loginRes.status()).toBe(401);
+  expect(loginRes.status()).toBe(200);
+
+  // Privilege escalation stays shut: neither admin nor HOD can be created
+  // without an already-privileged caller.
+  for (const role of ['admin', 'hod']) {
+    const escalationRes = await request.post(`${API}/auth/register`, {
+      data: { full_name: `QA Anon ${role}`, email: uniqueEmail(`qa-anon-${role}`), password: 'password123', role },
+    });
+    expect(escalationRes.status()).toBe(403);
+  }
+});
+
+test('registration rejects a password shorter than 8 characters', async ({ request }) => {
+  const res = await request.post(`${API}/auth/register`, {
+    data: { full_name: 'QA Short Password', email: uniqueEmail('qa-shortpw'), password: 'abc', role: 'nurse' },
+  });
+  expect(res.status()).toBe(400);
+  expect((await res.json()).detail).toContain('at least 8 characters');
+});
+
+test('registering a doctor also creates the DoctorProfile the HOD dashboard reads from', async ({ request }) => {
+  // /hod/summary and /hod/monitoring both source doctor duty/leave status from
+  // doctor_profiles, so a doctor account without one is invisible to the HOD.
+  const fullName = uniqueId('Dr. QA Profile');
+  const createRes = await request.post(`${API}/auth/register`, {
+    data: { full_name: fullName, email: uniqueEmail('qa-docprofile'), password: 'password123', role: 'doctor' },
+  });
+  expect(createRes.status()).toBe(201);
+  const created = await createRes.json();
+
+  const hodHeaders = await apiLogin(request, 'hod');
+  const profileRes = await request.get(`${API}/doctors/${created.id}/profile`, { headers: hodHeaders });
+  expect(profileRes.status()).toBe(200);
+  expect((await profileRes.json()).status).toBe('Available');
+
+  const monitoringRes = await request.get(`${API}/hod/monitoring`, { headers: hodHeaders });
+  const rows = await monitoringRes.json();
+  expect(rows.some((r: any) => r.name === fullName)).toBe(true);
+});
+
+test('two doctors cannot share a full_name -- patients are linked to a doctor by name', async ({ request }) => {
+  const fullName = uniqueId('Dr. QA Namesake');
+  const first = await request.post(`${API}/auth/register`, {
+    data: { full_name: fullName, email: uniqueEmail('qa-namesake-1'), password: 'password123', role: 'doctor' },
+  });
+  expect(first.status()).toBe(201);
+
+  const second = await request.post(`${API}/auth/register`, {
+    data: { full_name: fullName, email: uniqueEmail('qa-namesake-2'), password: 'password123', role: 'doctor' },
+  });
+  expect(second.status()).toBe(400);
+  expect((await second.json()).detail).toContain('already exists');
 });
 
 test('an authenticated HOD can create a new user via POST /auth/register, and that user can immediately log in', async ({ request }) => {
@@ -101,13 +163,11 @@ test('an authenticated HOD can create a new user via POST /auth/register, and th
   expect(access_token).toBeTruthy();
 });
 
-test('a receptionist-authenticated caller can create an ordinary (non-admin) account, but is blocked from creating an admin account', async ({ request }) => {
-  // register()'s only privilege check is specifically for role == admin
-  // ("Only admin/HOD can create admin accounts") -- any other authenticated
-  // caller, of any role, can still create a non-admin account. That's a real
-  // gap (no receptionist should be able to enroll a new doctor/nurse
-  // account on their own authority), documented here as a contrast to the
-  // admin-role check that DOES work.
+test('a receptionist-authenticated caller can create an ordinary account, but is blocked from creating an admin account', async ({ request }) => {
+  // A receptionist enrolling a doctor/nurse is intentional -- the staff
+  // portal's "Register New Doctor" form runs exactly this call, which is what
+  // gives a newly-registered doctor working credentials. The privilege line is
+  // drawn at admin/HOD.
   const headers = await apiLogin(request, 'receptionist');
 
   const okEmail = uniqueEmail('qa-receptionist-created');
@@ -123,7 +183,7 @@ test('a receptionist-authenticated caller can create an ordinary (non-admin) acc
     data: { full_name: 'QA Receptionist SelfAdmin', email: adminEmail, password: 'password123', role: 'admin', staff_id: null },
   });
   expect(adminRes.status()).toBe(403);
-  expect((await adminRes.json()).detail).toBe('Only admin/HOD can create admin accounts');
+  expect((await adminRes.json()).detail).toBe('Only admin/HOD can create admin or HOD accounts');
 });
 
 test('registration with a duplicate email is rejected with a 400, even for an authenticated caller', async ({ request }) => {

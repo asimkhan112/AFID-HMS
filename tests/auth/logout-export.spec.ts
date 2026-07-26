@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/helpers';
+import { DIALOG, acceptDialog } from '../fixtures/helpers';
 import { loginAs, authHeaders, uniqueId } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
@@ -142,18 +143,27 @@ test('doctor portal: clicking "Logout Session" really does call POST /auth/logou
   expect(await page.evaluate(() => localStorage.getItem('afid_user'))).toBeNull();
 });
 
-test('HOD portal: "Logout Portal" now really does call the backend /auth/logout endpoint -- the old "never reaches the backend" gap is fixed, though the confirm() dialog it alone shows is still an inconsistency versus the other two portals', async ({ page }) => {
+test('HOD portal: "Logout Portal" calls the backend /auth/logout endpoint, behind an in-page confirmation rather than a native confirm()', async ({ page }) => {
   await loginAs(page, 'hod');
 
   let logoutRequestSeen = false;
   page.on('request', (req) => {
     if (req.method() === 'POST' && req.url().endsWith('/auth/logout')) logoutRequestSeen = true;
   });
-  page.on('dialog', (dialog) => dialog.accept());
+  let nativeDialogFired = false;
+  page.on('dialog', async (dialog) => { nativeDialogFired = true; await dialog.dismiss(); });
 
   await page.click('button:has-text("Logout Portal")');
+
+  // The HOD portal still asks for confirmation before logging out (it is the
+  // only portal that does), but it now uses the same in-page dialog as the
+  // rest of the app instead of a native confirm() prefixed by the page origin.
+  await expect(page.locator(DIALOG)).toBeVisible({ timeout: 10000 });
+  await acceptDialog(page);
+
   await page.waitForURL(/Login\.html$/);
 
   expect(logoutRequestSeen).toBe(true);
+  expect(nativeDialogFired).toBe(false);
   expect(await page.evaluate(() => localStorage.getItem('afid_token'))).toBeNull();
 });

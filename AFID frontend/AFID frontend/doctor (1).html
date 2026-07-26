@@ -200,6 +200,9 @@
       15: { name: "Consultation", duration: 15 }
     };
 
+    const PROCEDURE_MASTER_BY_NAME = Object.values(PROCEDURE_MASTER)
+      .reduce((acc, p) => { acc[p.name] = p.duration; return acc; }, {});
+
     function getDifficultyInfo(duration) {
       if (duration <= 25) return { label: "Easy (≤25m)", class: "diff-easy", category: "Easy" };
       if (duration <= 50) return { label: "Moderate (25-50m)", class: "diff-moderate", category: "Moderate" };
@@ -209,7 +212,11 @@
     let cachedPatients = [];
     let cachedMyLeaves = [];
     let currentPatient = null;
-    let cachedPresets = {};
+    // Seeded lazily on first use with the built-in catalogue (see
+    // ensurePresets()). Starting as {} left a window during page load in which
+    // navigating to Patient Operations rendered a completely empty
+    // "Select a procedure" dropdown.
+    let cachedPresets = null;
     
     let activeMaterials = [];
     let activePharmacy = [];
@@ -232,6 +239,66 @@
       return { full_name: LOGGED_IN_DOCTOR, role: "Senior Consultant" };
     }
 
+    // The one place that decides "who am I". Everything that scopes data to the
+    // signed-in doctor must go through this.
+    function currentDoctorName() {
+      return (getUser()?.full_name || '').trim();
+    }
+
+    // Patients belong to exactly the doctor named on the record. This used to
+    // also accept the hard-coded LOGGED_IN_DOCTOR constant as a match, which
+    // meant every signed-in doctor additionally saw Dr. Asadullah Khan's
+    // queue -- and a patient registered to any *other* doctor never showed up
+    // for the doctor who was actually assigned.
+    function isMyPatient(p) {
+      const me = currentDoctorName();
+      if (!me) return false;
+      const assigned = (p?.assigned_doctor || p?.doctor || '').trim();
+      return assigned.toLowerCase() === me.toLowerCase();
+    }
+
+    function myPatients() {
+      return (cachedPatients || []).filter(isMyPatient);
+    }
+
+    // Fallback catalogue used when the backend has no presets seeded. Without
+    // it, "Select a procedure" renders as an empty dropdown and the whole
+    // patient-operations workflow is unreachable.
+    // Guarantees cachedPresets is populated before any read, whether or not
+    // loadDashboardData() has finished (or succeeded).
+    function ensurePresets() {
+      if (!cachedPresets || !Object.keys(cachedPresets).length) {
+        cachedPresets = buildFallbackPresets();
+      }
+      return cachedPresets;
+    }
+
+    function buildFallbackPresets() {
+      const out = {};
+      Object.keys(PRESETS).forEach(name => {
+        const p = PRESETS[name];
+        out[name] = {
+          materials: [...(p.materials || [])],
+          pharmacy: [...(p.pharmacy || [])],
+          diagnostics: [...(p.diagnostics || [])],
+          notes: p.notes || `Procedure performed: ${name}.`,
+          duration: p.duration || (PROCEDURE_MASTER_BY_NAME[name] || 30)
+        };
+      });
+      // Fold in any procedure from the master list that has no preset defined,
+      // so the dropdown covers the department's full procedure catalogue.
+      Object.values(PROCEDURE_MASTER).forEach(({ name, duration }) => {
+        if (!out[name]) {
+          out[name] = {
+            materials: [], pharmacy: [], diagnostics: [],
+            notes: `Procedure performed: ${name}.`,
+            duration
+          };
+        }
+      });
+      return out;
+    }
+
     async function loadDashboardData() {
       try {
         const [patients, leaves, presets] = await Promise.all([
@@ -243,7 +310,9 @@
         cachedMyLeaves = leaves || [];
         
         // Build presets lookup from backend data
-        cachedPresets = {};
+        // Start from the built-in catalogue so the procedure dropdown is never
+        // empty, then let anything the backend defines override it by name.
+        cachedPresets = buildFallbackPresets();
         (presets || []).forEach(preset => {
           const materials = (preset.materials || []).map(m => ({ name: m.name, qty: m.quantity })).sort(sortByProp('name'));
           const pharmacy = (preset.pharmacy || []).map(p => ({ med: p.medication, dose: p.dose || '—', freq: p.frequency || '—' })).sort(sortByProp('med'));
@@ -257,12 +326,7 @@
           };
         });
 
-        leaveTimeline = cachedMyLeaves.map(l => ({
-          date: `${l.start_date} - ${l.end_date}`,
-          officer: l.coverage_officer || '—',
-          status: (l.status || 'PENDING').toUpperCase(),
-          reason: l.reason || '—'
-        }));
+        leaveTimeline = mapLeaveTimeline(cachedMyLeaves);
 
         const user = getUser();
         if (user) {
@@ -275,7 +339,9 @@
         console.warn("Failed to load doctor data:", e);
         cachedPatients = [];
         cachedMyLeaves = [];
-        cachedPresets = {};
+        // Keep the built-in catalogue even when the API is unreachable, so the
+        // procedure picker still works offline instead of going blank.
+        cachedPresets = buildFallbackPresets();
         leaveTimeline = [];
       }
     }
@@ -408,11 +474,30 @@
       }
     };
 
-    let leaveTimeline = [
-      { date: '12/10 - 12/12', officer: 'Maj. T. Farooq', status: 'APPROVED', reason: 'Official Duty Rotation' }
-    ];
+    // Populated from GET /leaves/. Seeded empty -- it used to carry a fabricated
+    // "APPROVED" demo row that appeared in every doctor's real leave log.
+    let leaveTimeline = [];
 
     /* ===================== VIEW GENERATION MOTORS ===================== */
+    // Non-blocking success feedback. Confirmations that used to fire a native
+    // alert() for routine "saved OK" outcomes now use this instead -- native
+    // dialogs are prefixed with the page origin by the browser.
+    function showDoctorToast(msg) {
+      const el = document.createElement('div');
+      el.innerText = msg;
+      el.style.cssText = 'position:fixed;bottom:28px;right:28px;background:#073e2b;color:#fff;'
+        + 'padding:14px 24px;border-radius:10px;font-size:13px;font-weight:700;z-index:99999;'
+        + 'box-shadow:0 12px 28px rgba(3,37,26,.25);opacity:0;transform:translateY(15px);'
+        + 'transition:all .25s cubic-bezier(.4,0,.2,1);max-width:420px;';
+      document.body.appendChild(el);
+      requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(15px)';
+        setTimeout(() => el.remove(), 300);
+      }, 2800);
+    }
+
     function panel(title, bodyHtml) {
       return `
         <div class="panel">
@@ -423,37 +508,43 @@
     }
 
     function renderDashboard() {
-      const currentUser = getUser();
-      const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
-      
-      const myPatients = (cachedPatients || []).filter(p => {
-        const assignedDoctor = p.assigned_doctor || p.doctor || '';
-        return assignedDoctor === currentName || assignedDoctor === LOGGED_IN_DOCTOR;
-      });
-      
-      const rows = myPatients.slice(0, 10).map(p => `
+      const mine = myPatients();
+
+      const statusBadge = (status) => {
+        const s = (status || '').toString().toUpperCase();
+        const cls = s === 'ACTIVE' ? 'badge-success' : s === 'COMPLETED' ? 'badge-info' : 'badge-warning';
+        return `<span class="badge ${cls}">${s || 'WAITING'}</span>`;
+      };
+
+      const rows = mine.length ? mine.slice(0, 25).map(p => `
         <tr>
           <td><strong>${p.mr_number}</strong></td>
           <td>${p.full_name}</td>
-          <td>${p.status || 'Active'}</td>
+          <td>${p.procedure_category || '—'}</td>
+          <td>${statusBadge(p.status)}</td>
           <td>
             <button class="btn btn-sm" onclick="openPatient('${p.mr_number}')" style="margin-right:4px;">Open Case</button>
             <button class="btn btn-sm" onclick="viewPatientProcedureHistory(${p.id})" style="background:#0f6244;">History</button>
           </td>
         </tr>
-      `).join('');
+      `).join('') : `<tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:24px;">
+          No patients are currently assigned to ${currentDoctorName() || 'you'}.
+        </td></tr>`;
 
       return `
         <div class="dashboard-title-row">
           <h1>Executive Clinic Dashboard</h1>
-          <div class="meta-tag">Dental Command Portal</div>
+          <div class="meta-tag">${currentDoctorName() || 'Dental Command Portal'}</div>
         </div>
 
         <div class="grid grid-executive">
           ${panel('Today\'s Appointment & Routine Rotation Logs', `
+            <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+              <button class="btn btn-sm" onclick="refreshDashboard()" style="background:var(--text-muted);">⟳ Refresh Queue</button>
+            </div>
             <table>
               <thead>
-                <tr><th>Patient MR No.</th><th>Rank / Full Name</th><th>Target Action</th><th>Action Log</th></tr>
+                <tr><th>Patient MR No.</th><th>Rank / Full Name</th><th>Procedure</th><th>Status</th><th>Action Log</th></tr>
               </thead>
               <tbody>${rows}</tbody>
             </table>
@@ -462,7 +553,55 @@
       `;
     }
 
+    // Reception registers patients while a doctor is already signed in, so the
+    // dashboard needs a way to pick up new arrivals without a full page reload.
+    async function refreshDashboard() {
+      try {
+        cachedPatients = (await api.get('/patients/')) || [];
+      } catch (e) {
+        console.warn('Failed to refresh patient queue:', e);
+      }
+      document.getElementById('main-root').innerHTML = renderDashboard();
+    }
+
+    // Reporting window for "My Analytics". The summary card used to state
+    // totals with no period at all, so there was no way to tell whether the
+    // numbers covered a week, a month, or all time.
+    const ANALYTICS_PERIODS = {
+      week:    { label: 'This Week (last 7 days)',   days: 7 },
+      month:   { label: 'This Month (last 30 days)', days: 30 },
+      quarter: { label: 'Last 90 Days',              days: 90 },
+      all:     { label: 'All Time',                  days: null }
+    };
+    let analyticsPeriod = 'month';
+
+    function analyticsPeriodStart() {
+      const cfg = ANALYTICS_PERIODS[analyticsPeriod];
+      if (!cfg || cfg.days === null) return null;
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      start.setDate(start.getDate() - (cfg.days - 1));
+      return start;
+    }
+
+    function analyticsPeriodDescription() {
+      const cfg = ANALYTICS_PERIODS[analyticsPeriod] || ANALYTICS_PERIODS.month;
+      const start = analyticsPeriodStart();
+      if (!start) return 'All recorded activity to date';
+      const fmt = (d) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+      return `${cfg.label} — ${fmt(start)} to ${fmt(new Date())}`;
+    }
+
+    function setAnalyticsPeriod(value) {
+      analyticsPeriod = value;
+      processAndRenderDoctorAnalytics();
+    }
+
     function renderDoctorAnalytics() {
+      const periodOptions = Object.entries(ANALYTICS_PERIODS)
+        .map(([key, cfg]) => `<option value="${key}" ${analyticsPeriod === key ? 'selected' : ''}>${cfg.label}</option>`)
+        .join('');
+
       return `
         <div class="dashboard-title-row">
           <h1>My Performance & Workload Analytics</h1>
@@ -470,7 +609,14 @@
         </div>
 
         <div class="panel">
-          <div class="panel-header">Personal Activity Summary</div>
+          <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+            <span>Personal Activity Summary</span>
+            <span style="display:flex; align-items:center; gap:8px; font-weight:500;">
+              <label for="docAnalyticsPeriod" style="font-size:12px; color:var(--text-muted); white-space:nowrap;">Reporting period</label>
+              <select id="docAnalyticsPeriod" style="width:auto; min-width:220px; padding:6px 10px; font-size:13px;"
+                      onchange="setAnalyticsPeriod(this.value)">${periodOptions}</select>
+            </span>
+          </div>
           <div class="panel-body">
             <div class="doc-card" id="docAnalytics-personalCard">
             </div>
@@ -480,13 +626,14 @@
         <div class="panel">
           <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center;">
             <span>My Procedure History Log</span>
-            <input type="text" id="docAnalyticsSearch" class="search-box" style="width:220px;" placeholder="Filter procedure or ID..." onkeyup="filterDoctorAnalytics()">
+            <input type="text" id="docAnalyticsSearch" class="search-box" style="width:220px;" placeholder="Filter procedure or MR no..." onkeyup="filterDoctorAnalytics()">
           </div>
           <div class="panel-body" style="padding:0;">
             <table>
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th>MR No.</th>
+                  <th>Patient</th>
                   <th>Date</th>
                   <th>Procedure Target</th>
                   <th>Duration</th>
@@ -501,23 +648,31 @@
     }
 
     function buildAnalyticsRows() {
-      const currentUser = getUser();
-      const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
-      const myPatients = (cachedPatients || []).filter(patient => {
-        const assignedDoctor = patient.assigned_doctor || patient.doctor || '';
-        return assignedDoctor === currentName || assignedDoctor === LOGGED_IN_DOCTOR;
-      });
-      return myPatients.filter(patient => {
+      const periodStart = analyticsPeriodStart();
+
+      return myPatients().filter(patient => {
         const status = (patient.status || '').toString().toUpperCase();
-        return status === 'ACTIVE' || status === 'COMPLETED';
-      }).map((patient, index) => {
+        if (status !== 'ACTIVE' && status !== 'COMPLETED') return false;
+        if (!periodStart) return true;
+        const seenAt = patient.check_in_time || patient.registered_at;
+        if (!seenAt) return false;
+        const when = new Date(seenAt);
+        return !isNaN(when) && when >= periodStart;
+      }).map(patient => {
         const procName = patient.procedure_category || 'Clinical Assessment';
-        const duration = /root|canal/i.test(procName) ? 60 : /bracket|bond/i.test(procName) ? 45 : /retainer|align/i.test(procName) ? 30 : /consult/i.test(procName) ? 15 : 25;
+        const duration = PROCEDURE_MASTER_BY_NAME[procName]
+          || (/root|canal/i.test(procName) ? 60 : /bracket|bond/i.test(procName) ? 45 : /retainer|align/i.test(procName) ? 30 : /consult/i.test(procName) ? 15 : 25);
         const diff = getDifficultyInfo(duration);
+        const seenAt = patient.check_in_time || patient.registered_at;
         return {
-          id: `CASE-${String(index + 1).padStart(3, '0')}`,
-          date: patient.registered_at ? new Date(patient.registered_at).toLocaleDateString() : '—',
-          doctor: currentName,
+          // The patient's real MR number -- this column used to show a
+          // sequential "CASE-001" label generated on the fly at render time,
+          // which is not an identifier that exists anywhere else in the system
+          // and made the row impossible to tie back to a patient.
+          id: patient.mr_number || '—',
+          patientName: patient.full_name || '—',
+          date: seenAt ? new Date(seenAt).toLocaleDateString() : '—',
+          doctor: currentDoctorName(),
           procName,
           duration,
           diff
@@ -544,6 +699,7 @@
         const row = document.createElement("tr");
         row.innerHTML = `
           <td><strong>${item.id}</strong></td>
+          <td>${item.patientName}</td>
           <td>${item.date}</td>
           <td><strong>${item.procName}</strong></td>
           <td>${item.duration} mins</td>
@@ -552,11 +708,23 @@
         tbody.appendChild(row);
       });
 
+      if (!rows.length) {
+        const empty = document.createElement("tr");
+        empty.innerHTML = `<td colspan="6" style="text-align:center; color:#9ca3af; padding:24px;">
+          No procedures recorded in this period.
+        </td>`;
+        tbody.appendChild(empty);
+      }
+
       const personalCard = document.getElementById("docAnalytics-personalCard");
       if (personalCard) {
         personalCard.innerHTML = `
-          <h3>${getUser()?.full_name || LOGGED_IN_DOCTOR}</h3>
-          <div class="stat-row"><span>Total Completed Procedures:</span> <strong>${rows.length}</strong></div>
+          <h3>${currentDoctorName() || LOGGED_IN_DOCTOR}</h3>
+          <div style="background:var(--green-soft); border:1px solid var(--border); border-radius:6px; padding:10px 12px; margin-bottom:14px;">
+            <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--green-med);">Reporting Period</div>
+            <div style="font-size:13px; font-weight:600; margin-top:2px;">${analyticsPeriodDescription()}</div>
+          </div>
+          <div class="stat-row"><span>Total Procedures Handled:</span> <strong>${rows.length}</strong></div>
           <div class="stat-row"><span>Total Time Executed:</span> <strong>${totalMins} mins (${(totalMins/60).toFixed(1)} hrs)</strong></div>
           <div class="stat-row"><span>Easy Procedures (≤25m):</span> <strong style="color: #15803d">${countEasy}</strong></div>
           <div class="stat-row"><span>Moderate Procedures (25-50m):</span> <strong style="color: #a16207">${countMod}</strong></div>
@@ -569,7 +737,9 @@
       const query = (document.getElementById("docAnalyticsSearch")?.value || "").toLowerCase();
       const sourceRows = buildAnalyticsRows();
       const filtered = sourceRows.filter(item => {
-        return item.procName.toLowerCase().includes(query) || item.id.toLowerCase().includes(query);
+        return item.procName.toLowerCase().includes(query)
+          || item.id.toLowerCase().includes(query)
+          || item.patientName.toLowerCase().includes(query);
       });
       processAndRenderDoctorAnalytics(filtered);
     }
@@ -579,56 +749,55 @@
       const query = searchInput ? searchInput.value.trim() : '';
 
       if (!query) {
-        alert("Please enter search query details.");
+        await uiAlert("Please enter a search term (MR number, CNIC, file number or rank).", { title: 'Search' });
         return;
       }
 
       try {
-        let patient = null;
-        if (typeof api !== 'undefined') {
-          const currentUser = getUser();
-          const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
-          const patients = await api.get(`/patients/?search=${encodeURIComponent(query)}`);
-          if (patients && patients.length > 0) {
-            // Scope search to current doctor's patients only
-            const myPatients = patients.filter(p => {
-              const assignedDoctor = p.assigned_doctor || p.doctor || '';
-              return assignedDoctor === currentName || assignedDoctor === LOGGED_IN_DOCTOR;
-            });
-            patient = myPatients[0] || null;
-          }
-        } else {
-          const currentUser = getUser();
-          const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
-          patient = cachedPatients.find(p => {
-            const assignedDoctor = p.assigned_doctor || p.doctor || '';
-            return assignedDoctor === currentName || assignedDoctor === LOGGED_IN_DOCTOR;
-          });
-        }
-        
+        // Always refresh from the server: patients registered by reception after
+        // this portal loaded are not in cachedPatients yet.
+        const patients = (await api.get(`/patients/?search=${encodeURIComponent(query)}`)) || [];
+        const mine = patients.filter(isMyPatient);
+        let patient = mine[0] || null;
+
         if (!patient) {
-          alert("No patient record found matching: " + query);
+          const foundButNotMine = patients[0];
+          if (foundButNotMine) {
+            await uiAlert(
+              `${foundButNotMine.full_name} (${foundButNotMine.mr_number}) is assigned to ` +
+              `${foundButNotMine.assigned_doctor || 'another doctor'}, not to you.`,
+              { title: 'Not Your Patient', tone: 'warn' }
+            );
+          } else {
+            await uiAlert(`No patient record found matching: ${query}`, { title: 'Not Found', tone: 'warn' });
+          }
           return;
         }
-        
+
         currentPatient = patient;
-        
-        if ((patient.status || '').toString().toUpperCase() === 'WAITING' && typeof api !== 'undefined') {
+
+        if ((patient.status || '').toString().toUpperCase() === 'WAITING') {
           try {
             const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'ACTIVE' });
             currentPatient = updated;
             patient = updated;
-            alert(`Patient ${patient.full_name} checked in at ${new Date(updated.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+            showDoctorToast(`${patient.full_name} checked in at ${new Date(updated.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
           } catch (err) {
-            alert('Auto check-in failed: ' + (err.message || 'Unknown error'));
+            await uiError('Auto check-in failed: ' + (err.message || 'Unknown error'));
           }
         }
-        
+
+        // Keep the local cache in step so the dashboard/analytics/timeline all
+        // reflect the status change without a reload.
+        const cachedIdx = (cachedPatients || []).findIndex(p => p.id === patient.id);
+        if (cachedIdx !== -1) cachedPatients[cachedIdx] = patient;
+        else cachedPatients.push(patient);
+
         document.getElementById('view-search-screen').classList.remove('active');
         document.getElementById('view-workspace-screen').classList.add('active');
-        
+
         const badgeEl = document.getElementById('active-patient-badge');
-        if (badgeEl) badgeEl.innerText = `Active Patient: ${patient.full_name} (${patient.mr_number})`;
+        if (badgeEl) badgeEl.innerText = `Open Case: ${patient.full_name} (${patient.mr_number})`;
 
         const values = document.querySelectorAll('#view-workspace-screen .value');
         if (values[0]) values[0].innerText = patient.full_name;
@@ -636,7 +805,16 @@
         if (values[2]) values[2].innerText = patient.service_profile || '—';
         if (values[3]) values[3].innerText = `${patient.gender || '—'} / ${patient.blood_group || '—'}`;
         if (values[4]) values[4].innerText = patient.room || '—';
-        
+        // Real case status, straight from the record -- the "Open Case" badge
+        // above only means "this is the record on screen", which was previously
+        // the only status-looking text here and read as though every opened
+        // case was active.
+        if (values[5]) {
+          const st = (patient.status || 'WAITING').toString().toUpperCase();
+          const colour = st === 'COMPLETED' ? '#0369a1' : st === 'ACTIVE' ? '#15803d' : '#92400e';
+          values[5].innerHTML = `<span style="color:${colour}; font-weight:800;">${st}</span>`;
+        }
+
         updateAllergyAlertBox(patient.allergies);
 
         const recordAllergyInput = document.getElementById('record-allergy-input');
@@ -653,17 +831,23 @@
         const timeOutEl = document.getElementById('patient-time-out');
         if (timeOutEl) timeOutEl.value = patient.check_out_time ? new Date(patient.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
 
+        // A fresh case starts with a clean slate -- stale material/pharmacy/
+        // diagnostic rows from the previously opened patient must not carry over.
+        activeMaterials = [];
+        activePharmacy = [];
+        activeDiagnostics = [];
+
         document.getElementById('step-3-container').style.display = 'none';
         document.getElementById('procedure-select').value = "";
         document.getElementById('master-summary-injection-point').innerHTML = '';
 
       } catch (err) {
-        alert("Error executing record search: " + err.message);
+        await uiError("Error executing record search: " + err.message);
       }
     }
 
     function renderOperations() {
-      const proceduralOptions = Object.keys(cachedPresets).map(key => `<option value="${key}">${key}</option>`).join('');
+      const proceduralOptions = Object.keys(ensurePresets()).map(key => `<option value="${key}">${key}</option>`).join('');
 
       return `
         <!-- SCREEN 1: SEARCH / LOOKUP VIEW -->
@@ -714,6 +898,7 @@
                 <div><span class="label">Service Profile:</span><span class="value">—</span></div>
                 <div><span class="label">Gender/Blood:</span><span class="value">—</span></div>
                 <div><span class="label">System Location:</span><span class="value">—</span></div>
+                <div><span class="label">Case Status:</span><span class="value">—</span></div>
               </div>
               <div class="alert-box" id="allergy-alert-box" style="margin-bottom:12px; display:none;"></div>
               
@@ -785,7 +970,7 @@
                   </div>
                   <table>
                     <thead>
-                      <tr><th>Medication</th><th>Dose</th><th>Frequency</th></tr>
+                      <tr><th>Medication</th><th>Dose</th><th>Frequency</th><th style="width:80px; text-align:right;">Action</th></tr>
                     </thead>
                     <tbody id="pharmacy-log-list"></tbody>
                   </table>
@@ -905,59 +1090,86 @@
       `;
     }
 
-    function renderLeave() {
-      const rows = leaveTimeline.map(l => `
+    function buildLeaveLogRows() {
+      const statusClass = (s) => s === 'APPROVED' ? 'badge-success'
+        : s === 'REJECTED' ? 'badge-danger' : 'badge-warning';
+
+      return leaveTimeline.length ? leaveTimeline.map(l => `
         <tr>
           <td><strong>${l.date}</strong></td>
+          <td>${l.type || '—'}</td>
           <td>${l.officer}</td>
           <td>${l.reason}</td>
-          <td><span class="badge ${l.status === 'APPROVED' ? 'badge-success' : 'badge-warning'}">${l.status}</span></td>
+          <td><span class="badge ${statusClass(l.status)}">${l.status}</span></td>
         </tr>
-      `).join('');
+      `).join('') : '<tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:24px;">No leave requests submitted yet.</td></tr>';
+    }
+
+    // Repaints ONLY the leave log table body, leaving the submission form (and
+    // anything already typed into it) untouched.
+    function repaintLeaveLog() {
+      const body = document.getElementById('leave-log-body');
+      if (body) body.innerHTML = buildLeaveLogRows();
+    }
+
+    function renderLeave() {
+      const rows = buildLeaveLogRows();
+
+      // Earliest selectable start date is today -- the form previously had no
+      // bound at all, so a start date already in the past was accepted and
+      // forwarded to the HOD as a live request.
+      const today = new Date();
+      const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
       return `
         <div class="dashboard-title-row">
           <h1>Leave Requests & Rotations</h1>
+          <div class="meta-tag">${currentDoctorName() || 'Clinical Staff'}</div>
         </div>
         <div class="panel">
           <div class="panel-header">My Active Leave & Coverage Log</div>
-          <div class="panel-body">
+          <div class="panel-body" style="padding:0;">
             <table>
               <thead>
-                <tr><th>Date Range</th><th>Coverage Officer</th><th>Reason / Log</th><th>Status</th></tr>
+                <tr><th>Date Range</th><th>Type</th><th>Coverage Officer</th><th>Reason / Log</th><th>Status</th></tr>
               </thead>
-              <tbody>${rows}</tbody>
+              <tbody id="leave-log-body">${rows}</tbody>
             </table>
           </div>
         </div>
         <div class="panel">
           <div class="panel-header">Submit Leave Request to HOD</div>
           <div class="panel-body">
+            <!-- Every field is wrapped in .form-group (display:flex; column).
+                 The date and coverage-officer fields previously placed a bare
+                 <label class="label"> next to their input inside a flex ROW
+                 container, and since .label has no display:block the label sat
+                 inline against the field and the whole form rendered misaligned. -->
             <form onsubmit="handleLeaveSubmit(event)">
-              <div class="flex-row-inputs">
-                <div style="flex: 1;">
-                  <label class="label">Start Date</label>
-                  <input type="date" id="leave-start-date" required />
+              <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                <div class="form-group" style="flex:1; min-width:180px;">
+                  <label class="label" for="leave-start-date">Start Date</label>
+                  <input type="date" id="leave-start-date" min="${isoToday}" value="${isoToday}" required />
                 </div>
-                <div style="flex: 1;">
-                  <label class="label">End Date</label>
-                  <input type="date" id="leave-end-date" required />
+                <div class="form-group" style="flex:1; min-width:180px;">
+                  <label class="label" for="leave-end-date">End Date</label>
+                  <input type="date" id="leave-end-date" min="${isoToday}" value="${isoToday}" required />
+                </div>
+                <div class="form-group" style="flex:1; min-width:180px;">
+                  <label class="label" for="leave-type">Leave Type</label>
+                  <select id="leave-type" required>
+                    <option value="Casual Leave">Casual Leave</option>
+                    <option value="Annual Leave">Annual Leave</option>
+                    <option value="Medical Allocation">Medical Allocation</option>
+                  </select>
                 </div>
               </div>
               <div class="form-group">
-                <label class="label">Coverage Officer</label>
+                <label class="label" for="leave-coverage-officer">Coverage Officer</label>
                 <input type="text" id="leave-coverage-officer" placeholder="e.g. Maj. T. Farooq" required />
               </div>
               <div class="form-group">
-                <label class="label">Leave Type</label>
-                <select id="leave-type" required>
-                  <option value="Casual Leave">Casual Leave</option>
-                  <option value="Annual Leave">Annual Leave</option>
-                  <option value="Medical Allocation">Medical Allocation</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="label">Reason for Leave</label>
+                <label class="label" for="leave-reason">Reason for Leave</label>
                 <textarea id="leave-reason" rows="3" placeholder="Specify context or justification for the HOD..." required></textarea>
               </div>
               <button type="submit" class="btn">Submit Request to HOD</button>
@@ -977,60 +1189,87 @@
 
     window.handleLeaveSubmit = async function(event) {
       event.preventDefault();
+      const submitBtn = event.target.querySelector('button[type="submit"]');
       const start = document.getElementById('leave-start-date').value;
       const end = document.getElementById('leave-end-date').value;
-      const officer = document.getElementById('leave-coverage-officer').value;
-      const reason = document.getElementById('leave-reason').value;
+      const officer = document.getElementById('leave-coverage-officer').value.trim();
+      const reason = document.getElementById('leave-reason').value.trim();
 
       if (!start || !end || !officer || !reason) {
-        alert('Please complete all leave fields.');
+        await uiAlert('Please complete all leave fields.', { title: 'Incomplete Request', tone: 'warn' });
+        return;
+      }
+
+      // Client-side mirror of the backend rule, so the doctor is told
+      // immediately instead of after a round trip. Comparing date strings in
+      // ISO form is safe and sidesteps timezone drift from Date parsing.
+      const today = new Date();
+      const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      if (start < isoToday) {
+        await uiAlert(
+          `Start date ${start} has already passed. Leave must be applied for from ${isoToday} onwards.`,
+          { title: 'Invalid Start Date', tone: 'warn' }
+        );
+        return;
+      }
+      if (end < start) {
+        await uiAlert('End date must be on or after the start date.', { title: 'Invalid Date Range', tone: 'warn' });
         return;
       }
 
       const leaveType = document.getElementById('leave-type')?.value || 'Casual Leave';
-      
+
+      // Guard against a double submit creating two identical requests in the
+      // HOD's approval queue.
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.innerText = 'Submitting…'; }
+
       try {
-        const newLeave = await api.post('/leaves/', {
+        await api.post('/leaves/', {
           leave_type: leaveType,
           coverage_officer: officer,
           reason,
           start_date: start,
           end_date: end
         });
-        cachedMyLeaves = [newLeave, ...cachedMyLeaves];
-        leaveTimeline = cachedMyLeaves.map(l => ({
-          date: `${l.start_date} - ${l.end_date}`,
-          officer: l.coverage_officer || '—',
-          status: (l.status || 'PENDING').toUpperCase(),
-          reason: l.reason || '—'
-        }));
-        alert('Leave request successfully sent to the HOD.');
+        // Re-read the authoritative list rather than splicing the response in
+        // locally, so the log can never drift from what the HOD actually sees.
+        await refreshMyLeaves();
+        showDoctorToast('Leave request sent to the HOD.');
         switchView('leave');
       } catch (err) {
-        alert('Error submitting leave request: ' + err.message);
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerText = 'Submit Request to HOD'; }
+        await uiError(err.message || 'Error submitting leave request');
       }
     };
 
-    async function viewPatientProcedureHistory(patientId) {
-      let data = { full_name: "Patient", mr_number: "MR-XXXX", procedures: [] };
-      
+    function mapLeaveTimeline(leaves) {
+      return (leaves || []).map(l => ({
+        date: `${l.start_date} → ${l.end_date}`,
+        type: l.leave_type || '—',
+        officer: l.coverage_officer || '—',
+        status: (l.status || 'PENDING').toUpperCase(),
+        reason: l.reason || '—'
+      }));
+    }
+
+    async function refreshMyLeaves() {
       try {
-        if (typeof api !== 'undefined') {
-          data = await api.get(`/patients/${patientId}/procedures`);
-        } else {
-          const match = cachedPatients.find(p => p.id === patientId);
-          if (match) {
-            data.full_name = match.full_name;
-            data.mr_number = match.mr_number;
-          }
-          // Mock data history for the patient modal view
-          data.procedures = [
-            { name: "Consultation", session_date: "2026-07-10T10:00:00Z", is_completed: true, materials_count: 2, pharmacy_count: 0, diagnostics_count: 0 },
-            { name: "Treatment planning / File analysis / Tracing", session_date: "2026-07-14T11:30:00Z", is_completed: true, materials_count: 3, pharmacy_count: 0, diagnostics_count: 4 },
-            { name: "U/L Bracketing", session_date: "2026-07-20T09:15:00Z", is_completed: true, materials_count: 5, pharmacy_count: 2, diagnostics_count: 1 }
-          ];
-        }
-        
+        cachedMyLeaves = (await api.get('/leaves/')) || [];
+      } catch (e) {
+        console.warn('Failed to refresh leave requests:', e);
+      }
+      leaveTimeline = mapLeaveTimeline(cachedMyLeaves);
+    }
+
+    async function viewPatientProcedureHistory(patientId) {
+      // No mock fallback: this used to invent three fake completed procedures
+      // whenever the API object was unavailable, so a patient with nothing
+      // recorded appeared to have a full treatment history.
+      let data = { full_name: "Patient", mr_number: "MR-XXXX", procedures: [] };
+
+      try {
+        data = await api.get(`/patients/${patientId}/procedures`);
+
         const container = document.getElementById('main-root');
         const procRows = (data.procedures || []).map(p => `
           <tr>
@@ -1049,7 +1288,7 @@
             <div class="meta-tag">${data.full_name} (${data.mr_number})</div>
           </div>
           <div style="margin-bottom:16px;">
-            <button class="btn btn-sm" onclick="switchView('operations')" style="height:45px;">← Back to Operations</button>
+            <button class="btn btn-sm" onclick="switchView('dashboard')" style="height:45px;">← Back to Dashboard</button>
           </div>
           <div class="panel">
             <div class="panel-header">All Procedures for ${data.full_name}</div>
@@ -1071,7 +1310,7 @@
           </div>
         `;
       } catch (err) {
-        alert("Error loading procedure history: " + err.message);
+        await uiError("Error loading procedure history: " + err.message);
       }
     }
 
@@ -1102,9 +1341,41 @@
       updateAllergyAlertBox(newAllergies);
     }
 
-    function saveMedicalRecordChanges() {
+    // Persists the allergy/history edits to the patient record. This used to
+    // only mutate the in-memory object and announce success, so every change
+    // was lost as soon as the page was left.
+    async function saveMedicalRecordChanges() {
+      if (!currentPatient) {
+        await uiAlert('No patient record is open.', { title: 'Nothing To Save', tone: 'warn' });
+        return;
+      }
       updatePatientMedicalRecord();
-      alert("Medical record updated successfully!");
+
+      try {
+        const updated = await api.put(`/patients/${currentPatient.id}`, {
+          mr_number: currentPatient.mr_number,
+          file_number: currentPatient.file_number,
+          full_name: currentPatient.full_name,
+          rank: currentPatient.rank,
+          cnic: currentPatient.cnic,
+          gender: currentPatient.gender,
+          blood_group: currentPatient.blood_group,
+          service_profile: currentPatient.service_profile,
+          allergies: currentPatient.allergies || null,
+          room: currentPatient.room,
+          assigned_doctor: currentPatient.assigned_doctor,
+          procedure_category: currentPatient.procedure_category
+        });
+        currentPatient = { ...updated, ...{
+          diagnostic_history: currentPatient.diagnostic_history,
+          systemic_status: currentPatient.systemic_status
+        }};
+        const cachedIdx = (cachedPatients || []).findIndex(p => p.id === updated.id);
+        if (cachedIdx !== -1) cachedPatients[cachedIdx] = updated;
+        showDoctorToast('Medical record saved.');
+      } catch (err) {
+        await uiError(err.message || 'Unable to save medical record');
+      }
     }
 
     function returnToSearchScreen() {
@@ -1118,7 +1389,7 @@
     function applyProcedure() {
       const procSelect = document.getElementById('procedure-select');
       const selectedProcedure = procSelect.value;
-      if (!selectedProcedure || !cachedPresets[selectedProcedure]) return;
+      if (!selectedProcedure || !ensurePresets()[selectedProcedure]) return;
 
       const data = cachedPresets[selectedProcedure];
 
@@ -1177,32 +1448,58 @@
     /* ===================== DYNAMIC MUTATION RENDERERS ===================== */
     function renderMaterialsList() {
       const container = document.getElementById('materials-log-list');
+      if (!container) return;
       if (activeMaterials.length === 0) {
         container.innerHTML = '<div style="color: var(--text-muted); font-size:13px;">No clinical items logged.</div>';
         return;
       }
+      // The quantity is an editable field rather than static text, so an
+      // already-logged item can be corrected directly on its own row.
       container.innerHTML = activeMaterials.map((m, idx) => `
         <div class="qty-row">
           <span>${m.name}</span>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span class="qty-val">QTY: ${m.qty}</span>
+            <label style="font-size:11px; font-weight:700; color:var(--text-muted);">QTY</label>
+            <input type="number" min="1" value="${m.qty}"
+                   style="width:70px; padding:4px 8px; font-size:13px; text-align:center;"
+                   onchange="setMaterialQty(${idx}, this.value)" />
             <button class="btn btn-sm btn-danger" style="padding: 2px 6px; font-size: 11px;" onclick="removeMaterialItem(${idx})">Remove</button>
           </div>
         </div>
       `).join('');
     }
 
+    // Adding a material that is ALREADY on the list means "correct its
+    // quantity", not "log a second identical line". Previously every submit
+    // pushed a new row, so trying to change a quantity silently duplicated the
+    // item and both copies were then saved to the procedure.
     function addMaterialItem() {
       const input = document.getElementById('material-input');
       const qtyInput = document.getElementById('material-qty-input');
       const name = input.value.trim();
-      const qty = parseInt(qtyInput.value) || 1;
+      const qty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
 
       if (!name) return;
-      activeMaterials.push({ name, qty });
+
+      const existing = activeMaterials.find(m => m.name.toLowerCase() === name.toLowerCase());
+      if (existing) {
+        existing.qty = qty;
+        showDoctorToast(`Updated ${existing.name} quantity to ${qty}`);
+      } else {
+        activeMaterials.push({ name, qty });
+      }
+
       activeMaterials.sort(sortByProp('name'));
       input.value = '';
       qtyInput.value = '1';
+      renderMaterialsList();
+    }
+
+    function setMaterialQty(idx, value) {
+      const item = activeMaterials[idx];
+      if (!item) return;
+      const qty = Math.max(1, parseInt(value, 10) || 1);
+      item.qty = qty;
       renderMaterialsList();
     }
 
@@ -1213,15 +1510,19 @@
 
     function renderPharmacyList() {
       const container = document.getElementById('pharmacy-log-list');
+      if (!container) return;
       if (activePharmacy.length === 0) {
-        container.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No medications logged.</td></tr>';
+        container.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No medications logged.</td></tr>';
         return;
       }
-      container.innerHTML = activePharmacy.map(p => `
+      container.innerHTML = activePharmacy.map((p, idx) => `
         <tr>
           <td><strong>${p.med}</strong></td>
           <td>${p.dose}</td>
           <td>${p.freq}</td>
+          <td style="text-align:right;">
+            <button class="btn btn-sm btn-danger" style="padding:2px 6px; font-size:11px;" onclick="removePharmacyItem(${idx})">Remove</button>
+          </td>
         </tr>
       `).join('');
     }
@@ -1231,15 +1532,29 @@
       const doseIn = document.getElementById('pharmacy-dose');
       const freqIn = document.getElementById('pharmacy-freq');
 
-      if (!medIn.value.trim()) return;
-      activePharmacy.push({
-        med: medIn.value.trim(),
-        dose: doseIn.value.trim() || '—',
-        freq: freqIn.value.trim() || '—'
-      });
+      const med = medIn.value.trim();
+      if (!med) return;
+      const dose = doseIn.value.trim() || '—';
+      const freq = freqIn.value.trim() || '—';
+
+      // Re-entering the same medication revises its dose/frequency rather than
+      // stacking a second prescription line for the same drug.
+      const existing = activePharmacy.find(p => p.med.toLowerCase() === med.toLowerCase());
+      if (existing) {
+        existing.dose = dose;
+        existing.freq = freq;
+        showDoctorToast(`Updated prescription for ${existing.med}`);
+      } else {
+        activePharmacy.push({ med, dose, freq });
+      }
       activePharmacy.sort(sortByProp('med'));
 
       medIn.value = ''; doseIn.value = ''; freqIn.value = '';
+      renderPharmacyList();
+    }
+
+    function removePharmacyItem(idx) {
+      activePharmacy.splice(idx, 1);
       renderPharmacyList();
     }
 
@@ -1258,12 +1573,12 @@
       `).join('');
     }
 
-    function addDiagnosticRow() {
+    async function addDiagnosticRow() {
       const testSelect = document.getElementById('diagnostic-test-select');
       const urgencySelect = document.getElementById('diagnostic-urgency-select');
 
       if (!testSelect.value) {
-        alert("Please select a diagnostic test template.");
+        await uiAlert("Please select a diagnostic investigation from the list first.", { title: 'Diagnostics' });
         return;
       }
 
@@ -1272,9 +1587,17 @@
         return;
       }
 
-      activeDiagnostics.push({ name: testSelect.value, urgency: urgencySelect.value });
+      // Re-requesting the same test updates its urgency instead of queueing a
+      // duplicate order for the same investigation.
+      const existing = activeDiagnostics.find(d => d.name.toLowerCase() === testSelect.value.toLowerCase());
+      if (existing) {
+        existing.urgency = urgencySelect.value;
+        showDoctorToast(`Updated ${existing.name} urgency to ${urgencySelect.value}`);
+      } else {
+        activeDiagnostics.push({ name: testSelect.value, urgency: urgencySelect.value });
+      }
       activeDiagnostics.sort(sortByProp('name'));
-      
+
       testSelect.value = '';
       renderDiagnosticsList();
     }
@@ -1311,22 +1634,34 @@
       const targetReportBox = document.getElementById('master-summary-injection-point');
       targetReportBox.innerHTML = `
         <div class="summary-sheet">
-          <div class="summary-header print-hide">
+          <!-- These carry the institute header, the patient identifiers and the
+               materials log. They were marked .print-hide, which the @media
+               print rule hides outright -- so the printed discharge order came
+               out with no letterhead, no patient details and no materials. -->
+          <div class="summary-header">
             <h2>ARMED FORCES INSTITUTE OF DENTISTRY</h2>
             <p style="font-size:12px; font-weight:600; text-transform:uppercase; color:var(--text-muted); margin-top:4px;">Official Compiled Patient Treatment & Discharge Order</p>
           </div>
-          
-          <div class="summary-grid print-hide">
+
+          <div class="summary-grid">
             <div>
               <p><strong>Patient Name:</strong> ${currentPatient.full_name}</p>
               <p><strong>MR Number:</strong> ${currentPatient.mr_number}</p>
-              <p><strong>Rank Profile:</strong> ${currentPatient.service_profile || 'Civ / Dependent'}</p>
+              <p><strong>File Number:</strong> ${currentPatient.file_number || '—'}</p>
+              <!-- Never substitute a guessed classification: an unset service
+                   profile prints as "Not recorded", not as an invented
+                   "Civ / Dependent" that goes onto an official discharge order. -->
+              <p><strong>Rank / Service Profile:</strong> ${currentPatient.service_profile || currentPatient.rank || 'Not recorded'}</p>
+              <p><strong>Gender / Blood Group:</strong> ${currentPatient.gender || '—'} / ${currentPatient.blood_group || '—'}</p>
             </div>
             <div style="text-align:right;">
               <p><strong>Session Timeline:</strong> ${timeIn} - ${timeOut}</p>
               <p><strong>Duration:</strong> ${duration}</p>
               <p><strong>Allergy Profile:</strong> <span style="color:var(--red); font-weight:700;">${currentPatient.allergies || 'NKA'}</span></p>
-              <p><strong>Attending Specialist:</strong> ${LOGGED_IN_DOCTOR}</p>
+              <!-- The doctor actually signed in, not the hard-coded demo name
+                   this template shipped with. -->
+              <p><strong>Attending Specialist:</strong> ${currentDoctorName() || 'Unknown'}</p>
+              <p><strong>Report Generated:</strong> ${new Date().toLocaleString()}</p>
             </div>
           </div>
 
@@ -1335,7 +1670,7 @@
             <div><strong>${procedureTitle}</strong></div>
           </div>
 
-          <div class="summary-field print-hide">
+          <div class="summary-field">
             <label>Materials Used Log</label>
             <div>${materialsHtml}</div>
           </div>
@@ -1376,12 +1711,13 @@
 
     let cachedTimelineSteps = {};
 
+    // Refreshes the patient cache the timeline view filters against. It used to
+    // fetch /patients/ and throw the response away, then call
+    // renderPatientTimeline() purely for its (discarded) return value.
     async function loadTimelineData() {
       try {
-        if (typeof api !== 'undefined') {
-          await api.get('/patients/');
-        }
-        renderPatientTimeline();
+        const patients = await api.get('/patients/');
+        if (patients) cachedPatients = patients;
       } catch (e) {
         console.warn('Timeline load failed:', e);
       }
@@ -1396,12 +1732,13 @@
       }
     }
 
-    function timelineSearch() {
-      const filterType = document.getElementById('timeline-filter-type')?.value || 'mr_number';
-      const query = document.getElementById('timeline-search-input')?.value.trim().toLowerCase() || '';
+    async function timelineSearch() {
       const tbody = document.getElementById('timeline-results-body');
       const detailArea = document.getElementById('timeline-detail-area');
       if (!tbody) return;
+
+      const filterType = document.getElementById('timeline-filter-type')?.value || 'mr_number';
+      const query = document.getElementById('timeline-search-input')?.value.trim().toLowerCase() || '';
 
       if (!query) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#6b7280;">Enter a search term.</td></tr>';
@@ -1409,21 +1746,31 @@
         return;
       }
 
-      const currentUser = getUser();
-      const currentName = currentUser?.full_name || LOGGED_IN_DOCTOR;
-      const myPatients = (cachedPatients || []).filter(p => {
-        const assignedDoctor = p.assigned_doctor || p.doctor || '';
-        return assignedDoctor === currentName || assignedDoctor === LOGGED_IN_DOCTOR;
-      });
+      // Re-read patients before filtering. This searched a cache captured at
+      // page load, so a patient whose case had since been completed still
+      // showed the status they had when the portal was first opened -- most
+      // visibly, a checked-out patient still listed as WAITING.
+      try {
+        const fresh = await api.get('/patients/');
+        if (fresh) cachedPatients = fresh;
+      } catch (e) {
+        console.warn('Failed to refresh patient data for timeline search:', e);
+      }
 
-      let results = myPatients.filter(p => {
-        if (!p) return false;
-        const val = (p[filterType] || '').toString().toLowerCase();
-        return val.includes(query);
-      });
+      const mine = myPatients();
 
-      if (!results.length && filterType !== 'mr_number') {
-        results = myPatients.filter(p => (p.mr_number || '').toLowerCase().includes(query));
+      // Map the dropdown value to the actual field name on the patient record.
+      // "name" was passed straight through as a property key, but the API
+      // returns full_name -- so searching by name always matched nothing.
+      const FIELD_MAP = { mr_number: 'mr_number', file_number: 'file_number', name: 'full_name' };
+      const field = FIELD_MAP[filterType] || 'mr_number';
+
+      let results = mine.filter(p => p && (p[field] || '').toString().toLowerCase().includes(query));
+
+      // Widen to any identifying field rather than giving up.
+      if (!results.length) {
+        results = mine.filter(p => p && ['mr_number', 'file_number', 'full_name', 'cnic', 'rank']
+          .some(f => (p[f] || '').toString().toLowerCase().includes(query)));
       }
 
       tbody.innerHTML = results.length ? results.map(p => `
@@ -1434,7 +1781,9 @@
           <td><span class="badge ${(p.status || '').toString().toUpperCase() === 'ACTIVE' ? 'badge-success' : (p.status || '').toString().toUpperCase() === 'COMPLETED' ? 'badge-info' : 'badge-warning'}">${(p.status || '—').toString().toUpperCase()}</span></td>
           <td><button class="btn btn-sm" onclick="event.stopPropagation(); selectTimelinePatient('${p.mr_number}')" style="height:38px;">View Timeline</button></td>
         </tr>
-      `).join('') : '<tr><td colspan="5" style="text-align:center; color:#6b7280;">No patients found.</td></tr>';
+      `).join('') : `<tr><td colspan="5" style="text-align:center; color:#6b7280;">
+          No patient assigned to ${currentDoctorName() || 'you'} matches “${query}”.
+        </td></tr>`;
     }
 
     async function selectTimelinePatient(mr) {
@@ -1442,8 +1791,17 @@
       const titleEl = document.getElementById('timeline-patient-title');
       const badgeEl = document.getElementById('timeline-total-badge');
       const stepsList = document.getElementById('timeline-steps-list');
+      const record = (cachedPatients || []).find(p => p.mr_number === mr) || null;
       if (detailArea) detailArea.style.display = 'block';
-      if (titleEl) titleEl.innerText = mr;
+      // Show the patient's real name and their CURRENT case status alongside
+      // the MR number, instead of the bare MR string.
+      if (titleEl) {
+        titleEl.innerText = record ? `${record.full_name} (${mr})` : mr;
+        const subtitle = titleEl.parentElement?.querySelector('p');
+        if (subtitle && record) {
+          subtitle.innerText = `Case status: ${(record.status || 'WAITING').toString().toUpperCase()} · Procedure breakdown by status`;
+        }
+      }
 
       try {
         const steps = await api.get(`/hod/timeline/${encodeURIComponent(mr)}`);
@@ -1519,7 +1877,7 @@
     }
 
     /* ===================== SYSTEM APP ROUTER ===================== */
-    function switchView(pageId) {
+    async function switchView(pageId) {
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
       const activeBtn = document.querySelector(`[data-page="${pageId}"]`);
       if (activeBtn) activeBtn.classList.add('active');
@@ -1527,6 +1885,13 @@
       const mainRoot = document.getElementById('main-root');
       if (pageId === 'dashboard') {
         mainRoot.innerHTML = renderDashboard();
+        // Pull the live queue in the background so patients registered by
+        // reception since this portal loaded appear without a manual refresh.
+        loadTimelineData().then(() => {
+          if (document.querySelector('.nav-item.active')?.dataset.page === 'dashboard') {
+            mainRoot.innerHTML = renderDashboard();
+          }
+        });
       } else if (pageId === 'operations') {
         mainRoot.innerHTML = renderOperations();
       } else if (pageId === 'timeline') {
@@ -1537,6 +1902,16 @@
         processAndRenderDoctorAnalytics();
       } else if (pageId === 'leave') {
         mainRoot.innerHTML = renderLeave();
+        // Re-read leave state on entry so HOD approvals/rejections made since
+        // login are reflected instead of a stale snapshot. Only the log TABLE
+        // is repainted, never the whole view -- a full re-render landing while
+        // the doctor is filling in the request form below would wipe out
+        // whatever they had already typed.
+        refreshMyLeaves().then(() => {
+          if (document.querySelector('.nav-item.active')?.dataset.page === 'leave') {
+            repaintLeaveLog();
+          }
+        });
       }
     }
 
@@ -1552,86 +1927,144 @@
 
     async function confirmTimeOut() {
       if (!currentPatient) {
-        alert("No active patient selected.");
+        await uiAlert("No active patient selected. Search for a patient record first.", { title: 'No Patient', tone: 'warn' });
         return;
       }
+
+      const procedureSelect = document.getElementById('procedure-select');
+      const procedureTitle = procedureSelect.value;
+      if (!procedureTitle) {
+        await uiAlert("Select the procedure that was performed before completing the session.", { title: 'Procedure Required', tone: 'warn' });
+        return;
+      }
+
       const timeOutInput = document.getElementById('patient-time-out');
       const timeOut = timeOutInput.value || '—';
-      if (!confirm(`Confirm session completion with Time Out: ${timeOut}? This will save the session summary.`)) {
-        return;
-      }
+
+      const proceed = await uiConfirm(
+        `Complete the session for ${currentPatient.full_name} (${currentPatient.mr_number})?\n\n`
+        + `Procedure: ${procedureTitle}\n`
+        + `Materials: ${activeMaterials.length}   Medications: ${activePharmacy.length}   Diagnostics: ${activeDiagnostics.length}\n`
+        + `Time Out: ${timeOut}`,
+        { title: 'Complete Session', confirmLabel: 'Save & Complete' }
+      );
+      if (!proceed) return;
+
+      const notesValue = document.getElementById('clinical-notes-textarea').value;
 
       try {
-        // 1. Save procedure session
-        const procedureTitle = document.getElementById('procedure-select').value || "Routine Clinical Assessment";
+        // 1. Save procedure session. doctor_id is omitted so the backend
+        //    attributes it to the signed-in doctor -- it used to send null,
+        //    which saved every procedure with no doctor attached at all.
         const proc = await api.post('/procedures/', {
           patient_id: currentPatient.id,
-          doctor_id: null,
-          name: procedureTitle
+          name: procedureTitle,
+          is_completed: true
         });
 
-        // 2. Save checklist if any
-        // (Currently using preset notes only, no separate checklist UI)
+        // 2. Save materials, pharmacy, diagnostics and notes. Collect failures
+        //    instead of aborting: a single rejected row must not leave the rest
+        //    of the session silently unsaved.
+        const failures = [];
 
-        // 3. Save materials
         for (const m of activeMaterials) {
-          await api.post(`/procedures/${proc.id}/materials`, {
-            material_name: m.name,
-            quantity: m.qty || 1
-          });
+          try {
+            await api.post(`/procedures/${proc.id}/materials`, {
+              material_name: m.name,
+              quantity: m.qty || 1
+            });
+          } catch (e) { failures.push(`Material “${m.name}”: ${e.message}`); }
         }
 
-        // 4. Save pharmacy
         for (const p of activePharmacy) {
-          await api.post(`/procedures/${proc.id}/pharmacy`, {
-            medication: p.med,
-            dose: p.dose,
-            frequency: p.freq
-          });
+          try {
+            await api.post(`/procedures/${proc.id}/pharmacy`, {
+              medication: p.med,
+              // The UI writes '—' as a visual placeholder for "not specified";
+              // don't persist that glyph as if it were a real dose/frequency.
+              dose: p.dose === '—' ? null : p.dose,
+              frequency: p.freq === '—' ? null : p.freq
+            });
+          } catch (e) { failures.push(`Medication “${p.med}”: ${e.message}`); }
         }
 
-        // 5. Save diagnostics
         for (const d of activeDiagnostics) {
-          await api.post(`/procedures/${proc.id}/diagnostics`, {
-            test_name: d.name,
-            urgency: d.urgency || 'Routine'
-          });
+          try {
+            await api.post(`/procedures/${proc.id}/diagnostics`, {
+              test_name: d.name,
+              urgency: d.urgency || 'Routine'
+            });
+          } catch (e) { failures.push(`Diagnostic “${d.name}”: ${e.message}`); }
         }
 
-        // 6. Save clinical notes
-        const notesValue = document.getElementById('clinical-notes-textarea').value;
         if (notesValue && notesValue.trim()) {
-          await api.post(`/procedures/${proc.id}/notes`, {
-            note_text: notesValue
-          });
+          try {
+            await api.post(`/procedures/${proc.id}/notes`, { note_text: notesValue });
+          } catch (e) { failures.push(`Clinical notes: ${e.message}`); }
         }
 
-        // 7. Mark patient as completed
+        // 3. Record the procedure on the patient's timeline so it shows up in
+        //    the HOD's "Completed Procedures Log" and in Patient Timeline.
+        //    Nothing wrote timeline steps before, which is why a patient could
+        //    be checked out with a full summary and still show an empty
+        //    timeline stuck on WAITING.
+        try {
+          await api.post(`/hod/timeline/${encodeURIComponent(currentPatient.mr_number)}/steps`, {
+            step_name: procedureTitle,
+            status: 'Completed'
+          });
+        } catch (e) {
+          failures.push(`Timeline entry: ${e.message}`);
+        }
+
+        // 4. Mark patient as completed (backend stamps check_out_time).
         const updated = await api.patch(`/patients/${currentPatient.id}/status`, { status: 'COMPLETED' });
         currentPatient = updated;
         const updatedTimeOut = updated.check_out_time ? new Date(updated.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
         timeOutInput.value = updatedTimeOut;
 
-        // 8. Clear in-memory arrays
+        const statusCells = document.querySelectorAll('#view-workspace-screen .value');
+        if (statusCells[5]) statusCells[5].innerHTML = '<span style="color:#0369a1; font-weight:800;">COMPLETED</span>';
+
+        const cachedIdx = (cachedPatients || []).findIndex(p => p.id === updated.id);
+        if (cachedIdx !== -1) cachedPatients[cachedIdx] = updated;
+
+        // 5. Render the summary sheet BEFORE clearing the working set.
+        //    The arrays used to be emptied first, so the report that came out
+        //    of a completed session always showed "No clinical components
+        //    allocated", no medications and no diagnostics -- even though all
+        //    of it had just been saved successfully.
+        compileMasterSummary();
+
         activeMaterials = [];
         activePharmacy = [];
         activeDiagnostics = [];
 
-        alert('Session completed and saved successfully.');
-        compileMasterSummary();
+        if (failures.length) {
+          await uiAlert(
+            `Session completed, but some items could not be saved:\n\n• ${failures.join('\n• ')}`,
+            { title: 'Saved With Warnings', tone: 'warn' }
+          );
+        } else {
+          showDoctorToast('Session completed and saved successfully.');
+        }
       } catch (err) {
-        alert(err.message || "Unable to complete session");
+        await uiError(err.message || "Unable to complete session");
       }
     }
 
-    function openAddProcedureModal() {
-      const procName = prompt("Enter new procedure name:");
+    async function openAddProcedureModal() {
+      const procName = await uiPrompt("Name of the procedure to add:", { title: 'Add Procedure', confirmLabel: 'Next' });
       if (!procName || procName.trim() === "") return;
-      
-      const duration = parseInt(prompt("Enter procedure duration (minutes):")) || 30;
+
+      const durationInput = await uiPrompt("Approximate duration in minutes:", {
+        title: 'Add Procedure', defaultValue: '30', confirmLabel: 'Add'
+      });
+      if (durationInput === null) return;
+      const duration = parseInt(durationInput, 10) || 30;
       const cleanName = procName.trim();
-      
-      if (!cachedPresets[cleanName]) {
+
+      if (!ensurePresets()[cleanName]) {
         cachedPresets[cleanName] = {
           materials: [],
           pharmacy: [],
@@ -1662,9 +2095,22 @@
     // navigation has happened so the initial forced switchView is skipped
     // once that's the case.
     let userHasNavigated = false;
+
+    // Resolves once the first loadDashboardData() has completed. Views whose
+    // content is entirely derived from that data wait on it before painting,
+    // rather than rendering a confident-looking but empty result (My Analytics
+    // showing "Total Procedures Handled: 0", an empty procedure dropdown) that
+    // then silently jumps to the real numbers a moment later.
+    let initialDataReady = null;
+
     function userNavigate(pageId) {
       userHasNavigated = true;
-      switchView(pageId);
+      const DATA_BACKED = ['dashboard', 'operations', 'doctor-analytics', 'timeline', 'leave'];
+      if (initialDataReady && DATA_BACKED.includes(pageId)) {
+        initialDataReady.then(() => switchView(pageId));
+      } else {
+        switchView(pageId);
+      }
     }
 
     // A second, narrower consequence of the same race as above: even once
@@ -1680,7 +2126,7 @@
       const procedureSelect = document.getElementById('procedure-select');
       if (procedureSelect) {
         const existingOptions = new Set(Array.from(procedureSelect.options).map(opt => opt.value));
-        Object.keys(cachedPresets).forEach(key => {
+        Object.keys(ensurePresets()).forEach(key => {
           if (!existingOptions.has(key)) {
             const newOption = document.createElement('option');
             newOption.value = key;
@@ -1690,7 +2136,13 @@
         });
       }
       if (document.getElementById('docAnalyticsTableBody')) {
-        processAndRenderDoctorAnalytics();
+        // Respect a filter the doctor has already typed. Calling
+        // processAndRenderDoctorAnalytics() unconditionally repaints the table
+        // with the UNFILTERED row set, so a late-arriving startup refresh
+        // silently threw away the search they were in the middle of.
+        const query = document.getElementById('docAnalyticsSearch')?.value || '';
+        if (query.trim()) filterDoctorAnalytics();
+        else processAndRenderDoctorAnalytics();
       }
     }
 
@@ -1700,7 +2152,8 @@
         <button class="nav-item" data-page="${p.id}" onclick="userNavigate('${p.id}')">${p.label}</button>
       `).join('');
 
-      await loadDashboardData();
+      initialDataReady = loadDashboardData();
+      await initialDataReady;
       refreshStaleViewData();
       await loadTimelineData();
       if (!userHasNavigated) {

@@ -521,8 +521,8 @@
 
     <div class="sidebar-footer">
       <div class="logged-user-label">Logged In:</div>
-      <div class="logged-user-name">Fatima Asif</div>
-      <div class="logged-user-role">Role: Reception Ops Staff</div>
+      <div class="logged-user-name" id="sidebar-user-name">—</div>
+      <div class="logged-user-role" id="sidebar-user-role">Role: —</div>
       <button class="logout-btn" onclick="logout()">← Logout Portal</button>
     </div>
   </aside>
@@ -531,10 +531,12 @@
     <div class="top-utility-bar">
       <div class="search-wrapper">
         <span>🔍</span>
-        <input type="text" class="search-input" value="MR-2026-0848" placeholder="Search records, patients, allocations..." />
+        <input type="text" id="global-search" class="search-input" value=""
+               placeholder="Filter patients by MR, file no., name or doctor..."
+               oninput="applyGlobalSearch(this.value)" />
       </div>
       <div class="meta-status-group">
-        <span id="live-clock">Tuesday, 21 July 2026</span>
+        <span id="live-clock">—</span>
         <span class="live-indicator">+ LIVE</span>
       </div>
     </div>
@@ -568,9 +570,17 @@
   /* ---------------- MASTER DATA MODEL ---------------- */
   let patientLogs = [];
   let doctorAllocations = [];
+  // Real doctor USER accounts (GET /doctors) -- the authoritative list of who
+  // can actually be assigned a patient and log in to see them.
+  let doctorDirectory = [];
   let cachedTimelineMRs = [];
   let cachedSelectedTimelineMR = null;
   let cachedTimelineSteps = {};
+
+  function allocationRoomFor(doctorName) {
+    const match = doctorAllocations.find(a => a.name === doctorName);
+    return match ? match.room : '';
+  }
 
   function normalizePatient(p) {
     const status = (p.status || 'WAITING').toString().toUpperCase();
@@ -611,34 +621,36 @@
 
   async function loadStaffData() {
     try {
-      const [patients, allocations] = await Promise.all([
+      const [patients, allocations, doctors] = await Promise.all([
         api.get('/patients/').catch(() => []),
-        api.get('/allocations').catch(() => [])
+        api.get('/allocations').catch(() => []),
+        api.get('/doctors').catch(() => [])
       ]);
 
       patientLogs = (patients || []).map(normalizePatient);
       doctorAllocations = (allocations || []).map(normalizeAllocation);
+      doctorDirectory = (doctors || [])
+        .filter(d => d && d.full_name)
+        .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
-      if (!doctorAllocations.length) {
-        doctorAllocations = [
-          { id: 1, name: 'Dr. Asadullah Khan', room: 'Room 10', department: 'Orthodontics', chair: 'Chair 1' },
-          { id: 2, name: 'Dr. Rehan M.', room: 'Room 11', department: 'Orthodontics', chair: 'Chair 2' },
-          { id: 3, name: 'Dr. Sana K.', room: 'Room 12', department: 'Orthodontics', chair: 'Chair 3' }
-        ];
-      }
+      // No placeholder allocations: fabricated doctor names here used to leak
+      // into the patient-registration dropdown, so a patient could be assigned
+      // to a "doctor" that has no account and therefore no dashboard.
     } catch (e) {
       console.warn('Failed to load staff portal data:', e);
       patientLogs = [];
       doctorAllocations = [];
+      doctorDirectory = [];
     }
   }
 
+  // Refreshes the patient cache the timeline view searches against. This used
+  // to fetch /patients/ and discard the response, then call
+  // renderPatientTimeline() purely for its (also discarded) return value.
   async function loadTimelineData() {
     try {
-      if (typeof api !== 'undefined') {
-        await api.get('/patients/');
-      }
-      renderPatientTimeline();
+      const patients = await api.get('/patients/');
+      if (patients) patientLogs = patients.map(normalizePatient);
     } catch (e) {
       console.warn('Timeline load failed:', e);
     }
@@ -795,7 +807,7 @@
         <div class="panel-body panel-body-huge">
           <div class="form-row form-row-huge">
             <label>Active Staff Operator</label>
-            <input type="text" class="input-huge" value="Fatima Asif" readonly />
+            <input type="text" id="staff-operator-name" class="input-huge" value="—" readonly />
           </div>
           <div class="form-row form-row-huge">
             <label>Operational Duty Terminal ID</label>
@@ -815,7 +827,18 @@
   }
 
   function renderPatientRegistration() {
-    const docOptions = doctorAllocations.map(d => `<option value="${d.name}">${d.name} (${d.room})</option>`).join('');
+    // Build the dentist list from the real doctor USER accounts, not from room
+    // allocations. Patients are linked to a doctor by full_name string, and the
+    // doctor portal matches its queue on the logged-in user's full_name -- so a
+    // free-text allocation name that didn't exactly match a real account meant
+    // the registered patient never appeared on any doctor's dashboard.
+    const docOptions = doctorDirectory.length
+      ? doctorDirectory.map(d => {
+          const room = allocationRoomFor(d.full_name);
+          return `<option value="${d.full_name}">${d.full_name}${room ? ` (${room})` : ''}</option>`;
+        }).join('')
+      : '<option value="" disabled>No doctor accounts found — register one under Doctor Management</option>';
+
     const roomOptions = Array.from({ length: 10 }, (_, i) => 10 + i)
             .map(r => `<option value="Room ${r}">Room ${r}</option>`).join('');
 
@@ -832,20 +855,67 @@
           <form id="patient-form" onsubmit="addPatient(event)">
             <div class="form-row">
               <label>MR Number</label>
-              <input type="text" id="p-mr" value="MR-2026-1188" placeholder="e.g. MR-2026-0848" required />
+              <input type="text" id="p-mr" value="" placeholder="e.g. MR-2026-0848" required />
             </div>
             <div class="form-row">
               <label>File Number</label>
-              <input type="text" id="p-file" value="F-10380" placeholder="e.g. F-10299" required />
+              <input type="text" id="p-file" value="" placeholder="e.g. F-10299" required />
             </div>
             <div class="form-row">
               <label>Full Name / Rank</label>
-              <input type="text" id="p-name" value="Maj. Imran Raza" placeholder="e.g. Lt. Col. Sara Khan" required />
+              <input type="text" id="p-name" value="" placeholder="e.g. Lt. Col. Sara Khan" required />
             </div>
             <div class="form-row">
               <label>CNIC</label>
-              <input type="text" id="p-cnic" value="35202-8877665-3" placeholder="35202-1234567-9" required />
+              <input type="text" id="p-cnic" value="" placeholder="35202-1234567-9" required />
             </div>
+
+            <div style="display:flex; gap:12px;">
+              <div class="form-row" style="flex:1;">
+                <label>Gender</label>
+                <select id="p-gender" required>
+                  <option value="" disabled selected>Select gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="form-row" style="flex:1;">
+                <label>Blood Group</label>
+                <select id="p-blood" required>
+                  <option value="" disabled selected>Select group</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                  <option value="Unknown">Unknown</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label>Service Profile</label>
+              <select id="p-service-profile" required>
+                <option value="" disabled selected>Select service profile</option>
+                <option value="Serving Officer">Serving Officer</option>
+                <option value="Serving Soldier / JCO">Serving Soldier / JCO</option>
+                <option value="Retired Officer">Retired Officer</option>
+                <option value="Retired Soldier / JCO">Retired Soldier / JCO</option>
+                <option value="Family / Dependent">Family / Dependent</option>
+                <option value="Civilian (Paying)">Civilian (Paying)</option>
+                <option value="Civilian (Entitled)">Civilian (Entitled)</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <label>Known Allergies (optional)</label>
+              <input type="text" id="p-allergies" value="" placeholder="e.g. Penicillin, Latex — leave blank if none" />
+            </div>
+
             <div class="form-row">
               <label>Target Room (Rooms 10-19)</label>
               <select id="p-room" required>${roomOptions}</select>
@@ -874,7 +944,17 @@
   }
 
   function renderPatientManagement() {
-    const tableRows = patientLogs.map((p, index) => `
+    const q = (globalSearchTerm || '').trim().toLowerCase();
+    // Filter for display only -- indices passed to startProcedure()/
+    // completeProcedure() must still address the unfiltered patientLogs array.
+    const visible = q
+      ? patientLogs
+          .map((p, index) => ({ p, index }))
+          .filter(({ p }) => [p.mr, p.file, p.name, p.cnic, p.assignedDoctor]
+            .some(field => (field || '').toString().toLowerCase().includes(q)))
+      : patientLogs.map((p, index) => ({ p, index }));
+
+    const tableRows = visible.length ? visible.map(({ p, index }) => `
     <tr>
       <td><strong>${p.mr}</strong></td>
       <td><strong>${p.file}</strong></td>
@@ -899,7 +979,9 @@
         `}
       </td>
     </tr>
-  `).join('');
+  `).join('') : `<tr><td colspan="13" style="text-align:center; color:#9ca3af; padding:24px;">${
+      q ? `No patients match “${q}”.` : 'No patients registered yet.'
+    }</td></tr>`;
 
     return `
     <div class="header-group">
@@ -938,49 +1020,112 @@
   }
 
   function renderDoctorManagement() {
-    const docRows = doctorAllocations.map(d => {
-      // Calculate real-time dynamic doctor appointment queues directly from Patient Logs
-      const doctorQueue = patientLogs.filter(p => p.assignedDoctor === d.name);
+    // Drive the matrix off the doctor DIRECTORY (real accounts) and look each
+    // one's room up from the allocation list, rather than iterating allocations.
+    // Allocations used to be the source of truth here, so a doctor allocated
+    // twice appeared as two separate rows in two different rooms.
+    const docRows = doctorDirectory.length ? doctorDirectory.map(doc => {
+      const name = doc.full_name;
+      const alloc = doctorAllocations.find(a => a.name === name);
+      const doctorQueue = patientLogs.filter(p => p.assignedDoctor === name);
       const waitingCount = doctorQueue.filter(p => p.status === 'WAITING').length;
       const activeCount = doctorQueue.filter(p => p.status === 'ACTIVE').length;
       const nextAppt = doctorQueue.find(p => p.status === 'WAITING');
 
       return `
       <tr>
-        <td><strong>${d.name}</strong></td>
-        <td>${d.room}</td>
-        <td>${d.department}</td>
+        <td><strong>${name}</strong></td>
+        <td>${alloc ? alloc.room : '<span style="color:#9ca3af;">Unallocated</span>'}</td>
+        <td>${alloc ? alloc.department : 'Orthodontics'}</td>
         <td><span class="badge badge-active">${activeCount} Active</span></td>
         <td><span class="badge badge-waiting">${waitingCount} Waiting</span></td>
         <td>${nextAppt ? `<strong>${nextAppt.name}</strong> (${nextAppt.time})` : '<span style="color:#9ca3af;">No upcoming appts</span>'}</td>
+        <td>${alloc
+          ? `<button class="action-link" style="background:var(--red);" onclick="releaseAllocation(${alloc.id}, '${name.replace(/'/g, "\\'")}', '${alloc.room}')">Release Room</button>`
+          : '<span style="color:#9ca3af; font-size:11px;">—</span>'}</td>
       </tr>
       `;
-    }).join('');
+    }).join('') : '<tr><td colspan="7" style="text-align:center; color:#9ca3af;">No doctor accounts registered yet.</td></tr>';
+
+    const doctorPicker = doctorDirectory.length
+      ? doctorDirectory.map(d => {
+          const room = allocationRoomFor(d.full_name);
+          return `<option value="${d.full_name}">${d.full_name}${room ? ` — currently ${room}` : ' — unallocated'}</option>`;
+        }).join('')
+      : '<option value="" disabled selected>Register a doctor account first</option>';
+
+    // Rooms 10-19 is the department's actual operatory range. Only 15 and 16
+    // were listed here before, so 8 of the 10 rooms could never be allocated.
+    const roomOptions = Array.from({ length: 10 }, (_, i) => 10 + i)
+      .map(r => {
+        const holder = doctorAllocations.find(a => a.room === `Room ${r}`);
+        return `<option value="Room ${r}">Room ${r}${holder ? ` (occupied — ${holder.name})` : ''}</option>`;
+      }).join('');
 
     return `
     <div class="header-group">
       <h1>Doctor Management & Queue Allocations</h1>
-      <p>Real-time doctor station assignments and live appointment queue monitoring.</p>
+      <p>Register dental officers, assign operatory rooms, and monitor live appointment queues.</p>
     </div>
 
     <div class="grid-split">
-      <div class="panel">
-        <div class="panel-header">Room Allocation & Chair Setup</div>
-        <div class="panel-body">
-          <form id="doctor-form" onsubmit="addDoctorAllocation(event)">
-            <div class="form-row">
-              <label>Doctor Name</label>
-              <input type="text" id="d-name" value="Dr. Tariq Mahmood" required />
-            </div>
-            <div class="form-row">
-              <label>Assigned Room</label>
-              <select id="d-room">
-                <option value="Room 15">Room 15</option>
-                <option value="Room 16">Room 16</option>
-              </select>
-            </div>
-            <button type="submit" class="btn-primary" style="margin-top:12px;">Assign Allocation</button>
-          </form>
+      <!-- flex-shrink:0 on each panel is load-bearing: .panel is height:100% by
+           default, and in a scrolling flex column the two stacked panels would
+           otherwise be squeezed below their content height. With overflow
+           visible their contents then spill out and physically overlap the
+           panel above, leaving the first form's submit button covered by the
+           second form's label and unclickable. -->
+      <div style="display:flex; flex-direction:column; gap:20px; min-height:0; overflow-y:auto;">
+        <div class="panel" style="height:auto; flex:0 0 auto;">
+          <div class="panel-header">Register New Doctor (Creates Login Account)</div>
+          <div class="panel-body" style="overflow:visible; flex:0 0 auto;">
+            <form id="doctor-register-form" onsubmit="registerDoctorAccount(event)">
+              <div class="form-row">
+                <label>Full Name (incl. title)</label>
+                <input type="text" id="dr-name" placeholder="e.g. Dr. Hira Zaman" required />
+              </div>
+              <div class="form-row">
+                <label>Work Email (login ID)</label>
+                <input type="email" id="dr-email" placeholder="e.g. hira@afid.mil" required />
+              </div>
+              <div class="form-row">
+                <label>Staff ID (optional)</label>
+                <input type="text" id="dr-staffid" placeholder="e.g. HMS-0011" />
+              </div>
+              <div class="form-row">
+                <label>Temporary Password (min 8 characters)</label>
+                <input type="text" id="dr-password" placeholder="Share with the doctor to sign in" minlength="8" required />
+              </div>
+              <div class="form-row">
+                <label>Assign Room Now (optional)</label>
+                <select id="dr-room">
+                  <option value="">— Do not allocate yet —</option>
+                  ${roomOptions}
+                </select>
+              </div>
+              <button type="submit" class="btn-primary" style="margin-top:12px;">Create Doctor Account</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="panel" style="height:auto; flex:0 0 auto;">
+          <div class="panel-header">Room Allocation & Chair Setup</div>
+          <div class="panel-body" style="overflow:visible; flex:0 0 auto;">
+            <form id="doctor-form" onsubmit="addDoctorAllocation(event)">
+              <div class="form-row">
+                <label>Doctor</label>
+                <select id="d-name" required>${doctorPicker}</select>
+              </div>
+              <div class="form-row">
+                <label>Assigned Room (Rooms 10-19)</label>
+                <select id="d-room" required>${roomOptions}</select>
+              </div>
+              <p style="font-size:11px; color:var(--text-muted); margin-top:4px;">
+                Re-assigning a doctor moves them — their previous room is released automatically.
+              </p>
+              <button type="submit" class="btn-primary" style="margin-top:12px;">Assign Allocation</button>
+            </form>
+          </div>
         </div>
       </div>
 
@@ -997,6 +1142,7 @@
                   <th>Active Sessions</th>
                   <th>In Queue</th>
                   <th>Next Scheduled Appt</th>
+                  <th>Allocation</th>
                 </tr>
               </thead>
               <tbody>${docRows}</tbody>
@@ -1117,20 +1263,38 @@
 
   async function addPatient(e) {
     e.preventDefault();
-    const mr = document.getElementById('p-mr').value;
-    const file = document.getElementById('p-file').value;
-    const name = document.getElementById('p-name').value;
-    const cnic = document.getElementById('p-cnic').value;
-    const room = document.getElementById('p-room').value;
-    const rotation = document.getElementById('p-procedure').value;
-    const doctor = document.getElementById('p-doctor').value;
+    const val = (id) => (document.getElementById(id)?.value || '').trim();
+
+    const mr = val('p-mr');
+    const file = val('p-file');
+    const name = val('p-name');
+    const cnic = val('p-cnic');
+    const gender = val('p-gender');
+    const bloodGroup = val('p-blood');
+    const serviceProfile = val('p-service-profile');
+    const allergies = val('p-allergies');
+    const room = val('p-room');
+    const rotation = val('p-procedure');
+    const doctor = val('p-doctor');
+
+    if (!doctor) {
+      await uiError('No dentist selected. Register a doctor account under Doctor Management first.');
+      return;
+    }
 
     try {
       const created = await api.post('/patients/', {
         mr_number: mr,
         file_number: file,
         full_name: name,
+        // "Full Name / Rank" is entered as one string; mirror it into rank so
+        // the rank-scoped patient search on the doctor side can find it.
+        rank: name,
         cnic,
+        gender,
+        blood_group: bloodGroup,
+        service_profile: serviceProfile,
+        allergies: allergies || null,
         room,
         assigned_doctor: doctor,
         procedure_category: rotation
@@ -1138,9 +1302,9 @@
 
       patientLogs.unshift(normalizePatient(created));
       switchView('patient_mgmt');
-      showToast(`Registered & Queued ${name}`);
+      showToast(`Registered & Queued ${name} under ${doctor}`);
     } catch (error) {
-      showToast(error.message || 'Unable to register patient');
+      await uiError(error.message || 'Unable to register patient');
     }
   }
 
@@ -1178,35 +1342,154 @@
     }
   }
 
+  // Creates an actual login account (POST /auth/register with role=doctor), not
+  // just a room-allocation row. Doctor Management previously only wrote an
+  // allocation -- a name string with no user record behind it -- so a
+  // "registered" doctor had no credentials and could never sign in.
+  async function registerDoctorAccount(e) {
+    e.preventDefault();
+    const val = (id) => (document.getElementById(id)?.value || '').trim();
+
+    const fullName = val('dr-name');
+    const email = val('dr-email');
+    const staffId = val('dr-staffid');
+    const password = val('dr-password');
+    const room = val('dr-room');
+
+    if (password.length < 8) {
+      await uiError('Password must be at least 8 characters.');
+      return;
+    }
+
+    try {
+      await api.post('/auth/register', {
+        full_name: fullName,
+        email,
+        password,
+        role: 'doctor',
+        staff_id: staffId || null
+      });
+
+      if (room) {
+        try {
+          await api.post('/allocations', {
+            doctor_name: fullName,
+            room,
+            department: 'Orthodontics',
+            chair: 'Chair 1'
+          });
+        } catch (allocError) {
+          // The account itself is created; surface the allocation problem
+          // without pretending the whole operation failed.
+          await uiAlert(
+            `Account created for ${fullName}, but the room could not be allocated:\n\n${allocError.message}`,
+            { title: 'Doctor Registered', tone: 'warn' }
+          );
+        }
+      }
+
+      await refreshDoctorData();
+      switchView('doctor_mgmt');
+      showToast(`${fullName} can now log in with ${email}`);
+    } catch (error) {
+      await uiError(error.message || 'Unable to register doctor');
+    }
+  }
+
   async function addDoctorAllocation(e) {
     e.preventDefault();
     const name = document.getElementById('d-name').value;
     const room = document.getElementById('d-room').value;
 
+    if (!name) {
+      await uiError('Select a doctor to allocate.');
+      return;
+    }
+
     try {
-      const created = await api.post('/allocations', {
+      await api.post('/allocations', {
         doctor_name: name,
         room,
-        department: 'Oral Exam',
+        department: 'Orthodontics',
         chair: 'Chair 1'
       });
-      doctorAllocations.unshift(normalizeAllocation(created));
+      // Re-read from the server rather than prepending locally: the backend
+      // MOVES an already-allocated doctor instead of adding a second row, so a
+      // local unshift would leave the stale old room visible in the matrix.
+      await refreshDoctorData();
       switchView('doctor_mgmt');
-      showToast(`Allocation created for ${name}`);
+      showToast(`${name} allocated to ${room}`);
     } catch (error) {
-      showToast(error.message || 'Unable to create allocation');
+      await uiError(error.message || 'Unable to create allocation');
+    }
+  }
+
+  // Frees a room so it can be given to someone else. Rooms are exclusive (the
+  // backend refuses to seat two doctors in one), so without a release action
+  // an occupied room would be permanently locked to whoever holds it.
+  async function releaseAllocation(allocId, doctorName, room) {
+    const ok = await uiConfirm(
+      `Release ${room} from ${doctorName}? The room becomes available for another doctor.`,
+      { title: 'Release Room', confirmLabel: 'Release' }
+    );
+    if (!ok) return;
+
+    try {
+      await api.delete(`/allocations/${allocId}`);
+      await refreshDoctorData();
+      switchView('doctor_mgmt');
+      showToast(`${room} released`);
+    } catch (error) {
+      await uiError(error.message || 'Unable to release allocation');
+    }
+  }
+
+  async function refreshDoctorData() {
+    try {
+      const [allocations, doctors] = await Promise.all([
+        api.get('/allocations').catch(() => []),
+        api.get('/doctors').catch(() => [])
+      ]);
+      doctorAllocations = (allocations || []).map(normalizeAllocation);
+      doctorDirectory = (doctors || [])
+        .filter(d => d && d.full_name)
+        .sort((a, b) => a.full_name.localeCompare(b.full_name));
+    } catch (e) {
+      console.warn('Failed to refresh doctor data:', e);
     }
   }
 
   /* ==================== CONTROLLER ==================== */
 
   function switchView(pageId) {
+    currentPageId = pageId;
     const container = document.getElementById('main-root');
     if (pageId === 'dashboard') container.innerHTML = renderDashboard();
     else if (pageId === 'patient_reg') container.innerHTML = renderPatientRegistration();
     else if (pageId === 'patient_mgmt') container.innerHTML = renderPatientManagement();
     else if (pageId === 'patient_timeline') container.innerHTML = renderPatientTimeline();
     else if (pageId === 'doctor_mgmt') container.innerHTML = renderDoctorManagement();
+
+    if (pageId === 'dashboard') applyLoggedInIdentity();
+
+    // Doctor accounts and room allocations change from other terminals, so
+    // re-read them on entry instead of showing whatever was cached at login.
+    // `refreshing` breaks the recursion (this repaint calls switchView again),
+    // and the pristine-form check stops a refresh that lands while the
+    // receptionist is typing from wiping their input.
+    if ((pageId === 'doctor_mgmt' || pageId === 'patient_reg') && refreshedForPage !== pageId) {
+      // Latch BEFORE the await and keep it latched across the repaint below --
+      // the repaint re-enters switchView(), so clearing the flag first would
+      // make it refresh again, forever, and the constantly-replaced DOM would
+      // never settle long enough to be clicked.
+      refreshedForPage = pageId;
+      refreshDoctorData().finally(() => {
+        const stillHere = document.querySelector('.nav-btn.active')?.dataset.page === pageId;
+        const typed = ['dr-name', 'dr-email', 'dr-staffid', 'dr-password', 'p-mr', 'p-file', 'p-name', 'p-cnic']
+          .some(id => (document.getElementById(id)?.value || '').trim() !== '');
+        if (stillHere && !typed) switchView(pageId);
+      });
+    }
 
     document.querySelectorAll('.nav-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.page === pageId);
@@ -1223,7 +1506,51 @@
   let userHasNavigated = false;
   function userNavigate(pageId) {
     userHasNavigated = true;
+    refreshedForPage = null;   // a real navigation always re-reads
     switchView(pageId);
+  }
+
+  let globalSearchTerm = '';
+  let currentPageId = 'patient_mgmt';
+  // Which page we have already pulled fresh doctor/allocation data for. Reset
+  // on a genuine navigation so re-entering a page fetches again, but not on the
+  // internal repaint that fetch triggers.
+  let refreshedForPage = null;
+
+  function applyGlobalSearch(value) {
+    globalSearchTerm = value || '';
+    if (currentPageId === 'patient_mgmt') {
+      // Re-render the table in place; switchView would reset the nav highlight
+      // and steal focus away from the search box mid-typing.
+      document.getElementById('main-root').innerHTML = renderPatientManagement();
+    }
+  }
+
+  function startLiveClock() {
+    const el = document.getElementById('live-clock');
+    if (!el) return;
+    const tick = () => {
+      el.innerText = new Date().toLocaleString(undefined, {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    };
+    tick();
+    setInterval(tick, 30000);
+  }
+
+  function applyLoggedInIdentity() {
+    let user = null;
+    try { user = JSON.parse(localStorage.getItem('afid_user')); } catch (e) { user = null; }
+    const nameEl = document.getElementById('sidebar-user-name');
+    const roleEl = document.getElementById('sidebar-user-role');
+    if (nameEl) nameEl.innerText = user?.full_name || 'Unknown User';
+    if (roleEl) {
+      const role = (user?.role || 'staff').toString();
+      roleEl.innerText = `Role: ${role.charAt(0).toUpperCase()}${role.slice(1)}`;
+    }
+    const operatorInput = document.getElementById('staff-operator-name');
+    if (operatorInput) operatorInput.value = user?.full_name || '—';
   }
 
   function initApp() {
@@ -1237,6 +1564,8 @@
 
   window.onload = async () => {
     initApp();
+    applyLoggedInIdentity();
+    startLiveClock();
     await loadStaffData();
     await loadTimelineData();
     if (!userHasNavigated) {

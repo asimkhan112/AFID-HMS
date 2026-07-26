@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/helpers';
+import { DIALOG, dialogText, acceptDialog } from '../fixtures/helpers';
 import { loginAs, authHeaders, uniqueId, fillPatientForm, rowFor } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
@@ -84,9 +85,12 @@ test.describe('Reception Patient Queue', () => {
     await fillPatientForm(page, { mr, file: uniqueId('QA-F'), name: 'QA Duplicate Attempt', cnic: '44444-4444444-4' });
     await page.click('#patient-form button[type=submit]');
 
-    // addPatient() only has a toast for errors -- there's no inline form
-    // validation message, so this is the only signal the receptionist gets.
-    await expect(page.locator('.toast').last()).toContainText(/already exists/i);
+    // A rejected registration now surfaces in the in-page dialog rather than a
+    // transient toast, so the receptionist cannot miss it. (Native alert() is
+    // not used anywhere -- the browser prefixes those with the page origin.)
+    await expect(page.locator(DIALOG)).toBeVisible({ timeout: 10000 });
+    expect(await dialogText(page)).toMatch(/already exists/i);
+    await acceptDialog(page);
 
     // Confirm no second row was created and the original patient is untouched.
     await page.click('[data-page="patient_mgmt"]');
@@ -95,40 +99,48 @@ test.describe('Reception Patient Queue', () => {
     await expect(rowFor(page, mr)).not.toContainText('QA Duplicate Attempt');
   });
 
-  test('Doctor Management loads real allocations from API and allows creating new ones', async ({ page, request }) => {
-    // The /allocations router is now registered in main.py, so the endpoint
-    // should return 200 with an array (empty or populated).
-    // (No second loginAs() here -- beforeEach already logged us in, and
-    // Login.html auto-redirects an already-authenticated session away
-    // before the login form ever renders.)
+  test('Doctor Management loads real allocations from API and allocates a registered doctor to a room', async ({ page, request }) => {
     const headers = await authHeaders(page);
     const getRes = await request.get(`${API}/allocations`, { headers });
     expect(getRes.status()).toBe(200);
-    const allocations = await getRes.json();
-    expect(Array.isArray(allocations)).toBe(true);
+    expect(Array.isArray(await getRes.json())).toBe(true);
+
+    // "Doctor Name" is a picker over real doctor ACCOUNTS, not a free-text
+    // box. Patients are linked to a doctor by name, and the doctor portal
+    // matches its queue on the signed-in user's full_name -- a typed-in name
+    // with no account behind it produced allocations for a "doctor" who could
+    // never log in and never see the patients assigned to them.
+    const doctorName = uniqueId('Dr. QA New Hire');
+    const regRes = await request.post(`${API}/auth/register`, {
+      headers,
+      data: { full_name: doctorName, email: `${uniqueId('qa.hire')}@afid.mil`, password: 'doctor1234', role: 'doctor' },
+    });
+    expect(regRes.status()).toBe(201);
+
+    // Free a room to allocate into, so a full ward can't fail this test.
+    const room = 'Room 13';
+    for (const a of await (await request.get(`${API}/allocations`, { headers })).json()) {
+      if (a.room === room) await request.delete(`${API}/allocations/${a.id}`, { headers });
+    }
 
     await page.click('[data-page="doctor_mgmt"]');
     const table = page.locator('.panel', { hasText: 'Active Doctor Matrix' });
-    
-    // The table should show real doctors from the database, not just hardcoded fallbacks.
-    // At least one seeded doctor should be visible if the database is seeded.
-    const hasRealDoctors = await table.locator('tr').count() > 1; // header + at least one doctor
-    expect(hasRealDoctors).toBe(true);
+    await expect(table).toContainText(doctorName, { timeout: 15000 });
 
-    // Test that we can create a new allocation via the UI.
-    await page.fill('#d-name', 'Dr. QA New Hire');
-    await page.locator('form:has(#d-name) button[type=submit]').click();
+    await page.selectOption('#d-name', doctorName);
+    await page.selectOption('#d-room', room);
+    await page.locator('#doctor-form button[type=submit]').click();
 
-    // Should see a success toast, not a 404 error.
-    await expect(page.locator('.toast').last()).toContainText(/allocation created/i);
-    
-    // The new doctor should appear in the table.
-    await expect(table).toContainText('Dr. QA New Hire');
+    await expect(page.locator('.toast').last()).toContainText(new RegExp(`allocated to ${room}`, 'i'));
+    await expect(table.locator('tr', { hasText: doctorName })).toContainText(room);
 
     // Verify via API that the allocation was actually created.
     const postRes = await request.get(`${API}/allocations`, { headers });
     const updatedAllocations = await postRes.json();
-    const names = updatedAllocations.map((a: any) => a.doctor_name || a.name);
-    expect(names).toContain('Dr. QA New Hire');
+    const match = updatedAllocations.filter((a: any) => a.doctor_name === doctorName);
+    // Exactly one row -- allocation is an upsert keyed on the doctor, so a
+    // doctor can never end up occupying two rooms at once.
+    expect(match).toHaveLength(1);
+    expect(match[0].room).toBe(room);
   });
 });

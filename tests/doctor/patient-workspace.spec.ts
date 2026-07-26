@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/helpers';
+import { DIALOG, acceptDialog, dialogText, dismissDialogIfOpen } from '../fixtures/helpers';
 import { loginAs, authHeaders, uniqueId, CREDS } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
@@ -33,27 +34,29 @@ test('searching for a WAITING patient auto-checks them in and populates the work
   const headers = await authHeaders(page);
   const patient = await seedPatient(request, headers);
 
-  // executeSearch() auto-transitions a WAITING patient to ACTIVE and shows a
-  // native alert() reporting the check-in time -- register a dialog handler
-  // up front so Playwright doesn't just auto-dismiss it (which would still
-  // let the test proceed, but silently skip verifying the message).
-  const dialogMessages: string[] = [];
-  page.on('dialog', async (dialog) => {
-    dialogMessages.push(dialog.message());
-    await dialog.accept();
-  });
+  // executeSearch() auto-transitions a WAITING patient to ACTIVE and reports
+  // the check-in time in a non-blocking in-page toast. It used to be a native
+  // alert(), which the browser prefixes with the page origin; nothing should
+  // fire a native dialog here any more.
+  let nativeDialogFired = false;
+  page.on('dialog', async (dialog) => { nativeDialogFired = true; await dialog.dismiss(); });
 
   await page.click('[data-page="operations"]');
   await page.fill('#patient-search-input', patient.mr_number);
   await page.click('text=Search & Continue');
 
   await expect(page.locator('#view-workspace-screen')).toHaveClass(/active/);
-  expect(dialogMessages.some((m) => /checked in at/i.test(m))).toBe(true);
+  await expect(page.locator('body')).toContainText(/checked in at/i, { timeout: 10000 });
+  expect(nativeDialogFired).toBe(false);
 
   await expect(page.locator('#active-patient-badge')).toContainText(patient.mr_number);
   const values = page.locator('#view-workspace-screen .patient-details-grid .value');
   await expect(values.nth(0)).toHaveText('QA Doctor-Portal Patient');
   await expect(values.nth(1)).toContainText(patient.mr_number);
+  // The profile now reports the patient's real case status. The "Open Case"
+  // badge alone used to be the closest thing to a status readout, which made
+  // an already-completed case look as though it were still in progress.
+  await expect(values.nth(5)).toHaveText('ACTIVE');
 
   // Time In should no longer be blank now that the auto-check-in has fired.
   await expect(page.locator('#patient-time-in')).not.toHaveValue('—');
@@ -69,7 +72,6 @@ test('an allergy on the patient record shows a critical allergy banner; a patien
   await loginAs(page, 'doctor');
   const headers = await authHeaders(page);
 
-  page.on('dialog', (dialog) => dialog.accept());
 
   const allergicPatient = await seedPatient(request, headers, { allergies: 'Penicillin Sensitivity' });
   await page.click('[data-page="operations"]');
@@ -122,7 +124,6 @@ test('applying a backend-seeded procedure preset auto-fills materials, pharmacy,
   const patient = await seedPatient(request, apiHeaders);
 
   await loginAs(page, 'doctor');
-  page.on('dialog', (dialog) => dialog.accept());
   await page.click('[data-page="operations"]');
   await page.fill('#patient-search-input', patient.mr_number);
   await page.click('text=Search & Continue');
@@ -177,38 +178,46 @@ test('completing a session now genuinely persists everything entered -- the proc
   await loginAs(page, 'doctor');
   const headers = await authHeaders(page);
 
-  const dialogMessages: string[] = [];
-  page.on('dialog', async (dialog) => {
-    dialogMessages.push(dialog.message());
-    await dialog.accept();
-  });
+  let nativeDialogFired = false;
+  page.on('dialog', async (dialog) => { nativeDialogFired = true; await dialog.dismiss(); });
 
   await page.click('[data-page="operations"]');
   await page.fill('#patient-search-input', patient.mr_number);
   await page.click('text=Search & Continue');
+  await expect(page.locator('#view-workspace-screen')).toHaveClass(/active/);
   await page.selectOption('#procedure-select', presetName);
   await expect(page.locator('#materials-log-list')).toContainText('QA Persisted Material');
 
   await page.click('text=Confirm Time & Complete Session');
-  expect(dialogMessages.some((m) => /this will save the session summary/i.test(m))).toBe(true);
 
-  // confirmTimeOut() doesn't await the click -- it fires off a real chain
-  // of sequential POST /procedures/, then .../materials, .../pharmacy,
-  // .../diagnostics, .../notes, then a PATCH to COMPLETED, before finally
-  // alerting success. page.click() only waits for the click event (and the
-  // synchronous confirm() dialog it triggers) to be handled, not for that
-  // async chain to finish, so asserting on the second dialog immediately
-  // after the click races the network calls and fails every time. Poll
-  // instead of asserting synchronously, so the save chain has time to run.
-  //
-  // dialogMessages already has 2 entries by the time this chain starts
-  // (the "checked in at ..." alert from executeSearch(), then this
-  // confirm() dialog itself), so we poll for a 3RD message (index 2) --
-  // the success alert -- rather than just "length > 1".
-  await expect.poll(() => dialogMessages.length, { timeout: 10000 }).toBeGreaterThan(2);
-  expect(dialogMessages.some((m) => /session completed and saved successfully/i.test(m))).toBe(true);
+  // The confirmation is the in-page dialog, and it now itemises exactly what
+  // is about to be saved rather than making a vague promise.
+  await expect(page.locator(DIALOG)).toBeVisible({ timeout: 10000 });
+  const confirmText = await dialogText(page);
+  expect(confirmText).toContain('Complete the session for');
+  expect(confirmText).toContain(presetName);
+  expect(confirmText).toMatch(/Materials: \d+/);
+  await acceptDialog(page);
+
+  // Accepting the dialog kicks off a real chain of sequential
+  // POST /procedures/, then .../materials, .../pharmacy, .../diagnostics,
+  // .../notes, a timeline step, and finally a PATCH to COMPLETED. Wait for the
+  // observable end state rather than racing the network calls.
+  await expect(page.locator('body')).toContainText(/session completed and saved successfully/i, { timeout: 15000 });
+  expect(nativeDialogFired).toBe(false);
 
   await expect(page.locator('#patient-time-out')).not.toHaveValue('—');
+
+  // The summary sheet is rendered BEFORE the working set is cleared, so
+  // everything that was just saved actually appears on it. It used to be
+  // compiled after the arrays were emptied, so a completed session always
+  // printed "No clinical components allocated" and no medications.
+  const summary = page.locator('#master-summary-injection-point');
+  await expect(summary).toContainText('QA Persisted Material');
+  await expect(summary).toContainText('QA Persisted Med');
+  await expect(summary).toContainText('QA Persisted Diagnostic');
+  // …attributed to the doctor who is actually signed in.
+  await expect(summary).toContainText('Dr. Asadullah Khan');
 
   const statusRes = await request.get(`${API}/patients/lookup/mr/${encodeURIComponent(patient.mr_number)}`, { headers });
   const completed = await statusRes.json();

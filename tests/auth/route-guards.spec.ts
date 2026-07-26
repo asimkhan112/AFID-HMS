@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/helpers';
+import { futureLeaveWindow, clearOwnPendingLeaves } from '../fixtures/helpers';
 import { loginAs, CREDS } from '../fixtures/helpers';
 
 const API = 'http://localhost:8000';
@@ -142,6 +143,7 @@ test('API: GET /hod/timeline/{mr} deliberately allows doctor AND receptionist to
 
 test('contrast/positive control: PATCH /leaves/{id}/status still correctly 403s a receptionist -- this check was already correct before, and is now the model the endpoints above follow', async ({ request }) => {
   const headers = await apiLogin(request, 'receptionist');
+  await clearOwnPendingLeaves(request, headers);
 
   const submitRes = await request.post(`${API}/leaves/`, {
     headers,
@@ -149,8 +151,7 @@ test('contrast/positive control: PATCH /leaves/{id}/status still correctly 403s 
       leave_type: 'Casual Leave',
       coverage_officer: 'QA Coverage Officer',
       reason: uniqueId('QA route-guard contrast leave'),
-      start_date: '2026-11-01',
-      end_date: '2026-11-02',
+      ...futureLeaveWindow(1),
     },
   });
   expect(submitRes.status()).toBe(201);

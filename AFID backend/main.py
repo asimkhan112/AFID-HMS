@@ -33,9 +33,6 @@ import models  # noqa: F401
 
 from routers import auth, patients, doctors, procedures, leaves, staff, hod, presets
 
-# Doctor allocations router
-from routers.doctors import router as allocations_router
-
 # ── Create tables ─────────────────────────────────────────────────────────────
 # Table creation is fully handled by SQLAlchemy models against PostgreSQL.
 # For schema changes to an existing database, use Alembic migrations
@@ -61,6 +58,10 @@ app.add_middleware(
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
+# NOTE: doctors.router carries BOTH the /doctors and /allocations endpoints.
+# It used to be included a second time under the alias `allocations_router`,
+# which registered every one of those routes twice and produced duplicate
+# operation IDs in the OpenAPI schema (and duplicate entries in /docs).
 app.include_router(auth.router)
 app.include_router(patients.router)
 app.include_router(doctors.router)
@@ -69,7 +70,6 @@ app.include_router(leaves.router)
 app.include_router(staff.router)
 app.include_router(hod.router)
 app.include_router(presets.router)
-app.include_router(allocations_router)
 
 
 @app.get("/", tags=["Health"])
