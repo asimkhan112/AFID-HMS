@@ -24,9 +24,26 @@ copy .env.example .env
 pip install -r requirements.txt
 ```
 
-### 4. Seed the database (creates tables + sample data)
+### 4. Seed the database
+
+**Minimal bootstrap** — creates the tables plus the core accounts, rooms and a
+handful of patients. Safe to re-run: it skips entirely if any user already
+exists, which is why the Procfile runs it on every deploy.
 ```bash
 python init_db.py
+python seed_presets.py     # procedure preset catalogue
+```
+
+**Full demo clinic** — for demos, screenshots and manual testing. This one
+**deletes every row** and reseeds ~50 patients across WAITING/ACTIVE/COMPLETED,
+completed procedures with their materials/pharmacy/diagnostics/notes, patient
+timelines, leave requests in all three states, the staff directory and the
+operatory rooms — so every panel of every portal has data in it. Patient
+activity is spread over the last ~120 days so the doctor portal's reporting
+period selector (week / month / 90 days / all time) shows different numbers.
+```bash
+python seed_demo_data.py          # prompts before wiping
+python seed_demo_data.py --yes    # no prompt
 ```
 
 ### 5. Start the server
@@ -86,7 +103,10 @@ AFID backend/
 ├── models.py             # All ORM models (10 tables)
 ├── schemas.py            # All Pydantic request/response schemas
 ├── auth.py               # JWT + password hashing + dependencies
-├── init_db.py            # One-time seed script
+├── init_db.py            # Idempotent bootstrap seed (safe on every deploy)
+├── seed_presets.py       # Procedure preset catalogue
+├── seed_demo_data.py     # DESTRUCTIVE full demo clinic (wipe + reseed)
+├── excel_exporter.py     # Patient-queue .xlsx export on doctor logout
 ├── requirements.txt
 ├── .env.example
 └── routers/

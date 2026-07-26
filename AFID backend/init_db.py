@@ -25,11 +25,11 @@ def seed():
         users_data = [
             {"full_name": "Col. S. Hashmi",      "email": "hod@afid.mil",        "password": "admin1234",   "role": models.UserRole.hod,          "staff_id": "HMS-0001"},
             {"full_name": "Dr. Asadullah Khan",  "email": "doctor@afid.mil",     "password": "doctor1234",  "role": models.UserRole.doctor,       "staff_id": "HMS-0002"},
-            {"full_name": "Dr. Rehan M.",         "email": "rehan@afid.mil",      "password": "doctor1234",  "role": models.UserRole.doctor,       "staff_id": "HMS-0003"},
-            {"full_name": "Dr. Sana K.",          "email": "sana@afid.mil",       "password": "doctor1234",  "role": models.UserRole.doctor,       "staff_id": "HMS-0004"},
-            {"full_name": "Dr. Tariq A.",         "email": "tariq@afid.mil",      "password": "doctor1234",  "role": models.UserRole.doctor,       "staff_id": "HMS-0005"},
-            {"full_name": "Dr. Hira Z.",          "email": "hira@afid.mil",       "password": "doctor1234",  "role": models.UserRole.doctor,       "staff_id": "HMS-0006"},
-            {"full_name": "Dr. Bilal S.",         "email": "bilal@afid.mil",      "password": "doctor1234",  "role": models.UserRole.doctor,       "staff_id": "HMS-0007"},
+            {"full_name": "Dr. Rehan Mahmood",         "email": "rehan@afid.mil",      "password": "doctor1234",  "role": models.UserRole.doctor,       "staff_id": "HMS-0003"},
+            {"full_name": "Dr. Sana Kamal",          "email": "sana@afid.mil",       "password": "doctor1234",  "role": models.UserRole.doctor,       "staff_id": "HMS-0004"},
+            {"full_name": "Dr. Tariq Aziz",         "email": "tariq@afid.mil",      "password": "doctor1234",  "role": models.UserRole.doctor,       "staff_id": "HMS-0005"},
+            {"full_name": "Dr. Hira Zaman",          "email": "hira@afid.mil",       "password": "doctor1234",  "role": models.UserRole.doctor,       "staff_id": "HMS-0006"},
+            {"full_name": "Dr. Bilal Saeed",         "email": "bilal@afid.mil",      "password": "doctor1234",  "role": models.UserRole.doctor,       "staff_id": "HMS-0007"},
             {"full_name": "Fatima Asif",          "email": "reception@afid.mil",  "password": "staff1234",   "role": models.UserRole.receptionist, "staff_id": "HMS-0010"},
         ]
         users = {}
@@ -80,23 +80,26 @@ def seed():
         # ── Doctor Allocations ────────────────────────────────────────────────
         allocations = [
             ("Dr. Asadullah Khan", "Room 10", "Orthodontics",  "Dental Chair A"),
-            ("Dr. Rehan M.",       "Room 11", "Orthodontics",  "Dental Chair B"),
-            ("Dr. Sana K.",        "Room 12", "Orthodontics",  "Dental Chair C"),
-            ("Dr. Tariq A.",       "Room 13", "Oral Surgery",  "Dental Chair D"),
-            ("Dr. Hira Z.",        "Room 14", "Orthodontics",  "Dental Chair E"),
-            ("Dr. Bilal S.",       "Room 15", "Orthodontics",  "Dental Chair F"),
+            ("Dr. Rehan Mahmood",       "Room 11", "Orthodontics",  "Dental Chair B"),
+            ("Dr. Sana Kamal",        "Room 12", "Orthodontics",  "Dental Chair C"),
+            ("Dr. Tariq Aziz",       "Room 13", "Oral Surgery",  "Dental Chair D"),
+            ("Dr. Hira Zaman",        "Room 14", "Orthodontics",  "Dental Chair E"),
+            ("Dr. Bilal Saeed",       "Room 15", "Orthodontics",  "Dental Chair F"),
         ]
         for name, room, dept, chair in allocations:
             db.add(models.DoctorAllocation(doctor_name=name, room=room, department=dept, chair=chair))
 
         # ── Operatory Rooms ───────────────────────────────────────────────────
+        # Room -> doctor here MUST match the allocations above; they used to be
+        # offset by one, so the same room reported two different doctors
+        # depending on which screen you looked at.
         rooms = [
-            ("Room 10", "Dr. Rehan M.",       "Bracket Placement",  3, models.RoomStatus.busy),
-            ("Room 11", "Dr. Sana K.",         "Wire Adjustment",    2, models.RoomStatus.busy),
-            ("Room 12", "Dr. Tariq A.",        "New Case Eval",      1, models.RoomStatus.consultation),
-            ("Room 13", "Dr. Hira Z.",         "Retainer Check",     0, models.RoomStatus.available),
-            ("Room 14", "Dr. Bilal S.",        "Aligner Fit",        2, models.RoomStatus.busy),
-            ("Room 15", "Dr. Asadullah Khan",  "Elastics Check",     1, models.RoomStatus.consultation),
+            ("Room 10", "Dr. Asadullah Khan", "Bracket Placement",  3, models.RoomStatus.busy),
+            ("Room 11", "Dr. Rehan Mahmood",  "Wire Adjustment",    2, models.RoomStatus.busy),
+            ("Room 12", "Dr. Sana Kamal",     "New Case Eval",      1, models.RoomStatus.consultation),
+            ("Room 13", "Dr. Tariq Aziz",     "Retainer Check",     0, models.RoomStatus.available),
+            ("Room 14", "Dr. Hira Zaman",     "Aligner Fit",        2, models.RoomStatus.busy),
+            ("Room 15", "Dr. Bilal Saeed",    "Elastics Check",     1, models.RoomStatus.consultation),
             ("Room 16", "—",                   "—",                  0, models.RoomStatus.available),
             ("Room 17", "—",                   "—",                  0, models.RoomStatus.available),
             ("Room 18", "—",                   "—",                  0, models.RoomStatus.available),
@@ -111,11 +114,11 @@ def seed():
         # ── Sample Patients ───────────────────────────────────────────────────
         patients_data = [
             ("MR-0201708", "F-18281", "Maj Zeeshan Khan",     "Major",     "37405-1234567-1", "Male",   "A+", "Orthodontics", "Penicillin Sensitivity", "Room 10", "Dr. Asadullah Khan", "Root Canal Therapy (RCT)", models.PatientStatus.active),
-            ("MR-0201815", "F-18282", "Capt Tooba Tariq",     "Captain",   "31302-3070543-1", "Female", "B+", "Orthodontics", None,                     "Room 11", "Dr. Rehan M.",       "Composite Resin Filling",  models.PatientStatus.waiting),
-            ("MR-0203114", "F-18283", "Lt. Col. Sana Rauf",   "Lt. Col.",  "42101-9047382-1", "Female", "O+", "Orthodontics", None,                     "Room 12", "Dr. Sana K.",        "Scaling & Root Planing",   models.PatientStatus.waiting),
-            ("MR-1045",    "F-19001", "Ahmed Khan",           None,        None,              "Male",   None, "Orthodontics", None,                     "Room 13", "Dr. Tariq A.",       "Orthodontic Adjustment",   models.PatientStatus.active),
-            ("MR-1102",    "F-19002", "Fatima Noor",          None,        None,              "Female", None, "Orthodontics", None,                     "Room 14", "Dr. Hira Z.",        "Bracket Placement",        models.PatientStatus.active),
-            ("MR-0987",    "F-19003", "Usman Tariq",          None,        None,              "Male",   None, "Orthodontics", None,                     "Room 15", "Dr. Bilal S.",       "Debonding",                models.PatientStatus.active),
+            ("MR-0201815", "F-18282", "Capt Tooba Tariq",     "Captain",   "31302-3070543-1", "Female", "B+", "Orthodontics", None,                     "Room 11", "Dr. Rehan Mahmood",       "Composite Resin Filling",  models.PatientStatus.waiting),
+            ("MR-0203114", "F-18283", "Lt. Col. Sana Rauf",   "Lt. Col.",  "42101-9047382-1", "Female", "O+", "Orthodontics", None,                     "Room 12", "Dr. Sana Kamal",        "Scaling & Root Planing",   models.PatientStatus.waiting),
+            ("MR-1045",    "F-19001", "Ahmed Khan",           None,        None,              "Male",   None, "Orthodontics", None,                     "Room 13", "Dr. Tariq Aziz",       "Orthodontic Adjustment",   models.PatientStatus.active),
+            ("MR-1102",    "F-19002", "Fatima Noor",          None,        None,              "Female", None, "Orthodontics", None,                     "Room 14", "Dr. Hira Zaman",        "Bracket Placement",        models.PatientStatus.active),
+            ("MR-0987",    "F-19003", "Usman Tariq",          None,        None,              "Male",   None, "Orthodontics", None,                     "Room 15", "Dr. Bilal Saeed",       "Debonding",                models.PatientStatus.active),
             ("MR-1200",    "F-19004", "Zara Siddiqui",        None,        None,              "Female", None, "Orthodontics", None,                     "Room 10", "Dr. Asadullah Khan", "Initial Consultation",     models.PatientStatus.waiting),
         ]
         patient_objs = {}

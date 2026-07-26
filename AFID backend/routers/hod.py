@@ -10,6 +10,8 @@ HOD-specific endpoints:
 """
 
 from typing import List, Optional
+from datetime import datetime, date, time as dtime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -23,7 +25,15 @@ router = APIRouter(prefix="/hod", tags=["HOD Dashboard"])
 # ── Summary KPIs ──────────────────────────────────────────────────────────────
 @router.get("/summary", response_model=schemas.HODSummary)
 def get_summary(db: Session = Depends(get_db), _=Depends(get_current_user), __=Depends(require_role(models.UserRole.hod, models.UserRole.admin))):
-    total_patients = db.query(models.Patient).count()
+    # "Patients Today" means TODAY. This counted every patient ever registered,
+    # so the card climbed forever and read as a lifetime total under a
+    # today-scoped label.
+    start_of_today = datetime.combine(date.today(), dtime.min)
+    total_patients = (
+        db.query(models.Patient)
+        .filter(models.Patient.registered_at >= start_of_today)
+        .count()
+    )
     doctors_on_duty = (
         db.query(models.DoctorProfile)
         .filter(models.DoctorProfile.status != "On Leave")

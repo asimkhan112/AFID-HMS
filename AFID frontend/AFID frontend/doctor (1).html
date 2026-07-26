@@ -111,7 +111,11 @@
     .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; border-bottom: 1px dashed var(--border); padding-bottom: 20px; }
     .summary-field { margin-bottom: 20px; }
     .summary-field label { display: block; font-weight: 700; text-transform: uppercase; font-size: 11px; color: var(--green-med); margin-bottom: 6px; }
-    .summary-field div { font-size: 14px; line-height: 1.5; color: var(--text-dark); background: var(--bg-main); padding: 12px; border-radius: 6px; }
+    /* Direct child only. This matched EVERY nested div too, so each material
+       line in the "Materials Used Log" got its own 12px box and the list grew
+       to several times its natural height. */
+    .summary-field > div { font-size: 14px; line-height: 1.5; color: var(--text-dark); background: var(--bg-main); padding: 12px; border-radius: 6px; }
+    .summary-field > div > div { padding: 2px 0; }
 
     /* Patient Timeline Styles */
     .pt-pill { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-right: 8px; margin-bottom: 8px; cursor: pointer; border: 1px solid transparent; }
@@ -508,7 +512,16 @@
     }
 
     function renderDashboard() {
-      const mine = myPatients();
+      // Today's work first: ACTIVE (in the chair), then WAITING (queued), then
+      // COMPLETED history. Unsorted, finished cases were interleaved with the
+      // live queue and the doctor had to hunt for who was actually waiting.
+      const STATUS_RANK = { ACTIVE: 0, WAITING: 1, COMPLETED: 2 };
+      const mine = myPatients().slice().sort((a, b) => {
+        const ra = STATUS_RANK[(a.status || '').toString().toUpperCase()] ?? 3;
+        const rb = STATUS_RANK[(b.status || '').toString().toUpperCase()] ?? 3;
+        if (ra !== rb) return ra - rb;
+        return new Date(b.registered_at || 0) - new Date(a.registered_at || 0);
+      });
 
       const statusBadge = (status) => {
         const s = (status || '').toString().toUpperCase();
