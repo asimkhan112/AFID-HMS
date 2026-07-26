@@ -177,15 +177,24 @@ class ProcedureCreate(ProcedureBase):
 
 
 class ProcedureOut(ProcedureBase):
+    # These are SQLAlchemy relationships, i.e. lists of ORM model INSTANCES.
+    # They were typed List[dict], and Pydantic v2 does not coerce a model
+    # instance into a dict -- so any procedure that actually had a checklist,
+    # materials, pharmacy, diagnostics or notes attached failed validation and
+    # the endpoint returned 500. (Newly created procedures have empty lists,
+    # which is why POST worked and only reads of populated procedures broke.)
+    # Same defect that PatientWithProceduresOut.procedures was fixed for above.
+    # Forward references: the item schemas are declared further down; resolved
+    # by the model_rebuild() at the end of this module.
     id: int
     session_date: datetime
     patient: Optional[PatientOut] = None
     doctor: Optional[UserOut] = None
-    checklist: List[dict] = []
-    materials: List[dict] = []
-    pharmacy: List[dict] = []
-    diagnostics: List[dict] = []
-    notes: List[dict] = []
+    checklist: List["ChecklistItemOut"] = []
+    materials: List["MaterialOut"] = []
+    pharmacy: List["PharmacyOut"] = []
+    diagnostics: List["DiagnosticOut"] = []
+    notes: List["ClinicalNoteOut"] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -582,3 +591,9 @@ OperatoryRoomUpdate = RoomStatusUpdate
 # ── Timeline Steps ────────────────────────────────────────────────────────────
 
 TimelineStepOut = PatientTimelineStepOut
+
+
+# ── Forward-reference resolution ──────────────────────────────────────────────
+# ProcedureOut is declared before its child item schemas, so its annotations are
+# strings until every referenced class exists. Must stay at the very bottom.
+ProcedureOut.model_rebuild()
