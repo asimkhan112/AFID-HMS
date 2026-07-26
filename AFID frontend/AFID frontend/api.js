@@ -4,7 +4,10 @@
  *   <script src="api.js"></script>
  */
 
-const BASE_URL = "http://127.0.0.1:8000";   // change to your server address if needed
+// Same-origin: API calls go to the host serving these pages, which forwards
+// them to the backend — via the Vite dev proxy locally, and via Vercel
+// rewrites in production (see vercel.json). No hard-coded backend URL, no CORS.
+const BASE_URL = "";
 
 // ── Token / User storage ──────────────────────────────────────────────────────
 function getToken()        { return localStorage.getItem("afid_token"); }

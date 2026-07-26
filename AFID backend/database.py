@@ -10,8 +10,15 @@ from config import settings
 
 # ── Engine ────────────────────────────────────────────────────────────────────
 # PostgreSQL only -- no SQLite fallback / check_same_thread shim needed.
+# Normalize the legacy "postgres://" scheme that some hosts hand out to the
+# "postgresql://" scheme SQLAlchemy 2.0 requires. (Neon already uses
+# "postgresql://"; this is just a safety net for pasted URLs.)
+_db_url = settings.DATABASE_URL
+if _db_url.startswith("postgres://"):
+    _db_url = "postgresql://" + _db_url[len("postgres://"):]
+
 engine = create_engine(
-    settings.DATABASE_URL,
+    _db_url,
     pool_pre_ping=True,
 )
 

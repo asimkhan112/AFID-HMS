@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": false,
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/auth/:path*",        "destination": "https://REPLACE_WITH_RAILWAY_URL/auth/:path*" },
+    { "source": "/patients/:path*",    "destination": "https://REPLACE_WITH_RAILWAY_URL/patients/:path*" },
+    { "source": "/doctors/:path*",     "destination": "https://REPLACE_WITH_RAILWAY_URL/doctors/:path*" },
+    { "source": "/procedures/:path*",  "destination": "https://REPLACE_WITH_RAILWAY_URL/procedures/:path*" },
+    { "source": "/leaves/:path*",      "destination": "https://REPLACE_WITH_RAILWAY_URL/leaves/:path*" },
+    { "source": "/staff/:path*",       "destination": "https://REPLACE_WITH_RAILWAY_URL/staff/:path*" },
+    { "source": "/hod/:path*",         "destination": "https://REPLACE_WITH_RAILWAY_URL/hod/:path*" },
+    { "source": "/presets",            "destination": "https://REPLACE_WITH_RAILWAY_URL/presets" },
+    { "source": "/presets/:path*",     "destination": "https://REPLACE_WITH_RAILWAY_URL/presets/:path*" },
+    { "source": "/allocations",        "destination": "https://REPLACE_WITH_RAILWAY_URL/allocations" },
+    { "source": "/allocations/:path*", "destination": "https://REPLACE_WITH_RAILWAY_URL/allocations/:path*" }
+  ]
+}
