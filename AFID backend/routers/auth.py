@@ -7,12 +7,19 @@ POST /auth/logout  – logout and export patient queue
 """
 
 import logging
+from typing import Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from auth import hash_password, verify_password, create_access_token, get_current_user
+from auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    get_current_user,
+    get_current_user_optional,
+)
 from excel_exporter import generate_queue_excel
 import models, schemas
 
@@ -36,18 +43,80 @@ def login(payload: schemas.LoginIn, db: Session = Depends(get_db)):
     return {"access_token": token, "token_type": "bearer"}
 
 
+# NOTE: authentication here is OPTIONAL by design. This endpoint backs two
+# separate flows:
+#   1. the "Registration" tab on Login.html, where the caller has no token yet
+#   2. "Register Doctor" inside the staff portal, where a receptionist does
+# It used to require get_current_user, so flow (1) always 401'd -- and because
+# api.js treats any 401 as an expired session, the login page silently wiped
+# local storage and bounced back to itself, which is what made freshly
+# "registered" accounts impossible to log in with (they were never created).
 @router.post("/register", response_model=schemas.UserOut, status_code=201)
-def register(payload: schemas.UserCreate, db: Session = Depends(get_db)):
-    if db.query(models.User).filter(models.User.email == payload.email).first():
+def register(
+    payload: schemas.UserCreate,
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(get_current_user_optional),
+):
+    role = payload.role
+    if isinstance(role, str):
+        try:
+            role = models.UserRole(role.strip().lower())
+        except ValueError:
+            valid = ", ".join(r.value for r in models.UserRole)
+            raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {valid}")
+
+    # Privileged roles can never be self-provisioned by an anonymous caller.
+    if role in (models.UserRole.admin, models.UserRole.hod):
+        if current_user is None or current_user.role not in (models.UserRole.admin, models.UserRole.hod):
+            raise HTTPException(status_code=403, detail="Only admin/HOD can create admin or HOD accounts")
+
+    email = (payload.email or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    if not payload.password or len(payload.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if db.query(models.User).filter(models.User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
+
+    staff_id = (payload.staff_id or "").strip() or None
+    if staff_id and db.query(models.User).filter(models.User.staff_id == staff_id).first():
+        raise HTTPException(status_code=400, detail=f"Staff ID '{staff_id}' is already assigned")
+
+    full_name = (payload.full_name or "").strip()
+    if not full_name:
+        raise HTTPException(status_code=400, detail="Full name is required")
+    # Doctor accounts are matched to patients by full_name across the whole app
+    # (patients.assigned_doctor is a name string), so two doctors sharing a name
+    # would silently cross-wire each other's queues.
+    if role == models.UserRole.doctor:
+        clash = (
+            db.query(models.User)
+            .filter(models.User.role == models.UserRole.doctor, models.User.full_name == full_name)
+            .first()
+        )
+        if clash:
+            raise HTTPException(status_code=400, detail=f"A doctor named '{full_name}' already exists")
+
     user = models.User(
-        full_name=payload.full_name,
-        email=payload.email,
+        full_name=full_name,
+        email=email,
         hashed_password=hash_password(payload.password),
-        role=payload.role,
-        staff_id=payload.staff_id,
+        role=role,
+        staff_id=staff_id,
     )
     db.add(user)
+    db.flush()
+
+    # Every doctor needs a DoctorProfile row: /hod/summary and /hod/monitoring
+    # both read doctor duty/leave status from that table, so a doctor without
+    # one is invisible to the HOD dashboard.
+    if role == models.UserRole.doctor:
+        db.add(models.DoctorProfile(
+            user_id=user.id,
+            department="Orthodontics",
+            status="Available",
+        ))
+
     db.commit()
     db.refresh(user)
     return user
@@ -63,17 +132,10 @@ def logout(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Logout endpoint that exports the doctor's patient queue to Excel.
-    Export occurs only after successful logout.
-    If export fails, the error is logged and logout continues.
-    """
+    export_status = "no_queue"
     try:
-        # Only export queue for doctors
         if current_user.role == models.UserRole.doctor:
             try:
-                # Fetch all patients currently in this doctor's queue
-                # Queue records are patients assigned to this doctor and still waiting/active
                 doctor_name = current_user.full_name
                 patients = db.query(models.Patient).filter(
                     models.Patient.assigned_doctor == doctor_name,
@@ -82,7 +144,6 @@ def logout(
                     )
                 ).all()
                 
-                # Convert patients to list of dictionaries for Excel export
                 patient_data = []
                 for patient in patients:
                     patient_data.append({
@@ -92,36 +153,17 @@ def logout(
                         "status": patient.status.value if patient.status else "",
                         "visit_date": patient.registered_at,
                         "visit_time": patient.registered_at,
-                        "age": "N/A"  # Age not directly stored in model
+                        "age": "N/A"
                     })
                 
-                # Generate Excel file
                 if patient_data:
                     filepath = generate_queue_excel(patient_data, doctor_name)
-                    logger.info(
-                        f"Successfully exported patient queue for doctor {doctor_name} "
-                        f"to {filepath}. Total patients: {len(patient_data)}"
-                    )
+                    export_status = f"exported:{len(patient_data)}"
                 else:
-                    logger.info(
-                        f"No patients in queue for doctor {doctor_name}. "
-                        "No export file generated."
-                    )
-                    
+                    export_status = "empty_queue"
             except Exception as export_error:
-                # Log the error but don't fail the logout
-                logger.error(
-                    f"Failed to export patient queue for doctor {current_user.full_name}: "
-                    f"{str(export_error)}",
-                    exc_info=True
-                )
-        
-        # Return success response
-        return {"message": "Logout successful"}
-        
-    except Exception as e:
-        logger.error(f"Logout failed for user {current_user.id}: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Logout failed. Please try again."
-        )
+                export_status = f"error:{str(export_error)}"
+    except Exception:
+        pass
+    
+    return {"message": "Logout successful", "export_status": export_status}

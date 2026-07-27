@@ -9,14 +9,16 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from config import settings
 
 # ── Engine ────────────────────────────────────────────────────────────────────
-# SQLite needs check_same_thread=False for multi-threaded FastAPI
-connect_args = {}
-if settings.DATABASE_URL.startswith("sqlite"):
-    connect_args["check_same_thread"] = False
+# PostgreSQL only -- no SQLite fallback / check_same_thread shim needed.
+# Normalize the legacy "postgres://" scheme that some hosts hand out to the
+# "postgresql://" scheme SQLAlchemy 2.0 requires. (Neon already uses
+# "postgresql://"; this is just a safety net for pasted URLs.)
+_db_url = settings.DATABASE_URL
+if _db_url.startswith("postgres://"):
+    _db_url = "postgresql://" + _db_url[len("postgres://"):]
 
 engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args=connect_args,
+    _db_url,
     pool_pre_ping=True,
 )
 
@@ -29,9 +31,12 @@ Base = declarative_base()
 
 # ── FastAPI dependency ────────────────────────────────────────────────────────
 def get_db():
-    """Yield a database session and ensure it is closed after use."""
+    """Yield a database session, rolling back on exceptions."""
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

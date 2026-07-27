@@ -53,13 +53,53 @@ def list_allocations(db: Session = Depends(get_db), _=Depends(get_current_user))
     return db.query(models.DoctorAllocation).order_by(models.DoctorAllocation.created_at.desc()).all()
 
 
+# A doctor occupies exactly ONE room at a time, so this is an UPSERT keyed on
+# doctor_name, not a blind insert. Previously, re-allocating a doctor who
+# already had a room simply appended a second row, and every consumer that
+# lists allocations (the staff portal's doctor matrix, the registration form's
+# dentist dropdown) then showed the same doctor sitting in two rooms at once
+# with the stale allocation never going away.
 @router.post("/allocations", response_model=schemas.DoctorAllocationOut, status_code=201)
 def create_allocation(
     payload: schemas.DoctorAllocationCreate,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    alloc = models.DoctorAllocation(**payload.model_dump())
+    data = payload.model_dump()
+    doctor_name = (data.get("doctor_name") or "").strip()
+    room = (data.get("room") or "").strip()
+    if not doctor_name:
+        raise HTTPException(status_code=400, detail="Doctor name is required")
+    if not room:
+        raise HTTPException(status_code=400, detail="Room is required")
+    data["doctor_name"] = doctor_name
+    data["room"] = room
+
+    # A room is a physical resource -- refuse to seat a second doctor in one.
+    room_holder = (
+        db.query(models.DoctorAllocation)
+        .filter(models.DoctorAllocation.room == room, models.DoctorAllocation.doctor_name != doctor_name)
+        .first()
+    )
+    if room_holder:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{room} is already allocated to {room_holder.doctor_name}. Reassign that doctor first.",
+        )
+
+    existing = (
+        db.query(models.DoctorAllocation)
+        .filter(models.DoctorAllocation.doctor_name == doctor_name)
+        .first()
+    )
+    if existing:
+        for k, v in data.items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    alloc = models.DoctorAllocation(**data)
     db.add(alloc)
     db.commit()
     db.refresh(alloc)

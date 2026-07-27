@@ -4,8 +4,10 @@ Leave requests: submit, list, approve/reject (HOD).
 """
 
 from typing import List, Optional
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from auth import get_current_user
@@ -14,19 +16,39 @@ import models, schemas
 router = APIRouter(prefix="/leaves", tags=["Leave Management"])
 
 
-@router.get("/", response_model=List[schemas.LeaveOut])
+def serialize_leave(leave: models.LeaveRequest) -> dict:
+    return {
+        "id": leave.id,
+        "requester_id": leave.requester_id,
+        "leave_type": leave.leave_type.value if leave.leave_type else None,
+        "coverage_officer": leave.coverage_officer,
+        "reason": leave.reason,
+        "start_date": leave.start_date.isoformat() if leave.start_date else None,
+        "end_date": leave.end_date.isoformat() if leave.end_date else None,
+        "status": leave.status.value if leave.status else None,
+        "reviewed_by": leave.reviewed_by,
+        "created_at": leave.created_at.isoformat() if leave.created_at else None,
+        "updated_at": leave.updated_at.isoformat() if leave.updated_at else None,
+        "requester_name": leave.requester.full_name if leave.requester else None,
+    }
+
+
+@router.get("/")
 def list_leaves(
     status: Optional[models.LeaveStatus] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    q = db.query(models.LeaveRequest)
-    # Doctors/nurses see only their own; HOD/admin see all
+    query = db.query(models.LeaveRequest).options(joinedload(models.LeaveRequest.requester))
+
     if current_user.role not in (models.UserRole.hod, models.UserRole.admin):
-        q = q.filter(models.LeaveRequest.requester_id == current_user.id)
+        query = query.filter(models.LeaveRequest.requester_id == current_user.id)
+
     if status:
-        q = q.filter(models.LeaveRequest.status == status)
-    return q.order_by(models.LeaveRequest.created_at.desc()).all()
+        query = query.filter(models.LeaveRequest.status == status)
+
+    leaves = query.order_by(models.LeaveRequest.created_at.desc()).all()
+    return [serialize_leave(leave) for leave in leaves]
 
 
 @router.post("/", response_model=schemas.LeaveOut, status_code=201)
@@ -37,6 +59,38 @@ def submit_leave(
 ):
     if payload.end_date < payload.start_date:
         raise HTTPException(status_code=400, detail="End date must be on or after start date")
+
+    # Leave is applied for, not recorded retroactively -- a start date that has
+    # already passed used to sail straight through and land in the HOD queue.
+    today = date.today()
+    if payload.start_date < today:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Start date cannot be in the past (earliest allowed is {today.isoformat()})",
+        )
+
+    # Guard against the same request being filed twice (double submit, impatient
+    # re-click, browser retry). Without this the HOD's approval queue fills up
+    # with identical duplicate rows of one real request.
+    overlapping = (
+        db.query(models.LeaveRequest)
+        .filter(
+            models.LeaveRequest.requester_id == current_user.id,
+            models.LeaveRequest.status == models.LeaveStatus.pending,
+            models.LeaveRequest.start_date <= payload.end_date,
+            models.LeaveRequest.end_date >= payload.start_date,
+        )
+        .first()
+    )
+    if overlapping:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"You already have a pending leave request covering "
+                f"{overlapping.start_date.isoformat()} to {overlapping.end_date.isoformat()}."
+            ),
+        )
+
     leave = models.LeaveRequest(requester_id=current_user.id, **payload.model_dump())
     db.add(leave)
     db.commit()
@@ -44,15 +98,15 @@ def submit_leave(
     return leave
 
 
-@router.get("/{leave_id}", response_model=schemas.LeaveOut)
+@router.get("/{leave_id}")
 def get_leave(leave_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    leave = db.query(models.LeaveRequest).filter(models.LeaveRequest.id == leave_id).first()
+    leave = db.query(models.LeaveRequest).options(joinedload(models.LeaveRequest.requester)).filter(models.LeaveRequest.id == leave_id).first()
     if not leave:
         raise HTTPException(404, "Leave request not found")
-    return leave
+    return serialize_leave(leave)
 
 
-@router.patch("/{leave_id}/status", response_model=schemas.LeaveOut)
+@router.patch("/{leave_id}/status")
 def update_leave_status(
     leave_id: int,
     payload: schemas.LeaveStatusUpdate,
@@ -65,10 +119,11 @@ def update_leave_status(
     if not leave:
         raise HTTPException(404, "Leave request not found")
     leave.status = payload.status
-    leave.reviewed_by = payload.reviewed_by or current_user.full_name
+    leave.reviewed_by = current_user.full_name
     db.commit()
-    db.refresh(leave)
-    return leave
+
+    leave = db.query(models.LeaveRequest).options(joinedload(models.LeaveRequest.requester)).filter(models.LeaveRequest.id == leave_id).first()
+    return serialize_leave(leave)
 
 
 @router.delete("/{leave_id}", status_code=204)

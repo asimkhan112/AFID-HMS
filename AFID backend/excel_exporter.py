@@ -35,10 +35,17 @@ def generate_queue_excel(patients: List[Dict[str, Any]], doctor_name: str) -> st
     exports_dir = os.path.join(os.path.dirname(__file__), "exports")
     os.makedirs(exports_dir, exist_ok=True)
     
-    # Generate filename: DoctorName_YYYY-MM-DD_HH-MM.xlsx
+    # Generate filename: DoctorName_YYYY-MM-DD_HH-MM-SS-ffffff.xlsx
+    # Second-level precision alone is NOT collision-proof: two logouts for the
+    # same doctor within the same clock second (a double-click, two open tabs,
+    # a retried request) previously produced the identical filename, so the
+    # second wb.save() silently overwrote the first export with no error and
+    # no trace the first one ever existed. Microsecond precision makes every
+    # export's filename effectively unique, so every export attempt is kept
+    # as its own distinct file instead of silently clobbering a prior one.
     now = datetime.now()
     sanitized_doctor_name = sanitize_filename(doctor_name)
-    filename = f"{sanitized_doctor_name}_{now.strftime('%Y-%m-%d_%H-%M')}.xlsx"
+    filename = f"{sanitized_doctor_name}_{now.strftime('%Y-%m-%d_%H-%M-%S-%f')}.xlsx"
     filepath = os.path.join(exports_dir, filename)
     
     # Create workbook and worksheet
@@ -137,3 +144,23 @@ def generate_queue_excel(patients: List[Dict[str, Any]], doctor_name: str) -> st
     wb.save(filepath)
     
     return filepath
+
+
+def get_exported_file_path(doctor_name: str) -> str:
+    """
+    Get the expected filepath for a doctor's queue export.
+    Used to check if a file was created for the current minute.
+    
+    Args:
+        doctor_name: Name of the doctor
+        
+    Returns:
+        str: Expected filepath for the export
+    """
+    exports_dir = os.path.join(os.path.dirname(__file__), "exports")
+    os.makedirs(exports_dir, exist_ok=True)
+    
+    now = datetime.now()
+    sanitized_doctor_name = sanitize_filename(doctor_name)
+    filename = f"{sanitized_doctor_name}_{now.strftime('%Y-%m-%d_%H-%M')}.xlsx"
+    return os.path.join(exports_dir, filename)

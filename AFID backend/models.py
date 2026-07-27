@@ -3,7 +3,7 @@ models.py
 All SQLAlchemy ORM models for the AFID HMS.
 
 Tables
-------
+-----
 users               – authentication + role (doctor / hod / admin / receptionist / nurse)
 doctor_profiles     – extended info for users with role=doctor
 staff_members       – non-doctor clinical staff directory
@@ -18,6 +18,7 @@ clinical_notes      – free-text notes attached to a procedure
 leave_requests      – leave applications submitted by users
 patient_timeline    – ordered procedure steps for HOD timeline view
 operatory_rooms     – live room status tracked by HOD
+procedure_presets   – predefined procedure templates with materials, pharmacy, diagnostics
 """
 
 import enum
@@ -166,6 +167,58 @@ class Patient(Base):
 
     procedures       = relationship("Procedure", back_populates="patient")
     timeline_steps   = relationship("PatientTimelineStep", back_populates="patient")
+
+
+# ── Procedure Presets ────────────────────────────────────────────────────────
+
+class ProcedurePreset(Base):
+    """Predefined procedure templates with associated materials, pharmacy, diagnostics."""
+    __tablename__ = "procedure_presets"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    name        = Column(String(120), unique=True, nullable=False)
+    duration    = Column(Integer, default=30)  # in minutes
+    notes       = Column(Text)
+    is_active   = Column(Boolean, default=True)
+    created_at  = Column(DateTime, default=datetime.utcnow)
+
+    materials   = relationship("PresetMaterial", back_populates="preset", cascade="all, delete-orphan")
+    pharmacy    = relationship("PresetPharmacy", back_populates="preset", cascade="all, delete-orphan")
+    diagnostics = relationship("PresetDiagnostic", back_populates="preset", cascade="all, delete-orphan")
+
+
+class PresetMaterial(Base):
+    __tablename__ = "preset_materials"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    preset_id  = Column(Integer, ForeignKey("procedure_presets.id", ondelete="CASCADE"))
+    name       = Column(String(255), nullable=False)
+    quantity   = Column(Integer, default=1)
+
+    preset = relationship("ProcedurePreset", back_populates="materials")
+
+
+class PresetPharmacy(Base):
+    __tablename__ = "preset_pharmacy"
+
+    id        = Column(Integer, primary_key=True, index=True)
+    preset_id = Column(Integer, ForeignKey("procedure_presets.id", ondelete="CASCADE"))
+    medication = Column(String(255), nullable=False)
+    dose       = Column(String(80))
+    frequency   = Column(String(120))
+
+    preset = relationship("ProcedurePreset", back_populates="pharmacy")
+
+
+class PresetDiagnostic(Base):
+    __tablename__ = "preset_diagnostics"
+
+    id        = Column(Integer, primary_key=True, index=True)
+    preset_id = Column(Integer, ForeignKey("procedure_presets.id", ondelete="CASCADE"))
+    test_name = Column(String(255), nullable=False)
+    urgency   = Column(SAEnum(DiagnosticUrgency), default=DiagnosticUrgency.routine)
+
+    preset = relationship("ProcedurePreset", back_populates="diagnostics")
 
 
 # ── Procedures ────────────────────────────────────────────────────────────────

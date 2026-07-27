@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
-from auth import get_current_user
+from auth import get_current_user, require_role
 import models, schemas
 
 router = APIRouter(prefix="/staff", tags=["Staff Directory"])
@@ -19,6 +19,7 @@ def list_staff(
     role: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
+    __=Depends(require_role(models.UserRole.hod, models.UserRole.admin)),
 ):
     q = db.query(models.StaffMember)
     if role:
@@ -27,7 +28,7 @@ def list_staff(
 
 
 @router.post("/", response_model=schemas.StaffOut, status_code=201)
-def create_staff(payload: schemas.StaffCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def create_staff(payload: schemas.StaffCreate, db: Session = Depends(get_db), _=Depends(get_current_user), __=Depends(require_role(models.UserRole.hod, models.UserRole.admin))):
     member = models.StaffMember(**payload.model_dump())
     db.add(member)
     db.commit()
@@ -36,7 +37,7 @@ def create_staff(payload: schemas.StaffCreate, db: Session = Depends(get_db), _=
 
 
 @router.get("/{staff_id}", response_model=schemas.StaffOut)
-def get_staff(staff_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def get_staff(staff_id: int, db: Session = Depends(get_db), _=Depends(get_current_user), __=Depends(require_role(models.UserRole.hod, models.UserRole.admin))):
     member = db.query(models.StaffMember).filter(models.StaffMember.id == staff_id).first()
     if not member:
         raise HTTPException(404, "Staff member not found")
@@ -44,7 +45,7 @@ def get_staff(staff_id: int, db: Session = Depends(get_db), _=Depends(get_curren
 
 
 @router.put("/{staff_id}", response_model=schemas.StaffOut)
-def update_staff(staff_id: int, payload: schemas.StaffCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def update_staff(staff_id: int, payload: schemas.StaffCreate, db: Session = Depends(get_db), _=Depends(get_current_user), __=Depends(require_role(models.UserRole.hod, models.UserRole.admin))):
     member = db.query(models.StaffMember).filter(models.StaffMember.id == staff_id).first()
     if not member:
         raise HTTPException(404, "Staff member not found")
@@ -56,7 +57,7 @@ def update_staff(staff_id: int, payload: schemas.StaffCreate, db: Session = Depe
 
 
 @router.delete("/{staff_id}", status_code=204)
-def delete_staff(staff_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def delete_staff(staff_id: int, db: Session = Depends(get_db), _=Depends(get_current_user), __=Depends(require_role(models.UserRole.hod, models.UserRole.admin))):
     member = db.query(models.StaffMember).filter(models.StaffMember.id == staff_id).first()
     if not member:
         raise HTTPException(404, "Staff member not found")

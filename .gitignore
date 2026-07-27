@@ -1,3 +1,20 @@
 *.db
 node_modules/
 __pycache__/
+
+# secrets -- .env holds a live DB connection string + JWT SECRET_KEY; never commit it.
+# git log --all --full-history confirmed it has never been committed so far -- keep it that way.
+.env
+
+# generated / runtime artifacts
+AFID backend/.venv/
+AFID backend/app.log
+AFID backend/exports/
+
+# IDE project settings (personal, not shared config)
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

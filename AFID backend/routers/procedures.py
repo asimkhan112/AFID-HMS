@@ -23,8 +23,20 @@ def list_procedures(db: Session = Depends(get_db), _=Depends(get_current_user)):
 
 
 @router.post("/", response_model=schemas.ProcedureOut, status_code=201)
-def create_procedure(payload: schemas.ProcedureCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    proc = models.Procedure(**payload.model_dump())
+def create_procedure(
+    payload: schemas.ProcedureCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    data = payload.model_dump()
+    # Attribute the session to whoever is actually logged in when the client
+    # doesn't name a doctor. The doctor portal used to post doctor_id: null,
+    # so every saved procedure came back with no doctor attached and the
+    # summary sheet fell back to a hard-coded name that was frequently not the
+    # doctor who performed it.
+    if not data.get("doctor_id"):
+        data["doctor_id"] = current_user.id if current_user.role == models.UserRole.doctor else None
+    proc = models.Procedure(**data)
     db.add(proc)
     db.commit()
     db.refresh(proc)
@@ -101,10 +113,56 @@ def get_materials(proc_id: int, db: Session = Depends(get_db), _=Depends(get_cur
     return db.query(models.ProcedureMaterial).filter(models.ProcedureMaterial.procedure_id == proc_id).all()
 
 
+# Logging the same material twice means "I used more of it", not "there are now
+# two separate line items" -- so re-posting a name that is already on this
+# procedure updates the existing row's quantity instead of appending a
+# duplicate entry that nobody can reconcile.
 @router.post("/{proc_id}/materials", response_model=schemas.MaterialOut, status_code=201)
 def add_material(proc_id: int, payload: schemas.MaterialCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    item = models.ProcedureMaterial(procedure_id=proc_id, **payload.model_dump())
+    data = payload.model_dump()
+    name = (data.get("material_name") or "").strip()
+    if not name:
+        raise HTTPException(400, "Material name is required")
+    data["material_name"] = name
+
+    existing = (
+        db.query(models.ProcedureMaterial)
+        .filter(
+            models.ProcedureMaterial.procedure_id == proc_id,
+            models.ProcedureMaterial.material_name == name,
+        )
+        .first()
+    )
+    if existing:
+        existing.quantity = data.get("quantity", existing.quantity)
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    item = models.ProcedureMaterial(procedure_id=proc_id, **data)
     db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.patch("/{proc_id}/materials/{item_id}", response_model=schemas.MaterialOut)
+def update_material(
+    proc_id: int,
+    item_id: int,
+    payload: schemas.MaterialUpdate,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    item = db.query(models.ProcedureMaterial).filter(
+        models.ProcedureMaterial.id == item_id,
+        models.ProcedureMaterial.procedure_id == proc_id,
+    ).first()
+    if not item:
+        raise HTTPException(404, "Material not found")
+    if payload.quantity < 1:
+        raise HTTPException(400, "Quantity must be at least 1")
+    item.quantity = payload.quantity
     db.commit()
     db.refresh(item)
     return item

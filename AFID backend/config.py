@@ -9,7 +9,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # ── Database ──────────────────────────────────────────────────────────────
-    DATABASE_URL: str = "sqlite:///./afid.db"
+    # Default to SQLite for development; override with postgresql:// URL in production
+    # PostgreSQL only. Matches .env.example / the setup steps in
+    # AFID backend/README.md -- override via .env if your credentials differ.
+    DATABASE_URL: str = "postgresql://afid_user:afid_pass@localhost:5432/afid_db"
 
     # ── JWT ───────────────────────────────────────────────────────────────────
     SECRET_KEY: str = "CHANGE_ME_IN_PRODUCTION_USE_A_LONG_RANDOM_STRING"
@@ -19,7 +22,7 @@ class Settings(BaseSettings):
     # ── App ───────────────────────────────────────────────────────────────────
     APP_TITLE: str = "AFID HMS API"
     APP_VERSION: str = "1.0.0"
-    CORS_ORIGINS: list[str] = ["http://localhost", "http://127.0.0.1", "null", "http://localhost:5173"]
+    CORS_ORIGINS: list[str] = ["http://localhost", "http://127.0.0.1", "null", "http://localhost:5173", "http://localhost:3000", "http://localhost:3001", "http://localhost:3002"]
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
