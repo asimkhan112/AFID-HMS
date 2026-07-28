@@ -1954,11 +1954,6 @@ u<!DOCTYPE html>
       const data = ensurePresets()[selectedProcedure];
 
       // 1. Materials
-      // NOTE: cachedPresets is already normalized to the app-internal
-      // { name, qty } / { med, dose, freq } / { name, urgency } shapes back
-      // in loadDashboardData() (see the .map() calls there) -- data.materials
-      // / data.pharmacy / data.diagnostics here are ALREADY in that shape,
-      // not the raw backend field names. Do not re-map them here.
       activeMaterials = [...GLOBAL_MATERIALS, ...data.materials].sort(sortByProp('name'));
       renderMaterialsList();
 
@@ -1967,22 +1962,23 @@ u<!DOCTYPE html>
       renderPharmacyList();
 
       // 3. Diagnostics
-      // Note: Diagnostics are displayed via checkboxes in the investigations tab,
-      // not via renderDiagnosticsList() (which targets a non-existent element).
-      // The activeDiagnostics array is populated here and displayed by renderInvCheckboxes().
       activeDiagnostics = [...data.diagnostics].sort(sortByProp('name'));
 
       // 4. Notes
       document.getElementById('clinical-notes-textarea').value = data.notes;
 
-      document.getElementById('step-3-container').style.display = 'block';
+      // 5. Show step-3 container with a small delay to ensure DOM is ready
+      const step3Container = document.getElementById('step-3-container');
+      if (step3Container) {
+        step3Container.style.display = 'block';
+      }
+
       document.getElementById('master-summary-injection-point').innerHTML = '';
 
-      // Switch to investigations tab by default
+      // 6. Switch to investigations tab by default
       const targetSubTabName = 'subtab-investigations';
       const tabButton = document.querySelector(`[onclick*="${targetSubTabName}"]`);
       if(tabButton) {
-        // Create a proper event-like object with currentTarget
         const mockEvent = {
           currentTarget: tabButton,
           preventDefault: () => {}
@@ -2632,8 +2628,10 @@ u<!DOCTYPE html>
       const duration = parseInt(durationInput, 10) || 30;
       const cleanName = procName.trim();
 
-      if (!ensurePresets()[cleanName]) {
-        ensurePresets()[cleanName] = {
+      // Ensure cachedPresets is initialized before adding to it
+      const presets = ensurePresets();
+      if (!presets[cleanName]) {
+        presets[cleanName] = {
           materials: [],
           pharmacy: [],
           diagnostics: [],
@@ -2652,6 +2650,8 @@ u<!DOCTYPE html>
         select.appendChild(newOption);
       }
       select.value = cleanName;
+      
+      // Call applyProcedure to show the procedure details
       applyProcedure();
     }
 
