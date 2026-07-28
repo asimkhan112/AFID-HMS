@@ -1978,8 +1978,13 @@
 
       // Switch to investigations tab by default
       const targetSubTabName = 'subtab-investigations';
-      const mockEvent = { currentTarget: document.querySelector(`[onclick*="${targetSubTabName}"]`) };
-      if(mockEvent.currentTarget) {
+      const tabButton = document.querySelector(`[onclick*="${targetSubTabName}"]`);
+      if(tabButton) {
+        // Create a proper event-like object with currentTarget
+        const mockEvent = {
+          currentTarget: tabButton,
+          preventDefault: () => {}
+        };
         switchSubTab(mockEvent, targetSubTabName);
       }
     }
