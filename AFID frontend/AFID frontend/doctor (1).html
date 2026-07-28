@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+u<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -1951,7 +1951,7 @@
       const selectedProcedure = procSelect.value;
       if (!selectedProcedure || !ensurePresets()[selectedProcedure]) return;
 
-      const data = cachedPresets[selectedProcedure];
+      const data = ensurePresets()[selectedProcedure];
 
       // 1. Materials
       // NOTE: cachedPresets is already normalized to the app-internal
@@ -1967,8 +1967,10 @@
       renderPharmacyList();
 
       // 3. Diagnostics
+      // Note: Diagnostics are displayed via checkboxes in the investigations tab,
+      // not via renderDiagnosticsList() (which targets a non-existent element).
+      // The activeDiagnostics array is populated here and displayed by renderInvCheckboxes().
       activeDiagnostics = [...data.diagnostics].sort(sortByProp('name'));
-      renderDiagnosticsList();
 
       // 4. Notes
       document.getElementById('clinical-notes-textarea').value = data.notes;
@@ -2631,7 +2633,7 @@
       const cleanName = procName.trim();
 
       if (!ensurePresets()[cleanName]) {
-        cachedPresets[cleanName] = {
+        ensurePresets()[cleanName] = {
           materials: [],
           pharmacy: [],
           diagnostics: [],
