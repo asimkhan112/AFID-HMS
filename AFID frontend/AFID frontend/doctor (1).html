@@ -1394,9 +1394,13 @@
 
         // A fresh case starts with a clean slate -- stale material/pharmacy/
         // diagnostic rows from the previously opened patient must not carry over.
+        // The Diagnosis/Investigations checkbox sets are part of that state:
+        // leaving them ticked would silently attach the previous patient's
+        // diagnoses to this one.
         activeMaterials = [];
         activePharmacy = [];
         activeDiagnostics = [];
+        resetSelectionPickers();
 
         document.getElementById('step-3-container').style.display = 'none';
         document.getElementById('procedure-select').value = "";
@@ -2126,6 +2130,14 @@
 
     function renderDiagnosticsList() {
       const container = document.getElementById('diagnostics-list');
+      // The old "Diagnostics Queue" tab (a <select> + a #diagnostics-list
+      // table) was replaced by the checkbox-based Investigations tab, so this
+      // container no longer exists. Without this guard the very next line threw
+      // "Cannot set properties of null (setting 'innerHTML')" -- and because
+      // applyProcedure() calls this before it reveals #step-3-container, the
+      // exception aborted that function and NO clinical tab ever became
+      // visible. Selecting a procedure appeared to do nothing at all.
+      if (!container) return;
       if (activeDiagnostics.length === 0) {
         container.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No diagnostics requested.</td></tr>';
         return;
@@ -2142,6 +2154,11 @@
     async function addDiagnosticRow() {
       const testSelect = document.getElementById('diagnostic-test-select');
       const urgencySelect = document.getElementById('diagnostic-urgency-select');
+
+      // Same removal as above: these two controls belonged to the old
+      // Diagnostics Queue tab. Nothing in the current UI calls this any more,
+      // but guard rather than throw if anything ever does.
+      if (!testSelect || !urgencySelect) return;
 
       if (!testSelect.value) {
         await uiAlert("Please select a diagnostic investigation from the list first.", { title: 'Diagnostics' });
@@ -2605,6 +2622,7 @@
         activeMaterials = [];
         activePharmacy = [];
         activeDiagnostics = [];
+        resetSelectionPickers();
 
         if (failures.length) {
           await uiAlert(
@@ -2717,6 +2735,15 @@
     let diagSelected = new Set();
     let invSelected = new Set();
 
+    // Clears both checkbox pickers and repaints them, so the ticks visibly
+    // reset along with the underlying sets.
+    function resetSelectionPickers() {
+      diagSelected.clear();
+      invSelected.clear();
+      if (document.getElementById('diag-checkbox-container')) renderDiagCheckboxes('');
+      if (document.getElementById('inv-checkbox-container')) renderInvCheckboxes('');
+    }
+
     function renderDiagCheckboxes(filter) {
       const f = (filter||'').toLowerCase();
       const c = document.getElementById('diag-checkbox-container');
@@ -2787,22 +2814,48 @@
       renderInvCheckboxes('');
     }
 
-    function saveDiagSelections() {
-      if (diagSelected.size === 0) {
-        alert('Please select at least one diagnosis item.');
-        return;
-      }
-      console.log('Diagnosis saved:', Array.from(diagSelected));
-      alert('✅ Diagnosis saved! ' + diagSelected.size + ' items selected.');
+    // ── Diagnosis / Investigations -> the session's diagnostic record ─────────
+    //
+    // These two Save buttons used to only console.log and alert(): the ticked
+    // boxes went nowhere, so nothing selected here reached the summary sheet or
+    // the backend when the session was completed. They now merge their
+    // selections into activeDiagnostics, which is what compileMasterSummary()
+    // prints and confirmTimeOut() POSTs to /procedures/{id}/diagnostics.
+    //
+    // Merging (not replacing) matters: Diagnosis and Investigations are two
+    // separate pickers writing into one shared list, and a preset may already
+    // have seeded entries. Each item is tagged so a re-save can replace only
+    // its own contributions and leave the other picker's alone.
+    function commitSelections(selected, source, urgency = 'Routine') {
+      const chosen = Array.from(selected);
+      // Drop this source's previous contributions, keep everything else.
+      activeDiagnostics = activeDiagnostics.filter(d => d.source !== source);
+      chosen.forEach(name => {
+        if (!activeDiagnostics.some(d => d.name.toLowerCase() === name.toLowerCase())) {
+          activeDiagnostics.push({ name, urgency, source });
+        }
+      });
+      activeDiagnostics.sort(sortByProp('name'));
+      renderDiagnosticsList();   // no-ops if the legacy table isn't present
+      return chosen.length;
     }
 
-    function saveInvSelections() {
-      if (invSelected.size === 0) {
-        alert('Please select at least one investigation item.');
+    async function saveDiagSelections() {
+      if (diagSelected.size === 0) {
+        await uiAlert('Select at least one diagnosis item before saving.', { title: 'Diagnosis', tone: 'warn' });
         return;
       }
-      console.log('Investigations saved:', Array.from(invSelected));
-      alert('✅ Investigations saved! ' + invSelected.size + ' items selected.');
+      const n = commitSelections(diagSelected, 'diagnosis');
+      showDoctorToast(`${n} diagnosis item${n === 1 ? '' : 's'} recorded for this session.`);
+    }
+
+    async function saveInvSelections() {
+      if (invSelected.size === 0) {
+        await uiAlert('Select at least one investigation before saving.', { title: 'Investigations', tone: 'warn' });
+        return;
+      }
+      const n = commitSelections(invSelected, 'investigation');
+      showDoctorToast(`${n} investigation${n === 1 ? '' : 's'} recorded for this session.`);
     }
 
     document.addEventListener("DOMContentLoaded", async () => {
