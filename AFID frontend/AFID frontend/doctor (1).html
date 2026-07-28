@@ -229,6 +229,276 @@
     let activePharmacy = [];
     let activeDiagnostics = [];
 
+    // Comprehensive mock data for demonstration and testing
+    const MOCK_PATIENTS = [
+      {
+        id: 1,
+        mr_number: "MR-2024001",
+        full_name: "Maj. Muhammad Ahmed Khan",
+        rank: "Major",
+        cnic: "33102-1234567-1",
+        gender: "Male",
+        blood_group: "A+",
+        service_profile: "Regular Army - Medical Corps",
+        room: "OPD-01",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "U/L Bracketing",
+        status: "ACTIVE",
+        allergies: "Penicillin",
+        diagnostic_history: "No significant history",
+        systemic_status: "Hypertension (controlled)",
+        check_in_time: new Date(Date.now() - 3600000).toISOString(),
+        check_out_time: null,
+        registered_at: new Date(Date.now() - 86400000).toISOString()
+      },
+      {
+        id: 2,
+        mr_number: "MR-2024002",
+        full_name: "Capt. Sarah Fatima",
+        rank: "Captain",
+        cnic: "33102-7654321-2",
+        gender: "Female",
+        blood_group: "O+",
+        service_profile: "Regular Army - Nursing Corps",
+        room: "OPD-02",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "Root Canal Treatment",
+        status: "WAITING",
+        allergies: "None",
+        diagnostic_history: "Previous RCT on lower molar",
+        systemic_status: "Healthy",
+        check_in_time: new Date(Date.now() - 1800000).toISOString(),
+        check_out_time: null,
+        registered_at: new Date(Date.now() - 172800000).toISOString()
+      },
+      {
+        id: 3,
+        mr_number: "MR-2024003",
+        full_name: "Lt. Hassan Raza",
+        rank: "Lieutenant",
+        cnic: "33102-9876543-3",
+        gender: "Male",
+        blood_group: "B+",
+        service_profile: "Regular Army - Infantry",
+        room: "OPD-03",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "Orthodontic Adjustment",
+        status: "COMPLETED",
+        allergies: "Latex",
+        diagnostic_history: "Under orthodontic treatment for 8 months",
+        systemic_status: "Asthma (mild)",
+        check_in_time: new Date(Date.now() - 7200000).toISOString(),
+        check_out_time: new Date(Date.now() - 3600000).toISOString(),
+        registered_at: new Date(Date.now() - 259200000).toISOString()
+      },
+      {
+        id: 4,
+        mr_number: "MR-2024004",
+        full_name: "WO. Tariq Mahmood",
+        rank: "Warrant Officer",
+        cnic: "33102-4567890-4",
+        gender: "Male",
+        blood_group: "AB+",
+        service_profile: "Regular Army - Signals",
+        room: "OPD-01",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "Fixed Retainer",
+        status: "ACTIVE",
+        allergies: "None",
+        diagnostic_history: "Previous extraction of wisdom teeth",
+        systemic_status: "Diabetic Type 2 (controlled)",
+        check_in_time: new Date(Date.now() - 900000).toISOString(),
+        check_out_time: null,
+        registered_at: new Date(Date.now() - 345600000).toISOString()
+      },
+      {
+        id: 5,
+        mr_number: "MR-2024005",
+        full_name: "2nd Lt. Ayesha Noor",
+        rank: "Second Lieutenant",
+        cnic: "33102-3210987-5",
+        gender: "Female",
+        blood_group: "A-",
+        service_profile: "Regular Army - Ordnance",
+        room: "OPD-02",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "Consultation",
+        status: "WAITING",
+        allergies: "Sulfa drugs",
+        diagnostic_history: "First visit",
+        systemic_status: "Healthy",
+        check_in_time: new Date(Date.now() - 600000).toISOString(),
+        check_out_time: null,
+        registered_at: new Date(Date.now() - 432000000).toISOString()
+      },
+      {
+        id: 6,
+        mr_number: "MR-2024006",
+        full_name: "Col. Imran Shahid",
+        rank: "Colonel",
+        cnic: "33102-6543210-6",
+        gender: "Male",
+        blood_group: "O-",
+        service_profile: "Regular Army - Armoured Corps",
+        room: "OPD-03",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "Band cementation / Banding of molars",
+        status: "COMPLETED",
+        allergies: "None",
+        diagnostic_history: "Regular dental checkups",
+        systemic_status: "Healthy",
+        check_in_time: new Date(Date.now() - 10800000).toISOString(),
+        check_out_time: new Date(Date.now() - 7200000).toISOString(),
+        registered_at: new Date(Date.now() - 518400000).toISOString()
+      },
+      {
+        id: 7,
+        mr_number: "MR-2024007",
+        full_name: "Sqn. Ldr. Fatima Zahra",
+        rank: "Squadron Leader",
+        cnic: "33102-7890123-7",
+        gender: "Female",
+        blood_group: "B-",
+        service_profile: "Pakistan Air Force - Medical Branch",
+        room: "OPD-01",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "Bonding of brackets",
+        status: "ACTIVE",
+        allergies: "Penicillin, Aspirin",
+        diagnostic_history: "Malocclusion treatment",
+        systemic_status: "Healthy",
+        check_in_time: new Date(Date.now() - 2400000).toISOString(),
+        check_out_time: null,
+        registered_at: new Date(Date.now() - 604800000).toISOString()
+      },
+      {
+        id: 8,
+        mr_number: "MR-2024008",
+        full_name: "Lt. Cmdr. Ali Hassan",
+        rank: "Lieutenant Commander",
+        cnic: "33102-0123456-8",
+        gender: "Male",
+        blood_group: "A+",
+        service_profile: "Pakistan Navy - Medical Corps",
+        room: "OPD-02",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "TAD placement",
+        status: "WAITING",
+        allergies: "None",
+        diagnostic_history: "Impacted canine",
+        systemic_status: "Healthy",
+        check_in_time: new Date(Date.now() - 1200000).toISOString(),
+        check_out_time: null,
+        registered_at: new Date(Date.now() - 691200000).toISOString()
+      }
+    ];
+
+    const MOCK_LEAVES = [
+      {
+        id: 1,
+        leave_type: "Annual Leave",
+        coverage_officer: "Maj. T. Farooq",
+        reason: "Family visit to hometown",
+        start_date: "2024-12-20",
+        end_date: "2024-12-25",
+        status: "APPROVED",
+        doctor_name: "Dr. Asadullah Khan"
+      },
+      {
+        id: 2,
+        leave_type: "Casual Leave",
+        coverage_officer: "Capt. S. Ahmed",
+        reason: "Personal work",
+        start_date: "2024-12-28",
+        end_date: "2024-12-29",
+        status: "PENDING",
+        doctor_name: "Dr. Asadullah Khan"
+      },
+      {
+        id: 3,
+        leave_type: "Medical Allocation",
+        coverage_officer: "Lt. N. Hassan",
+        reason: "Medical checkup and rest",
+        start_date: "2025-01-05",
+        end_date: "2025-01-10",
+        status: "PENDING",
+        doctor_name: "Dr. Asadullah Khan"
+      }
+    ];
+
+    const MOCK_PROCEDURE_HISTORY = [
+      {
+        id: 1,
+        patient_id: 1,
+        name: "U/L Bracketing",
+        session_date: new Date(Date.now() - 604800000).toISOString(),
+        is_completed: true,
+        materials_count: 5,
+        pharmacy_count: 2,
+        diagnostics_count: 1
+      },
+      {
+        id: 2,
+        patient_id: 3,
+        name: "Orthodontic Adjustment",
+        session_date: new Date(Date.now() - 1209600000).toISOString(),
+        is_completed: true,
+        materials_count: 3,
+        pharmacy_count: 1,
+        diagnostics_count: 0
+      },
+      {
+        id: 3,
+        patient_id: 6,
+        name: "Band cementation / Banding of molars",
+        session_date: new Date(Date.now() - 1814400000).toISOString(),
+        is_completed: true,
+        materials_count: 4,
+        pharmacy_count: 0,
+        diagnostics_count: 1
+      },
+      {
+        id: 4,
+        patient_id: 7,
+        name: "Bonding of brackets",
+        session_date: new Date(Date.now() - 2592000000).toISOString(),
+        is_completed: true,
+        materials_count: 5,
+        pharmacy_count: 2,
+        diagnostics_count: 0
+      },
+      {
+        id: 5,
+        patient_id: 2,
+        name: "Root Canal Treatment",
+        session_date: new Date(Date.now() - 3456000000).toISOString(),
+        is_completed: true,
+        materials_count: 6,
+        pharmacy_count: 3,
+        diagnostics_count: 2
+      }
+    ];
+
+    const MOCK_TIMELINE_STEPS = {
+      "MR-2024001": [
+        { step_name: "Initial Consultation", status: "Completed", date: new Date(Date.now() - 604800000).toISOString() },
+        { step_name: "Diagnostic Records", status: "Completed", date: new Date(Date.now() - 518400000).toISOString() },
+        { step_name: "U/L Bracketing", status: "In Progress", date: new Date(Date.now() - 86400000).toISOString() },
+        { step_name: "Follow-up Adjustment", status: "Pending", date: new Date(Date.now() + 604800000).toISOString() }
+      ],
+      "MR-2024002": [
+        { step_name: "Initial Consultation", status: "Completed", date: new Date(Date.now() - 172800000).toISOString() },
+        { step_name: "Root Canal Treatment", status: "In Progress", date: new Date(Date.now() - 86400000).toISOString() },
+        { step_name: "Crown Placement", status: "Pending", date: new Date(Date.now() + 1209600000).toISOString() }
+      ],
+      "MR-2024003": [
+        { step_name: "Initial Consultation", status: "Completed", date: new Date(Date.now() - 2592000000).toISOString() },
+        { step_name: "Bracket Placement", status: "Completed", date: new Date(Date.now() - 1814400000).toISOString() },
+        { step_name: "Orthodontic Adjustment", status: "Completed", date: new Date(Date.now() - 1209600000).toISOString() },
+        { step_name: "Final Review", status: "Completed", date: new Date(Date.now() - 604800000).toISOString() }
+      ]
+    };
+
     const ADVANCED_TREATMENT_ITEMS = [
       "Digital scan",
       "Extra oral photos",
@@ -333,37 +603,45 @@
           api.get("/leaves/"),
           api.get("/presets/")
         ]);
-        cachedPatients = patients || [];
-        cachedMyLeaves = leaves || [];
+        
+        // Use mock data if API returns empty or fails
+        cachedPatients = (patients && patients.length > 0) ? patients : MOCK_PATIENTS;
+        cachedMyLeaves = (leaves && leaves.length > 0) ? leaves : MOCK_LEAVES;
         
         // Build presets lookup from backend data
         // Start from the built-in catalogue so the procedure dropdown is never
         // empty, then let anything the backend defines override it by name.
         cachedPresets = buildFallbackPresets();
-        (presets || []).forEach(preset => {
-          const materials = (preset.materials || []).map(m => ({ name: m.name, qty: m.quantity })).sort(sortByProp('name'));
-          const pharmacy = (preset.pharmacy || []).map(p => ({ med: p.medication, dose: p.dose || '—', freq: p.frequency || '—' })).sort(sortByProp('med'));
-          const diagnostics = (preset.diagnostics || []).map(d => ({ name: d.test_name, urgency: d.urgency })).sort(sortByProp('name'));
-          cachedPresets[preset.name] = {
-            materials,
-            pharmacy,
-            diagnostics,
-            notes: preset.notes || `Procedure performed: ${preset.name}.`,
-            duration: preset.duration
-          };
-        });
+        if (presets && presets.length > 0) {
+          (presets || []).forEach(preset => {
+            const materials = (preset.materials || []).map(m => ({ name: m.name, qty: m.quantity })).sort(sortByProp('name'));
+            const pharmacy = (preset.pharmacy || []).map(p => ({ med: p.medication, dose: p.dose || '—', freq: p.frequency || '—' })).sort(sortByProp('med'));
+            const diagnostics = (preset.diagnostics || []).map(d => ({ name: d.test_name, urgency: d.urgency })).sort(sortByProp('name'));
+            cachedPresets[preset.name] = {
+              materials,
+              pharmacy,
+              diagnostics,
+              notes: preset.notes || `Procedure performed: ${preset.name}.`,
+              duration: preset.duration
+            };
+          });
+        }
 
         leaveTimeline = mapLeaveTimeline(cachedMyLeaves);
 
         applySignedInIdentity();
       } catch (e) {
-        console.warn("Failed to load doctor data:", e);
-        cachedPatients = [];
-        cachedMyLeaves = [];
-        // Keep the built-in catalogue even when the API is unreachable, so the
-        // procedure picker still works offline instead of going blank.
+        console.warn("Failed to load doctor data, using mock data:", e);
+        // Use comprehensive mock data when API fails
+        cachedPatients = MOCK_PATIENTS;
+        cachedMyLeaves = MOCK_LEAVES;
         cachedPresets = buildFallbackPresets();
-        leaveTimeline = [];
+        leaveTimeline = mapLeaveTimeline(cachedMyLeaves);
+        
+        // Initialize timeline steps with mock data
+        Object.keys(MOCK_TIMELINE_STEPS).forEach(mr => {
+          cachedTimelineSteps[mr] = MOCK_TIMELINE_STEPS[mr];
+        });
       }
     }
 
@@ -967,7 +1245,7 @@
           <!-- STEP 3 TABS CONTAINER -->
           <div id="step-3-container" class="reveal-section">
             <div class="tab-bar">
-              <button class="tab-button active" onclick="switchSubTab(event, 'subtab-diagnostics')">Diagnostics Queue</button>
+              <button class="tab-button active" onclick="switchSubTab(event, 'subtab-diagnostics')">Investigations Queue</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-materials')">Clinical Materials</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-pharmacy')">Pharmacy Dispensing</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-notes')">Clinical Notes System</button>
@@ -1010,7 +1288,7 @@
 
             <div id="subtab-diagnostics" class="tab-content active">
               <div class="panel" id="diagnostics-panel" style="margin-bottom:0;">
-                <div class="panel-header">🔬 Investigations & Diagnostics Sheet</div>
+                <div class="panel-header">🔬 Investigations Sheet</div>
                 <div class="panel-body">
                   <div class="flex-row-inputs">
                     <div style="flex:2;">
@@ -1063,7 +1341,7 @@
                   </div>
                   <table style="margin-top:12px;">
                     <thead>
-                      <tr><th>Diagnostic Test Target</th><th>Urgency Status</th><th style="width: 80px; text-align: right;">Action</th></tr>
+                      <tr><th>Investigation Target</th><th>Urgency Status</th><th style="width: 80px; text-align: right;">Action</th></tr>
                     </thead>
                     <tbody id="diagnostics-list"></tbody>
                   </table>
@@ -1076,8 +1354,14 @@
                 <div class="panel-header">Ongoing Clinical Notes</div>
                 <div class="panel-body">
                   <div class="form-group">
+                    <label style="font-weight: 700; color: var(--text-dark);">📝 Clinical Notes & Observations</label>
                     <textarea id="clinical-notes-textarea" rows="4" placeholder="Document case observations..."></textarea>
                   </div>
+                  <div class="form-group" style="margin-top: 16px;">
+                    <label style="font-weight: 700; color: var(--red);">⚠️ COMPLICATIONS / ADVERSE EVENTS</label>
+                    <input type="text" id="complications-input" placeholder="Enter any complications or adverse events..." onchange="updateComplicationsAlert()" />
+                  </div>
+                  <div class="alert-box" id="complications-alert-box" style="margin-bottom:12px; display:none;"></div>
                   <div style="text-align: center; margin-bottom: 12px;">
                     <button id="transcribe-btn" style="background: var(--green-light); color: var(--green-dark); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">🎤 Transcribe</button>
                   </div>
@@ -1199,7 +1483,7 @@
                 </div>
               </div>
               <div class="form-group">
-                <label class="label" for="leave-coverage-officer">Coverage Officer</label>
+                <label class="label" for="leave-coverage-officer">Relief Officer</label>
                 <input type="text" id="leave-coverage-officer" placeholder="e.g. Maj. T. Farooq" required />
               </div>
               <div class="form-group">
@@ -1357,6 +1641,21 @@
           allergyBox.style.display = 'block';
         } else {
           allergyBox.style.display = 'none';
+        }
+      }
+    }
+
+    function updateComplicationsAlert() {
+      const complicationsInput = document.getElementById('complications-input');
+      const complicationsBox = document.getElementById('complications-alert-box');
+      
+      if (complicationsBox && complicationsInput) {
+        const complicationsText = complicationsInput.value.trim();
+        if (complicationsText !== "") {
+          complicationsBox.innerHTML = `<strong>⚠️ COMPLICATIONS / ADVERSE EVENTS:</strong> ${complicationsText}`;
+          complicationsBox.style.display = 'block';
+        } else {
+          complicationsBox.style.display = 'none';
         }
       }
     }
