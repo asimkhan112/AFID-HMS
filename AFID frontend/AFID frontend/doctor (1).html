@@ -136,6 +136,121 @@
     .container-card { background: white; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 24px; overflow: hidden; }
     .container-title { background: var(--green-soft); padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 600; color: var(--green-dark); display: flex; justify-content: space-between; align-items: center; }
 
+    /* Diagnosis & Investigations Checkbox Styles */
+    .diag-inv-container {
+      max-height: 500px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px;
+    }
+    .diag-category {
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .diag-category-header {
+      background: #dbeafe;
+      color: #1e40af;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .diag-category-header:hover {
+      background: #bfdbfe;
+    }
+    .diag-category-header::after {
+      content: '▼';
+      font-size: 11px;
+      transition: transform 0.2s;
+    }
+    .diag-category-header.collapsed::after {
+      transform: rotate(-90deg);
+    }
+    .diag-category-content {
+      padding: 8px 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 4px;
+    }
+    .diag-category-content.collapsed {
+      display: none;
+    }
+    .diag-check-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 4px;
+      transition: background 0.15s;
+      cursor: pointer;
+    }
+    .diag-check-item:hover {
+      background: var(--green-soft);
+    }
+    .diag-check-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--green-med);
+      flex-shrink: 0;
+    }
+    .diag-check-item label {
+      flex: 1;
+      cursor: pointer;
+      font-size: 13px;
+      user-select: none;
+      line-height: 1.3;
+    }
+    .diag-search-box {
+      width: 100%;
+      padding: 10px 14px;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 12px;
+      transition: all 0.2s;
+    }
+    .diag-search-box:focus {
+      outline: none;
+      border-color: var(--green-med);
+      box-shadow: 0 0 0 3px rgba(15,98,68,0.1);
+    }
+    .diag-selected-count {
+      background: var(--green-med);
+      color: white;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .diag-no-results {
+      text-align: center;
+      padding: 30px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .diag-highlight {
+      background: #fef08a;
+      padding: 1px 3px;
+      border-radius: 2px;
+    }
+    .diag-action-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      margin-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+
     @media print {
       .sidebar, .dashboard-title-row button, .nav-item, .panel, .tab-bar, .afid-header, .dashboard-title-row, .print-action-row, .print-hide { display: none !important; }
       body { background: white; }
@@ -229,6 +344,276 @@
     let activePharmacy = [];
     let activeDiagnostics = [];
 
+    // Comprehensive mock data for demonstration and testing
+    const MOCK_PATIENTS = [
+      {
+        id: 1,
+        mr_number: "MR-2024001",
+        full_name: "Maj. Muhammad Ahmed Khan",
+        rank: "Major",
+        cnic: "33102-1234567-1",
+        gender: "Male",
+        blood_group: "A+",
+        service_profile: "Regular Army - Medical Corps",
+        room: "OPD-01",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "U/L Bracketing",
+        status: "ACTIVE",
+        allergies: "Penicillin",
+        diagnostic_history: "No significant history",
+        systemic_status: "Hypertension (controlled)",
+        check_in_time: new Date(Date.now() - 3600000).toISOString(),
+        check_out_time: null,
+        registered_at: new Date(Date.now() - 86400000).toISOString()
+      },
+      {
+        id: 2,
+        mr_number: "MR-2024002",
+        full_name: "Capt. Sarah Fatima",
+        rank: "Captain",
+        cnic: "33102-7654321-2",
+        gender: "Female",
+        blood_group: "O+",
+        service_profile: "Regular Army - Nursing Corps",
+        room: "OPD-02",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "Root Canal Treatment",
+        status: "WAITING",
+        allergies: "None",
+        diagnostic_history: "Previous RCT on lower molar",
+        systemic_status: "Healthy",
+        check_in_time: new Date(Date.now() - 1800000).toISOString(),
+        check_out_time: null,
+        registered_at: new Date(Date.now() - 172800000).toISOString()
+      },
+      {
+        id: 3,
+        mr_number: "MR-2024003",
+        full_name: "Lt. Hassan Raza",
+        rank: "Lieutenant",
+        cnic: "33102-9876543-3",
+        gender: "Male",
+        blood_group: "B+",
+        service_profile: "Regular Army - Infantry",
+        room: "OPD-03",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "Orthodontic Adjustment",
+        status: "COMPLETED",
+        allergies: "Latex",
+        diagnostic_history: "Under orthodontic treatment for 8 months",
+        systemic_status: "Asthma (mild)",
+        check_in_time: new Date(Date.now() - 7200000).toISOString(),
+        check_out_time: new Date(Date.now() - 3600000).toISOString(),
+        registered_at: new Date(Date.now() - 259200000).toISOString()
+      },
+      {
+        id: 4,
+        mr_number: "MR-2024004",
+        full_name: "WO. Tariq Mahmood",
+        rank: "Warrant Officer",
+        cnic: "33102-4567890-4",
+        gender: "Male",
+        blood_group: "AB+",
+        service_profile: "Regular Army - Signals",
+        room: "OPD-01",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "Fixed Retainer",
+        status: "ACTIVE",
+        allergies: "None",
+        diagnostic_history: "Previous extraction of wisdom teeth",
+        systemic_status: "Diabetic Type 2 (controlled)",
+        check_in_time: new Date(Date.now() - 900000).toISOString(),
+        check_out_time: null,
+        registered_at: new Date(Date.now() - 345600000).toISOString()
+      },
+      {
+        id: 5,
+        mr_number: "MR-2024005",
+        full_name: "2nd Lt. Ayesha Noor",
+        rank: "Second Lieutenant",
+        cnic: "33102-3210987-5",
+        gender: "Female",
+        blood_group: "A-",
+        service_profile: "Regular Army - Ordnance",
+        room: "OPD-02",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "Consultation",
+        status: "WAITING",
+        allergies: "Sulfa drugs",
+        diagnostic_history: "First visit",
+        systemic_status: "Healthy",
+        check_in_time: new Date(Date.now() - 600000).toISOString(),
+        check_out_time: null,
+        registered_at: new Date(Date.now() - 432000000).toISOString()
+      },
+      {
+        id: 6,
+        mr_number: "MR-2024006",
+        full_name: "Col. Imran Shahid",
+        rank: "Colonel",
+        cnic: "33102-6543210-6",
+        gender: "Male",
+        blood_group: "O-",
+        service_profile: "Regular Army - Armoured Corps",
+        room: "OPD-03",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "Band cementation / Banding of molars",
+        status: "COMPLETED",
+        allergies: "None",
+        diagnostic_history: "Regular dental checkups",
+        systemic_status: "Healthy",
+        check_in_time: new Date(Date.now() - 10800000).toISOString(),
+        check_out_time: new Date(Date.now() - 7200000).toISOString(),
+        registered_at: new Date(Date.now() - 518400000).toISOString()
+      },
+      {
+        id: 7,
+        mr_number: "MR-2024007",
+        full_name: "Sqn. Ldr. Fatima Zahra",
+        rank: "Squadron Leader",
+        cnic: "33102-7890123-7",
+        gender: "Female",
+        blood_group: "B-",
+        service_profile: "Pakistan Air Force - Medical Branch",
+        room: "OPD-01",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "Bonding of brackets",
+        status: "ACTIVE",
+        allergies: "Penicillin, Aspirin",
+        diagnostic_history: "Malocclusion treatment",
+        systemic_status: "Healthy",
+        check_in_time: new Date(Date.now() - 2400000).toISOString(),
+        check_out_time: null,
+        registered_at: new Date(Date.now() - 604800000).toISOString()
+      },
+      {
+        id: 8,
+        mr_number: "MR-2024008",
+        full_name: "Lt. Cmdr. Ali Hassan",
+        rank: "Lieutenant Commander",
+        cnic: "33102-0123456-8",
+        gender: "Male",
+        blood_group: "A+",
+        service_profile: "Pakistan Navy - Medical Corps",
+        room: "OPD-02",
+        assigned_doctor: "Dr. Asadullah Khan",
+        procedure_category: "TAD placement",
+        status: "WAITING",
+        allergies: "None",
+        diagnostic_history: "Impacted canine",
+        systemic_status: "Healthy",
+        check_in_time: new Date(Date.now() - 1200000).toISOString(),
+        check_out_time: null,
+        registered_at: new Date(Date.now() - 691200000).toISOString()
+      }
+    ];
+
+    const MOCK_LEAVES = [
+      {
+        id: 1,
+        leave_type: "Annual Leave",
+        coverage_officer: "Maj. T. Farooq",
+        reason: "Family visit to hometown",
+        start_date: "2024-12-20",
+        end_date: "2024-12-25",
+        status: "APPROVED",
+        doctor_name: "Dr. Asadullah Khan"
+      },
+      {
+        id: 2,
+        leave_type: "Casual Leave",
+        coverage_officer: "Capt. S. Ahmed",
+        reason: "Personal work",
+        start_date: "2024-12-28",
+        end_date: "2024-12-29",
+        status: "PENDING",
+        doctor_name: "Dr. Asadullah Khan"
+      },
+      {
+        id: 3,
+        leave_type: "Medical Allocation",
+        coverage_officer: "Lt. N. Hassan",
+        reason: "Medical checkup and rest",
+        start_date: "2025-01-05",
+        end_date: "2025-01-10",
+        status: "PENDING",
+        doctor_name: "Dr. Asadullah Khan"
+      }
+    ];
+
+    const MOCK_PROCEDURE_HISTORY = [
+      {
+        id: 1,
+        patient_id: 1,
+        name: "U/L Bracketing",
+        session_date: new Date(Date.now() - 604800000).toISOString(),
+        is_completed: true,
+        materials_count: 5,
+        pharmacy_count: 2,
+        diagnostics_count: 1
+      },
+      {
+        id: 2,
+        patient_id: 3,
+        name: "Orthodontic Adjustment",
+        session_date: new Date(Date.now() - 1209600000).toISOString(),
+        is_completed: true,
+        materials_count: 3,
+        pharmacy_count: 1,
+        diagnostics_count: 0
+      },
+      {
+        id: 3,
+        patient_id: 6,
+        name: "Band cementation / Banding of molars",
+        session_date: new Date(Date.now() - 1814400000).toISOString(),
+        is_completed: true,
+        materials_count: 4,
+        pharmacy_count: 0,
+        diagnostics_count: 1
+      },
+      {
+        id: 4,
+        patient_id: 7,
+        name: "Bonding of brackets",
+        session_date: new Date(Date.now() - 2592000000).toISOString(),
+        is_completed: true,
+        materials_count: 5,
+        pharmacy_count: 2,
+        diagnostics_count: 0
+      },
+      {
+        id: 5,
+        patient_id: 2,
+        name: "Root Canal Treatment",
+        session_date: new Date(Date.now() - 3456000000).toISOString(),
+        is_completed: true,
+        materials_count: 6,
+        pharmacy_count: 3,
+        diagnostics_count: 2
+      }
+    ];
+
+    const MOCK_TIMELINE_STEPS = {
+      "MR-2024001": [
+        { step_name: "Initial Consultation", status: "Completed", date: new Date(Date.now() - 604800000).toISOString() },
+        { step_name: "Diagnostic Records", status: "Completed", date: new Date(Date.now() - 518400000).toISOString() },
+        { step_name: "U/L Bracketing", status: "In Progress", date: new Date(Date.now() - 86400000).toISOString() },
+        { step_name: "Follow-up Adjustment", status: "Pending", date: new Date(Date.now() + 604800000).toISOString() }
+      ],
+      "MR-2024002": [
+        { step_name: "Initial Consultation", status: "Completed", date: new Date(Date.now() - 172800000).toISOString() },
+        { step_name: "Root Canal Treatment", status: "In Progress", date: new Date(Date.now() - 86400000).toISOString() },
+        { step_name: "Crown Placement", status: "Pending", date: new Date(Date.now() + 1209600000).toISOString() }
+      ],
+      "MR-2024003": [
+        { step_name: "Initial Consultation", status: "Completed", date: new Date(Date.now() - 2592000000).toISOString() },
+        { step_name: "Bracket Placement", status: "Completed", date: new Date(Date.now() - 1814400000).toISOString() },
+        { step_name: "Orthodontic Adjustment", status: "Completed", date: new Date(Date.now() - 1209600000).toISOString() },
+        { step_name: "Final Review", status: "Completed", date: new Date(Date.now() - 604800000).toISOString() }
+      ]
+    };
+
     const ADVANCED_TREATMENT_ITEMS = [
       "Digital scan",
       "Extra oral photos",
@@ -237,6 +622,144 @@
       "OPG",
       "Study cast"
     ];
+
+    // Diagnosis categories and items from the orthodontic document
+    const DIAGNOSIS_DATA = {
+      "Skeletal Diagnosis — Sagittal (AP)": [
+        "Skeletal Class I",
+        "Skeletal Class II – maxillary protrusion",
+        "Skeletal Class II – mandibular retrusion",
+        "Skeletal Class III – maxillary retrusion",
+        "Skeletal Class III – mandibular protrusion"
+      ],
+      "Skeletal Diagnosis — Vertical": [
+        "Normodivergent",
+        "Hypodivergent (deep bite tendency)",
+        "Hyperdivergent (open bite tendency)"
+      ],
+      "Skeletal Diagnosis — Transverse": [
+        "Maxillary skeletal constriction",
+        "Mandibular asymmetry",
+        "Skeletal crossbite – unilateral",
+        "Skeletal crossbite – bilateral",
+        "Facial asymmetry"
+      ],
+      "Dental Classification (Angle's)": [
+        "Class I malocclusion",
+        "Class II Division 1",
+        "Class II Division 2",
+        "Class III malocclusion (true)",
+        "Class III malocclusion (pseudo)",
+        "Class II subdivision (R/L)",
+        "Class III subdivision (R/L)"
+      ],
+      "Space-Related Findings": [
+        "Crowding – mild (<4mm)",
+        "Crowding – moderate (4–8mm)",
+        "Crowding – severe (>8mm)",
+        "Spacing – generalized",
+        "Spacing – localized",
+        "Midline diastema",
+        "Bolton discrepancy",
+        "Arch length discrepancy",
+        "Blocked-out / ectopic tooth"
+      ],
+      "Anteroposterior Dental Findings": [
+        "Increased overjet",
+        "Reduced / reverse overjet",
+        "Bimaxillary protrusion",
+        "Bimaxillary retrusion",
+        "Dentoalveolar protrusion – maxillary",
+        "Dentoalveolar protrusion – mandibular"
+      ],
+      "Vertical Dental Findings": [
+        "Deep bite (traumatic)",
+        "Deep bite (non-traumatic)",
+        "Anterior open bite",
+        "Posterior open bite",
+        "Increased curve of Spee",
+        "Reversed curve of Spee"
+      ],
+      "Transverse Dental Findings": [
+        "Anterior crossbite",
+        "Posterior crossbite – unilateral",
+        "Posterior crossbite – bilateral",
+        "Scissor bite",
+        "Dental midline deviation – upper",
+        "Dental midline deviation – lower"
+      ],
+      "Tooth Number / Position / Structure Anomalies": [
+        "Hypodontia",
+        "Oligodontia",
+        "Anodontia",
+        "Supernumerary tooth",
+        "Impacted tooth",
+        "Ectopic eruption",
+        "Ankylosed tooth",
+        "Transposition",
+        "Rotation",
+        "Microdontia / Macrodontia",
+        "Root resorption / dilaceration",
+        "Cleft lip/palate–associated"
+      ],
+      "Soft Tissue / Functional / Habit Findings": [
+        "Thumb / digit sucking habit",
+        "Tongue thrust / atypical swallow",
+        "Mouth breathing",
+        "Ankyloglossia",
+        "Lip incompetence",
+        "TMJ disorder",
+        "Bruxism / parafunction"
+      ]
+    };
+
+    // Investigations categories and items from the orthodontic document
+    const INVESTIGATIONS_DATA = {
+      "Clinical Examination": [
+        "Extraoral examination",
+        "Intraoral examination",
+        "Functional / TMJ examination",
+        "Habit history & assessment"
+      ],
+      "Radiographic": [
+        "Lateral cephalogram",
+        "PA (frontal) cephalogram",
+        "OPG / Panoramic radiograph",
+        "IOPA",
+        "Occlusal radiograph",
+        "CBCT",
+        "Hand-wrist radiograph (skeletal age)",
+        "TMJ radiograph / MRI"
+      ],
+      "Photographic Records": [
+        "Extraoral – frontal repose",
+        "Extraoral – frontal smiling",
+        "Extraoral – profile",
+        "Extraoral – 3/4 view",
+        "Intraoral – right buccal",
+        "Intraoral – left buccal",
+        "Intraoral – frontal",
+        "Intraoral – upper occlusal",
+        "Intraoral – lower occlusal"
+      ],
+      "Study Models / Digital Records": [
+        "Diagnostic casts (plaster/stone)",
+        "Digital intraoral scan",
+        "Bolton analysis",
+        "Arch length analysis",
+        "Mixed dentition (Moyers/Tanaka-Johnston)"
+      ],
+      "Additional / Adjunct": [
+        "Periodontal charting",
+        "Pulp vitality / sensibility test",
+        "Airway assessment",
+        "Speech assessment",
+        "3D superimposition (pre/post)"
+      ]
+    };
+
+    let activeDiagnosis = [];
+    let activeInvestigations = [];
 
     function getUser() {
       try {
@@ -333,37 +856,45 @@
           api.get("/leaves/"),
           api.get("/presets/")
         ]);
-        cachedPatients = patients || [];
-        cachedMyLeaves = leaves || [];
+        
+        // Use mock data if API returns empty or fails
+        cachedPatients = (patients && patients.length > 0) ? patients : MOCK_PATIENTS;
+        cachedMyLeaves = (leaves && leaves.length > 0) ? leaves : MOCK_LEAVES;
         
         // Build presets lookup from backend data
         // Start from the built-in catalogue so the procedure dropdown is never
         // empty, then let anything the backend defines override it by name.
         cachedPresets = buildFallbackPresets();
-        (presets || []).forEach(preset => {
-          const materials = (preset.materials || []).map(m => ({ name: m.name, qty: m.quantity })).sort(sortByProp('name'));
-          const pharmacy = (preset.pharmacy || []).map(p => ({ med: p.medication, dose: p.dose || '—', freq: p.frequency || '—' })).sort(sortByProp('med'));
-          const diagnostics = (preset.diagnostics || []).map(d => ({ name: d.test_name, urgency: d.urgency })).sort(sortByProp('name'));
-          cachedPresets[preset.name] = {
-            materials,
-            pharmacy,
-            diagnostics,
-            notes: preset.notes || `Procedure performed: ${preset.name}.`,
-            duration: preset.duration
-          };
-        });
+        if (presets && presets.length > 0) {
+          (presets || []).forEach(preset => {
+            const materials = (preset.materials || []).map(m => ({ name: m.name, qty: m.quantity })).sort(sortByProp('name'));
+            const pharmacy = (preset.pharmacy || []).map(p => ({ med: p.medication, dose: p.dose || '—', freq: p.frequency || '—' })).sort(sortByProp('med'));
+            const diagnostics = (preset.diagnostics || []).map(d => ({ name: d.test_name, urgency: d.urgency })).sort(sortByProp('name'));
+            cachedPresets[preset.name] = {
+              materials,
+              pharmacy,
+              diagnostics,
+              notes: preset.notes || `Procedure performed: ${preset.name}.`,
+              duration: preset.duration
+            };
+          });
+        }
 
         leaveTimeline = mapLeaveTimeline(cachedMyLeaves);
 
         applySignedInIdentity();
       } catch (e) {
-        console.warn("Failed to load doctor data:", e);
-        cachedPatients = [];
-        cachedMyLeaves = [];
-        // Keep the built-in catalogue even when the API is unreachable, so the
-        // procedure picker still works offline instead of going blank.
+        console.warn("Failed to load doctor data, using mock data:", e);
+        // Use comprehensive mock data when API fails
+        cachedPatients = MOCK_PATIENTS;
+        cachedMyLeaves = MOCK_LEAVES;
         cachedPresets = buildFallbackPresets();
-        leaveTimeline = [];
+        leaveTimeline = mapLeaveTimeline(cachedMyLeaves);
+        
+        // Initialize timeline steps with mock data
+        Object.keys(MOCK_TIMELINE_STEPS).forEach(mr => {
+          cachedTimelineSteps[mr] = MOCK_TIMELINE_STEPS[mr];
+        });
       }
     }
 
@@ -863,9 +1394,13 @@
 
         // A fresh case starts with a clean slate -- stale material/pharmacy/
         // diagnostic rows from the previously opened patient must not carry over.
+        // The Diagnosis/Investigations checkbox sets are part of that state:
+        // leaving them ticked would silently attach the previous patient's
+        // diagnoses to this one.
         activeMaterials = [];
         activePharmacy = [];
         activeDiagnostics = [];
+        resetSelectionPickers();
 
         document.getElementById('step-3-container').style.display = 'none';
         document.getElementById('procedure-select').value = "";
@@ -967,11 +1502,48 @@
           <!-- STEP 3 TABS CONTAINER -->
           <div id="step-3-container" class="reveal-section">
             <div class="tab-bar">
-              <button class="tab-button active" onclick="switchSubTab(event, 'subtab-diagnostics')">Diagnostics Queue</button>
+              <button class="tab-button" onclick="switchSubTab(event, 'subtab-diagnosis')">📋 Diagnosis</button>
+              <button class="tab-button active" onclick="switchSubTab(event, 'subtab-investigations')">🔬 Investigations</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-materials')">Clinical Materials</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-pharmacy')">Pharmacy Dispensing</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-notes')">Clinical Notes System</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-records')">Allergy & Medical Record</button>
+            </div>
+
+            <!-- DIAGNOSIS SUBTAB -->
+            <div id="subtab-diagnosis" class="tab-content">
+              <div class="panel" style="margin-bottom:0;">
+                <div class="panel-header">📋 Orthodontic Diagnosis — Select all applicable findings</div>
+                <div class="panel-body">
+                  <input class="diag-search-box" id="diag-search" placeholder="🔍 Search diagnosis items... (type any letter to filter)" onkeyup="renderDiagCheckboxes(this.value)">
+                  <div id="diag-checkbox-container"></div>
+                  <div class="diag-action-row">
+                    <span class="diag-selected-count" id="diag-count">0 selected</span>
+                    <div>
+                      <button class="btn btn-sm btn-danger" onclick="clearDiagSelections()" style="margin-right:8px;">Clear All</button>
+                      <button class="btn btn-sm" onclick="saveDiagSelections()">💾 Save Diagnosis</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- INVESTIGATIONS SUBTAB (Checkbox version) -->
+            <div id="subtab-investigations" class="tab-content active">
+              <div class="panel" style="margin-bottom:0;">
+                <div class="panel-header">🔬 Investigations — Select all that apply</div>
+                <div class="panel-body">
+                  <input class="diag-search-box" id="inv-search" placeholder="🔍 Search investigations... (type any letter to filter)" onkeyup="renderInvCheckboxes(this.value)">
+                  <div id="inv-checkbox-container"></div>
+                  <div class="diag-action-row">
+                    <span class="diag-selected-count" id="inv-count">0 selected</span>
+                    <div>
+                      <button class="btn btn-sm btn-danger" onclick="clearInvSelections()" style="margin-right:8px;">Clear All</button>
+                      <button class="btn btn-sm" onclick="saveInvSelections()">💾 Save Investigations</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div id="subtab-materials" class="tab-content">
@@ -1008,76 +1580,19 @@
               </div>
             </div>
 
-            <div id="subtab-diagnostics" class="tab-content active">
-              <div class="panel" id="diagnostics-panel" style="margin-bottom:0;">
-                <div class="panel-header">🔬 Investigations & Diagnostics Sheet</div>
-                <div class="panel-body">
-                  <div class="flex-row-inputs">
-                    <div style="flex:2;">
-                      <select id="diagnostic-test-select" onchange="handleDiagnosticSelectChange(this)">
-                        <option value="" disabled selected>-- Select Diagnostic Investigation / X-Ray --</option>
-                        <option value="Advise new treatment file" style="font-weight: bold; background-color: var(--green-light);">Advise new treatment file</option>
-                        <option value="3D superimposition (pre/post)">3D superimposition (pre/post)</option>
-                        <option value="Airway assessment">Airway assessment</option>
-                        <option value="Arch length analysis">Arch length analysis</option>
-                        <option value="Bolton analysis">Bolton analysis</option>
-                        <option value="CBCT" style="font-weight: bold;">X-Ray: CBCT Scan</option>
-                        <option value="Diagnostic casts (plaster/stone)">Diagnostic casts (plaster/stone)</option>
-                        <option value="Digital intraoral scan">Digital intraoral scan</option>
-                        <option value="Extraoral - 3/4 view photo">Extraoral - 3/4 view photo</option>
-                        <option value="Extraoral - frontal repose photo">Extraoral - frontal repose photo</option>
-                        <option value="Extraoral - frontal smiling photo">Extraoral - frontal smiling photo</option>
-                        <option value="Extraoral - profile photo">Extraoral - profile photo</option>
-                        <option value="Extraoral examination">Extraoral examination</option>
-                        <option value="Full Mouth Periapical X-rays" style="font-weight: bold;">X-Ray: Full Mouth Periapical (FMX)</option>
-                        <option value="Functional / TMJ examination">Functional / TMJ examination</option>
-                        <option value="Habit history & assessment">Habit history & assessment</option>
-                        <option value="Hand-wrist radiograph (skeletal age)" style="font-weight: bold;">X-Ray: Hand-Wrist Radiograph</option>
-                        <option value="Intraoral - frontal photo">Intraoral - frontal photo</option>
-                        <option value="Intraoral - left buccal photo">Intraoral - left buccal photo</option>
-                        <option value="Intraoral - lower occlusal photo">Intraoral - lower occlusal photo</option>
-                        <option value="Intraoral - right buccal photo">Intraoral - right buccal photo</option>
-                        <option value="Intraoral - upper occlusal photo">Intraoral - upper occlusal photo</option>
-                        <option value="Intraoral examination">Intraoral examination</option>
-                        <option value="Mixed dentition (Moyers/Tanaka-Johnston)">Mixed dentition (Moyers/Tanaka-Johnston)</option>
-                        <option value="Nuclear Imaging (Tc99 Scan)">Nuclear Imaging (Tc99 Scan)</option>
-                        <option value="Occlusal radiograph" style="font-weight: bold;">X-Ray: Occlusal Radiograph</option>
-                        <option value="PA (frontal) cephalogram" style="font-weight: bold;">X-Ray: PA (Frontal) Cephalogram</option>
-                        <option value="Periodontal charting">Periodontal charting</option>
-                        <option value="Photogrammetry">Photogrammetry</option>
-                        <option value="Pulp vitality / sensibility test">Pulp vitality / sensibility test</option>
-                        <option value="Speech assessment">Speech assessment</option>
-                        <option value="TMJ radiograph / MRI" style="font-weight: bold;">X-Ray: TMJ Radiograph / MRI</option>
-                      </select>
-                    </div>
-                    <div style="flex: 1;">
-                      <select id="diagnostic-urgency-select">
-                        <option value="Routine">Routine</option>
-                        <option value="Urgent">Urgent</option>
-                        <option value="STAT">STAT</option>
-                      </select>
-                    </div>
-                    <div class="btn-holder">
-                      <button class="btn btn-sm" style="height:45px;" onclick="addDiagnosticRow()">+ Request</button>
-                    </div>
-                  </div>
-                  <table style="margin-top:12px;">
-                    <thead>
-                      <tr><th>Diagnostic Test Target</th><th>Urgency Status</th><th style="width: 80px; text-align: right;">Action</th></tr>
-                    </thead>
-                    <tbody id="diagnostics-list"></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
             <div id="subtab-notes" class="tab-content">
               <div class="panel" style="margin-bottom:0;">
                 <div class="panel-header">Ongoing Clinical Notes</div>
                 <div class="panel-body">
                   <div class="form-group">
+                    <label style="font-weight: 700; color: var(--text-dark);">📝 Clinical Notes & Observations</label>
                     <textarea id="clinical-notes-textarea" rows="4" placeholder="Document case observations..."></textarea>
                   </div>
+                  <div class="form-group" style="margin-top: 16px;">
+                    <label style="font-weight: 700; color: var(--red);">⚠️ COMPLICATIONS / ADVERSE EVENTS</label>
+                    <input type="text" id="complications-input" placeholder="Enter any complications or adverse events..." onchange="updateComplicationsAlert()" />
+                  </div>
+                  <div class="alert-box" id="complications-alert-box" style="margin-bottom:12px; display:none;"></div>
                   <div style="text-align: center; margin-bottom: 12px;">
                     <button id="transcribe-btn" style="background: var(--green-light); color: var(--green-dark); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">🎤 Transcribe</button>
                   </div>
@@ -1199,7 +1714,7 @@
                 </div>
               </div>
               <div class="form-group">
-                <label class="label" for="leave-coverage-officer">Coverage Officer</label>
+                <label class="label" for="leave-coverage-officer">Relief Officer</label>
                 <input type="text" id="leave-coverage-officer" placeholder="e.g. Maj. T. Farooq" required />
               </div>
               <div class="form-group">
@@ -1361,6 +1876,21 @@
       }
     }
 
+    function updateComplicationsAlert() {
+      const complicationsInput = document.getElementById('complications-input');
+      const complicationsBox = document.getElementById('complications-alert-box');
+      
+      if (complicationsBox && complicationsInput) {
+        const complicationsText = complicationsInput.value.trim();
+        if (complicationsText !== "") {
+          complicationsBox.innerHTML = `<strong>⚠️ COMPLICATIONS / ADVERSE EVENTS:</strong> ${complicationsText}`;
+          complicationsBox.style.display = 'block';
+        } else {
+          complicationsBox.style.display = 'none';
+        }
+      }
+    }
+
     function updatePatientMedicalRecord() {
       if (!currentPatient) return;
       
@@ -1425,14 +1955,9 @@
       const selectedProcedure = procSelect.value;
       if (!selectedProcedure || !ensurePresets()[selectedProcedure]) return;
 
-      const data = cachedPresets[selectedProcedure];
+      const data = ensurePresets()[selectedProcedure];
 
       // 1. Materials
-      // NOTE: cachedPresets is already normalized to the app-internal
-      // { name, qty } / { med, dose, freq } / { name, urgency } shapes back
-      // in loadDashboardData() (see the .map() calls there) -- data.materials
-      // / data.pharmacy / data.diagnostics here are ALREADY in that shape,
-      // not the raw backend field names. Do not re-map them here.
       activeMaterials = [...GLOBAL_MATERIALS, ...data.materials].sort(sortByProp('name'));
       renderMaterialsList();
 
@@ -1442,17 +1967,26 @@
 
       // 3. Diagnostics
       activeDiagnostics = [...data.diagnostics].sort(sortByProp('name'));
-      renderDiagnosticsList();
 
       // 4. Notes
       document.getElementById('clinical-notes-textarea').value = data.notes;
 
-      document.getElementById('step-3-container').style.display = 'block';
+      // 5. Show step-3 container with a small delay to ensure DOM is ready
+      const step3Container = document.getElementById('step-3-container');
+      if (step3Container) {
+        step3Container.style.display = 'block';
+      }
+
       document.getElementById('master-summary-injection-point').innerHTML = '';
 
-      const targetSubTabName = 'subtab-diagnostics';
-      const mockEvent = { currentTarget: document.querySelector(`[onclick*="${targetSubTabName}"]`) };
-      if(mockEvent.currentTarget) {
+      // 6. Switch to investigations tab by default
+      const targetSubTabName = 'subtab-investigations';
+      const tabButton = document.querySelector(`[onclick*="${targetSubTabName}"]`);
+      if(tabButton) {
+        const mockEvent = {
+          currentTarget: tabButton,
+          preventDefault: () => {}
+        };
         switchSubTab(mockEvent, targetSubTabName);
       }
     }
@@ -1594,6 +2128,14 @@
 
     function renderDiagnosticsList() {
       const container = document.getElementById('diagnostics-list');
+      // The old "Diagnostics Queue" tab (a <select> + a #diagnostics-list
+      // table) was replaced by the checkbox-based Investigations tab, so this
+      // container no longer exists. Without this guard the very next line threw
+      // "Cannot set properties of null (setting 'innerHTML')" -- and because
+      // applyProcedure() calls this before it reveals #step-3-container, the
+      // exception aborted that function and NO clinical tab ever became
+      // visible. Selecting a procedure appeared to do nothing at all.
+      if (!container) return;
       if (activeDiagnostics.length === 0) {
         container.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No diagnostics requested.</td></tr>';
         return;
@@ -1610,6 +2152,11 @@
     async function addDiagnosticRow() {
       const testSelect = document.getElementById('diagnostic-test-select');
       const urgencySelect = document.getElementById('diagnostic-urgency-select');
+
+      // Same removal as above: these two controls belonged to the old
+      // Diagnostics Queue tab. Nothing in the current UI calls this any more,
+      // but guard rather than throw if anything ever does.
+      if (!testSelect || !urgencySelect) return;
 
       if (!testSelect.value) {
         await uiAlert("Please select a diagnostic investigation from the list first.", { title: 'Diagnostics' });
@@ -2073,6 +2620,7 @@
         activeMaterials = [];
         activePharmacy = [];
         activeDiagnostics = [];
+        resetSelectionPickers();
 
         if (failures.length) {
           await uiAlert(
@@ -2098,8 +2646,10 @@
       const duration = parseInt(durationInput, 10) || 30;
       const cleanName = procName.trim();
 
-      if (!ensurePresets()[cleanName]) {
-        cachedPresets[cleanName] = {
+      // Ensure cachedPresets is initialized before adding to it
+      const presets = ensurePresets();
+      if (!presets[cleanName]) {
+        presets[cleanName] = {
           materials: [],
           pharmacy: [],
           diagnostics: [],
@@ -2118,6 +2668,8 @@
         select.appendChild(newOption);
       }
       select.value = cleanName;
+      
+      // Call applyProcedure to show the procedure details
       applyProcedure();
     }
 
@@ -2178,6 +2730,134 @@
         if (query.trim()) filterDoctorAnalytics();
         else processAndRenderDoctorAnalytics();
       }
+    }
+
+    // ===================== DIAGNOSIS & INVESTIGATIONS CHECKBOX FUNCTIONS =====================
+    // Track selected items
+    let diagSelected = new Set();
+    let invSelected = new Set();
+
+    // Clears both checkbox pickers and repaints them, so the ticks visibly
+    // reset along with the underlying sets.
+    function resetSelectionPickers() {
+      diagSelected.clear();
+      invSelected.clear();
+      if (document.getElementById('diag-checkbox-container')) renderDiagCheckboxes('');
+      if (document.getElementById('inv-checkbox-container')) renderInvCheckboxes('');
+    }
+
+    function renderDiagCheckboxes(filter) {
+      const f = (filter||'').toLowerCase();
+      const c = document.getElementById('diag-checkbox-container');
+      if (!c) return;
+      let html = '', total = 0;
+      for (const [cat, items] of Object.entries(DIAGNOSIS_DATA)) {
+        const fi = items.filter(i => i.toLowerCase().includes(f));
+        if (!fi.length) continue;
+        const catId = cat.replace(/\s+/g,'-');
+        html += '<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle(\'collapsed\');document.getElementById(\''+catId+'-body\').classList.toggle(\'collapsed\')">' +
+          cat + ' <span style="font-size:12px;font-weight:normal;color:var(--text-muted)">(' + fi.length + ' items)</span></div><div class="diag-category-content" id="'+catId+'-body">';
+        fi.forEach(i => {
+          const ch = diagSelected.has(i);
+          if (ch) total++;
+          const hl = f ? i.replace(new RegExp('('+f+')','gi'),'<span class="diag-highlight">$1</span>') : i;
+          html += '<div class="diag-check-item"><input type="checkbox" ' + (ch?'checked':'') + ' onchange="toggleDiag(\''+i.replace(/'/g,"\\'")+'\')"><label>' + hl + '</label></div>';
+        });
+        html += '</div></div>';
+      }
+      c.innerHTML = html || '<div class="diag-no-results">No diagnosis items found</div>';
+      const el = document.getElementById('diag-count');
+      if (el) el.textContent = total + ' selected';
+    }
+
+    function renderInvCheckboxes(filter) {
+      const f = (filter||'').toLowerCase();
+      const c = document.getElementById('inv-checkbox-container');
+      if (!c) return;
+      let html = '', total = 0;
+      for (const [cat, items] of Object.entries(INVESTIGATIONS_DATA)) {
+        const fi = items.filter(i => i.toLowerCase().includes(f));
+        if (!fi.length) continue;
+        const catId = cat.replace(/\s+/g,'-');
+        html += '<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle(\'collapsed\');document.getElementById(\''+catId+'-inv-body\').classList.toggle(\'collapsed\')">' +
+          cat + ' <span style="font-size:12px;font-weight:normal;color:var(--text-muted)">(' + fi.length + ' items)</span></div><div class="diag-category-content" id="'+catId+'-inv-body">';
+        fi.forEach(i => {
+          const ch = invSelected.has(i);
+          if (ch) total++;
+          const hl = f ? i.replace(new RegExp('('+f+')','gi'),'<span class="diag-highlight">$1</span>') : i;
+          html += '<div class="diag-check-item"><input type="checkbox" ' + (ch?'checked':'') + ' onchange="toggleInv(\''+i.replace(/'/g,"\\'")+'\')"><label>' + hl + '</label></div>';
+        });
+        html += '</div></div>';
+      }
+      c.innerHTML = html || '<div class="diag-no-results">No investigation items found</div>';
+      const el = document.getElementById('inv-count');
+      if (el) el.textContent = total + ' selected';
+    }
+
+    function toggleDiag(item) {
+      diagSelected.has(item) ? diagSelected.delete(item) : diagSelected.add(item);
+      const search = document.getElementById('diag-search');
+      renderDiagCheckboxes(search ? search.value : '');
+    }
+
+    function toggleInv(item) {
+      invSelected.has(item) ? invSelected.delete(item) : invSelected.add(item);
+      const search = document.getElementById('inv-search');
+      renderInvCheckboxes(search ? search.value : '');
+    }
+
+    function clearDiagSelections() {
+      diagSelected.clear();
+      renderDiagCheckboxes('');
+    }
+
+    function clearInvSelections() {
+      invSelected.clear();
+      renderInvCheckboxes('');
+    }
+
+    // ── Diagnosis / Investigations -> the session's diagnostic record ─────────
+    //
+    // These two Save buttons used to only console.log and alert(): the ticked
+    // boxes went nowhere, so nothing selected here reached the summary sheet or
+    // the backend when the session was completed. They now merge their
+    // selections into activeDiagnostics, which is what compileMasterSummary()
+    // prints and confirmTimeOut() POSTs to /procedures/{id}/diagnostics.
+    //
+    // Merging (not replacing) matters: Diagnosis and Investigations are two
+    // separate pickers writing into one shared list, and a preset may already
+    // have seeded entries. Each item is tagged so a re-save can replace only
+    // its own contributions and leave the other picker's alone.
+    function commitSelections(selected, source, urgency = 'Routine') {
+      const chosen = Array.from(selected);
+      // Drop this source's previous contributions, keep everything else.
+      activeDiagnostics = activeDiagnostics.filter(d => d.source !== source);
+      chosen.forEach(name => {
+        if (!activeDiagnostics.some(d => d.name.toLowerCase() === name.toLowerCase())) {
+          activeDiagnostics.push({ name, urgency, source });
+        }
+      });
+      activeDiagnostics.sort(sortByProp('name'));
+      renderDiagnosticsList();   // no-ops if the legacy table isn't present
+      return chosen.length;
+    }
+
+    async function saveDiagSelections() {
+      if (diagSelected.size === 0) {
+        await uiAlert('Select at least one diagnosis item before saving.', { title: 'Diagnosis', tone: 'warn' });
+        return;
+      }
+      const n = commitSelections(diagSelected, 'diagnosis');
+      showDoctorToast(`${n} diagnosis item${n === 1 ? '' : 's'} recorded for this session.`);
+    }
+
+    async function saveInvSelections() {
+      if (invSelected.size === 0) {
+        await uiAlert('Select at least one investigation before saving.', { title: 'Investigations', tone: 'warn' });
+        return;
+      }
+      const n = commitSelections(invSelected, 'investigation');
+      showDoctorToast(`${n} investigation${n === 1 ? '' : 's'} recorded for this session.`);
     }
 
     document.addEventListener("DOMContentLoaded", async () => {

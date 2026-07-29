@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orthodontic Diagnosis & Investigations - AFID HMS</title>
+  <style>
+    :root {
+      --green-dark: #073e2b;
+      --green-med: #0f6244;
+      --green-light: #e6f0ec;
+      --green-soft: #f0f7f4;
+      --border: #d1e2dc;
+      --text-dark: #1f2937;
+      --text-muted: #6b7280;
+      --red: #991b1b;
+      --red-soft: #fee2e2;
+      --bg-main: #f9fafb;
+      --blue-dark: #1e40af;
+      --blue-light: #dbeafe;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-main); color: var(--text-dark); padding: 20px; }
+
+    .container { max-width: 1400px; margin: 0 auto; }
+    
+    .header { 
+      background: linear-gradient(135deg, var(--green-dark) 0%, var(--green-med) 100%);
+      color: white;
+      padding: 24px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .header h1 { font-size: 28px; margin-bottom: 8px; }
+    .header p { opacity: 0.9; font-size: 14px; }
+
+    .patient-info {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .info-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .info-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    .info-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+
+    .tabs-container {
+      background: white;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .tabs-header {
+      display: flex;
+      background: var(--green-soft);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+
+    .tab-button {
+      background: none;
+      border: none;
+      padding: 16px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab-button:hover {
+      color: var(--green-med);
+      background: rgba(15, 98, 68, 0.05);
+    }
+
+    .tab-button.active {
+      color: var(--green-med);
+      border-bottom-color: var(--green-med);
+      background: white;
+    }
+
+    .tab-content {
+      display: none;
+      padding: 24px;
+      animation: fadeIn 0.3s ease-in;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .search-box {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      margin-bottom: 20px;
+      transition: all 0.2s;
+    }
+
+    .search-box:focus {
+      outline: none;
+      border-color: var(--green-med);
+      box-shadow: 0 0 0 3px rgba(15, 98, 68, 0.1);
+    }
+
+    .category-section {
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .category-header {
+      background: var(--blue-light);
+      color: var(--blue-dark);
+      padding: 14px 20px;
+      font-size: 16px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .category-header:hover {
+      background: #bfdbfe;
+    }
+
+    .category-header::after {
+      content: '▼';
+      font-size: 12px;
+      transition: transform 0.2s;
+    }
+
+    .category-header.collapsed::after {
+      transform: rotate(-90deg);
+    }
+
+    .category-content {
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 10px;
+    }
+
+    .category-content.collapsed {
+      display: none;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+
+    .checkbox-item:hover {
+      background: var(--green-soft);
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: var(--green-med);
+    }
+
+    .checkbox-item label {
+      flex: 1;
+      cursor: pointer;
+      font-size: 14px;
+      user-select: none;
+    }
+
+    .selected-count {
+      background: var(--green-med);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      background: var(--green-soft);
+      border-top: 1px solid var(--border);
+      position: sticky;
+      bottom: 0;
+    }
+
+    .btn {
+      background: var(--green-med);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: var(--green-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: var(--green-med);
+      border: 1px solid var(--green-med);
+    }
+
+    .btn-secondary:hover {
+      background: var(--green-light);
+    }
+
+    .summary-panel {
+      background: white;
+      border: 2px solid var(--green-med);
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .summary-panel h3 {
+      color: var(--green-dark);
+      margin-bottom: 16px;
+      font-size: 18px;
+    }
+
+    .summary-section {
+      margin-bottom: 16px;
+    }
+
+    .summary-section h4 {
+      color: var(--blue-dark);
+      font-size: 14px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .summary-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .summary-tag {
+      background: var(--green-light);
+      color: var(--green-dark);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .no-results {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .highlight {
+      background: yellow;
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+
+    @media (max-width: 768px) {
+      .category-content {
+        grid-template-columns: 1fr;
+      }
+      
+      .action-bar {
+        flex-direction: column;
+        gap: 10px;
+      }
+      
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🦷 Orthodontic Diagnosis & Investigations</h1>
+      <p>Armed Forces Institute of Dentistry - Patient Treatment Record System</p>
+    </div>
+
+    <div class="patient-info">
+      <div class="info-item">
+        <span class="info-label">Patient Name</span>
+        <span class="info-value" id="patient-name">Maj. Muhammad Ahmed Khan</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Patient ID / MRN</span>
+        <span class="info-value" id="patient-mrn">MR-2024001</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Age / Sex</span>
+        <span class="info-value" id="patient-age-sex">35 / Male</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Date of Visit</span>
+        <span class="info-value" id="visit-date">2024-12-15</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Referring Doctor</span>
+        <span class="info-value" id="referring-doctor">Dr. Asadullah Khan</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Contact Number</span>
+        <span class="info-value" id="contact-number">0300-1234567</span>
+      </div>
+    </div>
+
+    <div class="tabs-container">
+      <div class="tabs-header">
+        <button class="tab-button active" onclick="switchTab(event, 'diagnosis')">📋 Tab 1 - Diagnosis</button>
+        <button class="tab-button" onclick="switchTab(event, 'investigations')">🔬 Tab 2 - Investigations</button>
+        <button class="tab-button" onclick="switchTab(event, 'summary')">📊 Summary</button>
+      </div>
+
+      <!-- DIAGNOSIS TAB -->
+      <div id="diagnosis" class="tab-content active">
+        <input 
+          type="text" 
+          class="search-box" 
+          id="diagnosis-search" 
+          placeholder="🔍 Search diagnosis items... (type any letter to filter)"
+          onkeyup="filterDiagnosis()"
+        >
+        <div id="diagnosis-container"></div>
+        
+        <div class="action-bar">
+          <div>
+            <span class="selected-count" id="diagnosis-count">0 selected</span>
+          </div>
+          <div>
+            <button class="btn btn-secondary" onclick="clearAll('diagnosis')">Clear All</button>
+            <button class="btn" onclick="saveDiagnosis()">💾 Save Diagnosis</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- INVESTIGATIONS TAB -->
+      <div id="investigations" class="tab-content">
+        <input 
+          type="text" 
+          class="search-box" 
+          id="investigations-search" 
+          placeholder="🔍 Search investigations... (type any letter to filter)"
+          onkeyup="filterInvestigations()"
+        >
+        <div id="investigations-container"></div>
+        
+        <div class="action-bar">
+          <div>
+            <span class="selected-count" id="investigations-count">0 selected</span>
+          </div>
+          <div>
+            <button class="btn btn-secondary" onclick="clearAll('investigations')">Clear All</button>
+            <button class="btn" onclick="saveInvestigations()">💾 Save Investigations</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUMMARY TAB -->
+      <div id="summary" class="tab-content">
+        <div class="summary-panel">
+          <h3>📋 Selected Items Summary</h3>
+          
+          <div class="summary-section">
+            <h4>Diagnosis</h4>
+            <div id="summary-diagnosis" class="summary-items">
+              <p style="color: var(--text-muted); font-style: italic;">No diagnosis items selected</p>
+            </div>
+          </div>
+
+          <div class="summary-section">
+            <h4>Investigations</h4>
+            <div id="summary-investigations" class="summary-items">
+              <p style="color: var(--text-muted); font-style: italic;">No investigation items selected</p>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center;">
+          <button class="btn" onclick="printSummary()" style="font-size: 16px; padding: 12px 32px;">
+            🖨️ Print Summary
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Diagnosis data structure
+    const DIAGNOSIS_DATA = {
+      "Skeletal Diagnosis — Sagittal (AP)": [
+        "Skeletal Class I",
+        "Skeletal Class II – maxillary protrusion",
+        "Skeletal Class II – mandibular retrusion",
+        "Skeletal Class III – maxillary retrusion",
+        "Skeletal Class III – mandibular protrusion"
+      ],
+      "Skeletal Diagnosis — Vertical": [
+        "Normodivergent",
+        "Hypodivergent (deep bite tendency)",
+        "Hyperdivergent (open bite tendency)"
+      ],
+      "Skeletal Diagnosis — Transverse": [
+        "Maxillary skeletal constriction",
+        "Mandibular asymmetry",
+        "Skeletal crossbite – unilateral",
+        "Skeletal crossbite – bilateral",
+        "Facial asymmetry"
+      ],
+      "Dental Classification (Angle's)": [
+        "Class I malocclusion",
+        "Class II Division 1",
+        "Class II Division 2",
+        "Class III malocclusion (true)",
+        "Class III malocclusion (pseudo)",
+        "Class II subdivision (R/L)",
+        "Class III subdivision (R/L)"
+      ],
+      "Space-Related Findings": [
+        "Crowding – mild (<4mm)",
+        "Crowding – moderate (4–8mm)",
+        "Crowding – severe (>8mm)",
+        "Spacing – generalized",
+        "Spacing – localized",
+        "Midline diastema",
+        "Bolton discrepancy",
+        "Arch length discrepancy",
+        "Blocked-out / ectopic tooth"
+      ],
+      "Anteroposterior Dental Findings": [
+        "Increased overjet",
+        "Reduced / reverse overjet",
+        "Bimaxillary protrusion",
+        "Bimaxillary retrusion",
+        "Dentoalveolar protrusion – maxillary",
+        "Dentoalveolar protrusion – mandibular"
+      ],
+      "Vertical Dental Findings": [
+        "Deep bite (traumatic)",
+        "Deep bite (non-traumatic)",
+        "Anterior open bite",
+        "Posterior open bite",
+        "Increased curve of Spee",
+        "Reversed curve of Spee"
+      ],
+      "Transverse Dental Findings": [
+        "Anterior crossbite",
+        "Posterior crossbite – unilateral",
+        "Posterior crossbite – bilateral",
+        "Scissor bite",
+        "Dental midline deviation – upper",
+        "Dental midline deviation – lower"
+      ],
+      "Tooth Number / Position / Structure Anomalies": [
+        "Hypodontia",
+        "Oligodontia",
+        "Anodontia",
+        "Supernumerary tooth",
+        "Impacted tooth",
+        "Ectopic eruption",
+        "Ankylosed tooth",
+        "Transposition",
+        "Rotation",
+        "Microdontia / Macrodontia",
+        "Root resorption / dilaceration",
+        "Cleft lip/palate–associated"
+      ],
+      "Soft Tissue / Functional / Habit Findings": [
+        "Thumb / digit sucking habit",
+        "Tongue thrust / atypical swallow",
+        "Mouth breathing",
+        "Ankyloglossia",
+        "Lip incompetence",
+        "TMJ disorder",
+        "Bruxism / parafunction"
+      ]
+    };
+
+    // Investigations data structure
+    const INVESTIGATIONS_DATA = {
+      "Clinical Examination": [
+        "Extraoral examination",
+        "Intraoral examination",
+        "Functional / TMJ examination",
+        "Habit history & assessment"
+      ],
+      "Radiographic": [
+        "Lateral cephalogram",
+        "PA (frontal) cephalogram",
+        "OPG / Panoramic radiograph",
+        "IOPA",
+        "Occlusal radiograph",
+        "CBCT",
+        "Hand-wrist radiograph (skeletal age)",
+        "TMJ radiograph / MRI"
+      ],
+      "Photographic Records": [
+        "Extraoral – frontal repose",
+        "Extraoral – frontal smiling",
+        "Extraoral – profile",
+        "Extraoral – 3/4 view",
+        "Intraoral – right buccal",
+        "Intraoral – left buccal",
+        "Intraoral – frontal",
+        "Intraoral – upper occlusal",
+        "Intraoral – lower occlusal"
+      ],
+      "Study Models / Digital Records": [
+        "Diagnostic casts (plaster/stone)",
+        "Digital intraoral scan",
+        "Bolton analysis",
+        "Arch length analysis",
+        "Mixed dentition (Moyers/Tanaka-Johnston)"
+      ],
+      "Additional / Adjunct": [
+        "Periodontal charting",
+        "Pulp vitality / sensibility test",
+        "Airway assessment",
+        "Speech assessment",
+        "3D superimposition (pre/post)"
+      ]
+    };
+
+    // Track selected items
+    let selectedDiagnosis = new Set();
+    let selectedInvestigations = new Set();
+
+    // Mock patient data
+    const MOCK_PATIENT = {
+      name: "Maj. Muhammad Ahmed Khan",
+      mrn: "MR-2024001",
+      age: 35,
+      sex: "Male",
+      visitDate: "2024-12-15",
+      referringDoctor: "Dr. Asadullah Khan",
+      contact: "0300-1234567"
+    };
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', () => {
+      renderDiagnosis();
+      renderInvestigations();
+      updateSummary();
+    });
+
+    // Render diagnosis checkboxes
+    function renderDiagnosis(filterText = '') {
+      const container = document.getElementById('diagnosis-container');
+      const filter = filterText.toLowerCase();
+      let html = '';
+      let totalSelected = 0;
+
+      for (const [category, items] of Object.entries(DIAGNOSIS_DATA)) {
+        const filteredItems = items.filter(item => 
+          item.toLowerCase().includes(filter)
+        );
+
+        if (filteredItems.length === 0) continue;
+
+        html += `
+          <div class="category-section">
+            <div class="category-header" onclick="toggleCategory(this)">
+              ${category}
+              <span style="font-size: 12px; font-weight: normal; color: var(--text-muted);">
+                (${filteredItems.length} items)
+              </span>
+            </div>
+            <div class="category-content">
+              ${filteredItems.map(item => {
+                const isChecked = selectedDiagnosis.has(item);
+                if (isChecked) totalSelected++;
+                const highlightedItem = filter ? highlightText(item, filter) : item;
+                return `
+                  <div class="checkbox-item">
+                    <input 
+                      type="checkbox" 
+                      id="diag-${item.replace(/\s+/g, '-')}"
+                      ${isChecked ? 'checked' : ''}
+                      onchange="toggleDiagnosis('${item}')"
+                    >
+                    <label for="diag-${item.replace(/\s+/g, '-')}">
+                      ${highlightedItem}
+                    </label>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html || '<div class="no-results">No diagnosis items found</div>';
+      document.getElementById('diagnosis-count').textContent = `${totalSelected} selected`;
+    }
+
+    // Render investigations checkboxes
+    function renderInvestigations(filterText = '') {
+      const container = document.getElementById('investigations-container');
+      const filter = filterText.toLowerCase();
+      let html = '';
+      let totalSelected = 0;
+
+      for (const [category, items] of Object.entries(INVESTIGATIONS_DATA)) {
+        const filteredItems = items.filter(item => 
+          item.toLowerCase().includes(filter)
+        );
+
+        if (filteredItems.length === 0) continue;
+
+        html += `
+          <div class="category-section">
+            <div class="category-header" onclick="toggleCategory(this)">
+              ${category}
+              <span style="font-size: 12px; font-weight: normal; color: var(--text-muted);">
+                (${filteredItems.length} items)
+              </span>
+            </div>
+            <div class="category-content">
+              ${filteredItems.map(item => {
+                const isChecked = selectedInvestigations.has(item);
+                if (isChecked) totalSelected++;
+                const highlightedItem = filter ? highlightText(item, filter) : item;
+                return `
+                  <div class="checkbox-item">
+                    <input 
+                      type="checkbox" 
+                      id="inv-${item.replace(/\s+/g, '-')}"
+                      ${isChecked ? 'checked' : ''}
+                      onchange="toggleInvestigation('${item}')"
+                    >
+                    <label for="inv-${item.replace(/\s+/g, '-')}">
+                      ${highlightedItem}
+                    </label>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html || '<div class="no-results">No investigation items found</div>';
+      document.getElementById('investigations-count').textContent = `${totalSelected} selected`;
+    }
+
+    // Highlight matching text
+    function highlightText(text, filter) {
+      const regex = new RegExp(`(${filter})`, 'gi');
+      return text.replace(regex, '<span class="highlight">$1</span>');
+    }
+
+    // Toggle category collapse
+    function toggleCategory(header) {
+      header.classList.toggle('collapsed');
+      const content = header.nextElementSibling;
+      content.classList.toggle('collapsed');
+    }
+
+    // Toggle diagnosis selection
+    function toggleDiagnosis(item) {
+      if (selectedDiagnosis.has(item)) {
+        selectedDiagnosis.delete(item);
+      } else {
+        selectedDiagnosis.add(item);
+      }
+      updateSummary();
+    }
+
+    // Toggle investigation selection
+    function toggleInvestigation(item) {
+      if (selectedInvestigations.has(item)) {
+        selectedInvestigations.delete(item);
+      } else {
+        selectedInvestigations.add(item);
+      }
+      updateSummary();
+    }
+
+    // Filter diagnosis
+    function filterDiagnosis() {
+      const searchText = document.getElementById('diagnosis-search').value;
+      renderDiagnosis(searchText);
+    }
+
+    // Filter investigations
+    function filterInvestigations() {
+      const searchText = document.getElementById('investigations-search').value;
+      renderInvestigations(searchText);
+    }
+
+    // Clear all selections
+    function clearAll(type) {
+      if (type === 'diagnosis') {
+        selectedDiagnosis.clear();
+        renderDiagnosis();
+      } else {
+        selectedInvestigations.clear();
+        renderInvestigations();
+      }
+      updateSummary();
+    }
+
+    // Update summary tab
+    function updateSummary() {
+      const diagContainer = document.getElementById('summary-diagnosis');
+      const invContainer = document.getElementById('summary-investigations');
+
+      if (selectedDiagnosis.size === 0) {
+        diagContainer.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">No diagnosis items selected</p>';
+      } else {
+        diagContainer.innerHTML = Array.from(selectedDiagnosis)
+          .map(item => `<span class="summary-tag">${item}</span>`)
+          .join('');
+      }
+
+      if (selectedInvestigations.size === 0) {
+        invContainer.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">No investigation items selected</p>';
+      } else {
+        invContainer.innerHTML = Array.from(selectedInvestigations)
+          .map(item => `<span class="summary-tag">${item}</span>`)
+          .join('');
+      }
+    }
+
+    // Switch tabs
+    function switchTab(event, tabId) {
+      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      
+      event.currentTarget.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    // Save diagnosis
+    function saveDiagnosis() {
+      if (selectedDiagnosis.size === 0) {
+        alert('Please select at least one diagnosis item.');
+        return;
+      }
+      
+      const data = {
+        patientId: MOCK_PATIENT.mrn,
+        diagnosis: Array.from(selectedDiagnosis),
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('Saving diagnosis:', data);
+      alert(`✅ Diagnosis saved successfully!\n\n${selectedDiagnosis.size} items selected.`);
+    }
+
+    // Save investigations
+    function saveInvestigations() {
+      if (selectedInvestigations.size === 0) {
+        alert('Please select at least one investigation item.');
+        return;
+      }
+      
+      const data = {
+        patientId: MOCK_PATIENT.mrn,
+        investigations: Array.from(selectedInvestigations),
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('Saving investigations:', data);
+      alert(`✅ Investigations saved successfully!\n\n${selectedInvestigations.size} items selected.`);
+    }
+
+    // Print summary
+    function printSummary() {
+      window.print();
+    }
+
+    // Load mock data for demonstration
+    function loadMockData() {
+      // Pre-select some items for demonstration
+      selectedDiagnosis.add('Skeletal Class I');
+      selectedDiagnosis.add('Class I malocclusion');
+      selectedDiagnosis.add('Crowding – mild (<4mm)');
+      
+      selectedInvestigations.add('Lateral cephalogram');
+      selectedInvestigations.add('OPG / Panoramic radiograph');
+      selectedInvestigations.add('Intraoral examination');
+      
+      renderDiagnosis();
+      renderInvestigations();
+      updateSummary();
+    }
+
+    // Load mock data on initialization
+    setTimeout(loadMockData, 500);
+  </script>
+</body>
+</html>
