@@ -1499,12 +1499,14 @@
             </div>
           </div>
 
-          <!-- STEP 3 TABS CONTAINER -->
+            <!-- STEP 3 TABS CONTAINER -->
           <div id="step-3-container" class="reveal-section">
             <div class="tab-bar">
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-diagnosis')">📋 Diagnosis</button>
               <button class="tab-button active" onclick="switchSubTab(event, 'subtab-investigations')">🔬 Investigations</button>
-              <button class="tab-button" onclick="switchSubTab(event, 'subtab-materials')">Clinical Materials</button>
+              <button class="tab-button" onclick="switchSubTab(event, 'subtab-patient-records')">📁 Patient Records</button>
+              <button class="tab-button" onclick="switchSubTab(event, 'subtab-procedures')">⚕️ Procedures</button>
+              <button class="tab-button" onclick="switchSubTab(event, 'subtab-materials')">📦 Materials Used</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-pharmacy')">Pharmacy Dispensing</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-notes')">Clinical Notes System</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-records')">Allergy & Medical Record</button>
@@ -1515,7 +1517,7 @@
               <div class="panel" style="margin-bottom:0;">
                 <div class="panel-header">📋 Orthodontic Diagnosis — Select all applicable findings</div>
                 <div class="panel-body">
-                  <input class="diag-search-box" id="diag-search" placeholder="🔍 Search diagnosis items... (type any letter to filter)" onkeyup="renderDiagCheckboxes(this.value)">
+                  <input class="diag-search-box" id="diag-search" placeholder="🔍 Search diagnosis items... (type any word to filter)" onkeyup="renderDiagCheckboxes(this.value)">
                   <div id="diag-checkbox-container"></div>
                   <div class="diag-action-row">
                     <span class="diag-selected-count" id="diag-count">0 selected</span>
@@ -1528,12 +1530,12 @@
               </div>
             </div>
 
-            <!-- INVESTIGATIONS SUBTAB (Checkbox version) -->
+            <!-- INVESTIGATIONS SUBTAB -->
             <div id="subtab-investigations" class="tab-content active">
               <div class="panel" style="margin-bottom:0;">
                 <div class="panel-header">🔬 Investigations — Select all that apply</div>
                 <div class="panel-body">
-                  <input class="diag-search-box" id="inv-search" placeholder="🔍 Search investigations... (type any letter to filter)" onkeyup="renderInvCheckboxes(this.value)">
+                  <input class="diag-search-box" id="inv-search" placeholder="🔍 Search investigations... (type any word to filter)" onkeyup="renderInvCheckboxes(this.value)">
                   <div id="inv-checkbox-container"></div>
                   <div class="diag-action-row">
                     <span class="diag-selected-count" id="inv-count">0 selected</span>
@@ -1546,16 +1548,51 @@
               </div>
             </div>
 
+            <!-- PATIENT RECORDS SUBTAB -->
+            <div id="subtab-patient-records" class="tab-content">
+              <div class="panel" style="margin-bottom:0;">
+                <div class="panel-header">📁 Patient Records — Upload and view patient files</div>
+                <div class="panel-body">
+                  <div id="patient-records-container"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- PROCEDURES SUBTAB -->
+            <div id="subtab-procedures" class="tab-content">
+              <div class="panel" style="margin-bottom:0;">
+                <div class="panel-header">⚕️ Orthodontic Procedures — Select procedures performed</div>
+                <div class="panel-body">
+                  <input class="diag-search-box" id="proc-search" placeholder="🔍 Search procedures... (type any word to filter)" onkeyup="renderProcCheckboxes(this.value)">
+                  <div id="proc-checkbox-container"></div>
+                  <div class="diag-action-row">
+                    <span class="diag-selected-count" id="proc-count">0 selected</span>
+                    <div>
+                      <button class="btn btn-sm btn-danger" onclick="clearProcSelections()" style="margin-right:8px;">Clear All</button>
+                      <button class="btn btn-sm" onclick="saveProcSelections()">💾 Save Procedures</button>
+                    </div>
+                  </div>
+                  <div id="tooth-chart-container"></div>
+                  <div id="archwire-container"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MATERIALS SUBTAB -->
             <div id="subtab-materials" class="tab-content">
               <div class="panel" style="margin-bottom:0;">
-                <div class="panel-header">Clinical Materials Log</div>
+                <div class="panel-header">📦 Materials Used — Auto-populated from selected procedures</div>
                 <div class="panel-body">
-                  <div class="flex-row-inputs">
-                    <input type="text" id="material-input" placeholder="Add material item..." />
-                    <input type="number" id="material-qty-input" value="1" min="1" style="width: 80px; padding: 10px; border: 1px solid var(--border); border-radius: 6px;" />
-                    <button class="btn btn-sm" style="height: 45px;" onclick="addMaterialItem()">+ Add</button>
+                  <div class="alert-box" style="background: var(--green-soft); border-color: var(--green-med); margin-bottom: 16px; color: var(--green-dark);">
+                    <strong>ℹ️ AUTO-UPDATE:</strong> Materials are automatically added when you select procedures in the Procedures tab. You can edit quantities and units below.
                   </div>
-                  <div id="materials-log-list"></div>
+                  <div id="materials-container"></div>
+                  <div class="diag-action-row" style="margin-top: 16px;">
+                    <span class="diag-selected-count" id="materials-count">0 items</span>
+                    <div>
+                      <button class="btn btn-sm" onclick="saveMaterials()">💾 Save Materials</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2730,6 +2767,291 @@
         if (query.trim()) filterDoctorAnalytics();
         else processAndRenderDoctorAnalytics();
       }
+    }
+
+    // ===================== NEW TAB DATA & FUNCTIONS =====================
+    // Patient Records data
+    const PATIENT_RECORDS_DATA = {
+      "Radiographic Records": [
+        { id: 'opg', name: 'OPG (Panoramic Radiograph)', icon: '📷' },
+        { id: 'lateral-cephalogram', name: 'Lateral Cephalogram', icon: '📷' },
+        { id: 'pa-cephalogram', name: 'PA Cephalogram', icon: '📷' },
+        { id: 'cbct', name: 'CBCT Scan', icon: '📷' }
+      ],
+      "Photographic Records": [
+        { id: 'extraoral-photos', name: 'Extraoral Photographs', icon: '📸' },
+        { id: 'intraoral-photos', name: 'Intraoral Photographs', icon: '📸' }
+      ],
+      "Digital Records": [
+        { id: 'study-models', name: 'Study Models / Digital Scan', icon: '💾' }
+      ]
+    };
+
+    // Procedures data
+    const PROCEDURES_DATA = {
+      "Preventive & Interceptive": [
+        "Space maintainer – fixed",
+        "Space maintainer – removable",
+        "Space regainer",
+        "Serial extraction",
+        "Habit-breaking appliance"
+      ],
+      "Fixed Appliance Therapy": [
+        "Bonding of brackets *",
+        "Banding of molars *",
+        "Archwire insertion / change",
+        "Ligation (elastomeric / steel)",
+        "Power chain application *",
+        "Intermaxillary elastics",
+        "Coil spring placement *",
+        "Interproximal reduction (IPR) *",
+        "Debonding *",
+        "Rebonding *"
+      ],
+      "Removable & Functional Appliance Therapy": [
+        "Hawley appliance",
+        "Twin block",
+        "Activator",
+        "Bionator",
+        "Frankel appliance",
+        "Headgear – cervical pull",
+        "Headgear – occipital pull",
+        "Chin cup therapy",
+        "Removable expansion plate"
+      ],
+      "Expansion Procedures": [
+        "RPE (Hyrax / Haas)",
+        "MARPE",
+        "SARPE",
+        "Quad helix",
+        "W-arch"
+      ],
+      "Growth Modification": [
+        "Functional appliance therapy",
+        "Headgear therapy",
+        "Herbst appliance",
+        "MARA appliance",
+        "Forsus / fixed functional appliance",
+        "Facemask (protraction) therapy",
+        "Alt-RAMEC protocol",
+        "Miniplate protraction (De Clerck)"
+      ],
+      "TAD Procedures": [
+        "TAD / miniscrew placement *",
+        "TAD-assisted space closure",
+        "TAD-assisted intrusion / extrusion",
+        "TAD-assisted molar distalization"
+      ],
+      "Surgical Orthodontics": [
+        "Orthognathic surgery referral",
+        "LeFort I osteotomy",
+        "Bilateral sagittal split osteotomy",
+        "Genioplasty",
+        "Surgical exposure of impacted tooth *",
+        "Corticotomy / piezocision",
+        "Frenectomy",
+        "Distraction osteogenesis"
+      ],
+      "Aligner Therapy": [
+        "Aligner treatment planning",
+        "Aligner / attachment bonding *",
+        "Aligner progress review"
+      ],
+      "Retention Phase": [
+        "Fixed retainer (bonded)",
+        "Removable retainer – Hawley",
+        "Removable retainer – Essix",
+        "Positioner therapy",
+        "Retention review"
+      ]
+    };
+
+    // Materials data
+    const MATERIALS_DATA = {
+      "Brackets & Bands": [
+        { name: "Metal (stainless steel) brackets", spec: "Roth / MBT / Std" },
+        { name: "Ceramic brackets", spec: "" },
+        { name: "Self-ligating brackets", spec: "Active / Passive" },
+        { name: "Lingual brackets", spec: "" },
+        { name: "Molar bands", spec: "With/without tube" },
+        { name: "Bondable tubes", spec: "" }
+      ],
+      "Archwires": [
+        { name: "Stainless steel archwire", spec: "Round / Rectangular" },
+        { name: "NiTi archwire", spec: "Superelastic / Heat-activated" },
+        { name: "Copper NiTi archwire", spec: "" },
+        { name: "Beta-titanium (TMA) archwire", spec: "" },
+        { name: "Multi-strand / braided wire", spec: "" }
+      ],
+      "Bonding & Cementation": [
+        { name: "Composite bonding adhesive", spec: "" },
+        { name: "Phosphoric acid etchant", spec: "" },
+        { name: "Primer / bonding agent", spec: "" },
+        { name: "Glass ionomer cement (GIC)", spec: "" },
+        { name: "Resin-modified GIC (RMGIC)", spec: "" },
+        { name: "Band cement", spec: "" }
+      ],
+      "Auxiliaries": [
+        { name: "Elastomeric ligatures / modules", spec: "" },
+        { name: "Power chain", spec: "Short / Long pitch" },
+        { name: "Elastics", spec: "Latex / Non-latex, force" },
+        { name: "Coil springs", spec: "Open / Closed" },
+        { name: "Separators", spec: "Elastomeric / Brass wire" },
+        { name: "Lip bumper", spec: "" },
+        { name: "Finger / retraction springs", spec: "" },
+        { name: "Ligature wire (steel)", spec: "" }
+      ],
+      "TAD & Surgical": [
+        { name: "Titanium miniscrews / TADs", spec: "Length / Diameter" },
+        { name: "Miniplates", spec: "" },
+        { name: "Surgical exposure kit", spec: "" }
+      ],
+      "Impression & Model Materials": [
+        { name: "Alginate", spec: "" },
+        { name: "Polyvinyl siloxane (PVS)", spec: "" },
+        { name: "Dental stone", spec: "Type III / IV" },
+        { name: "Digital scan file", spec: "N/A" }
+      ],
+      "Retention Materials": [
+        { name: "Retainer wire", spec: "0.032–0.036\" SS / spiral" },
+        { name: "Thermoplastic sheet", spec: "Essix / Aligner" },
+        { name: "Retainer resin / adhesive", spec: "" }
+      ]
+    };
+
+    let procSelected = new Set();
+    let selectedTeeth = new Set();
+    let materialsQuantities = {};
+    const UPPER_TEETH = ['18', '17', '16', '15', '14', '13', '12', '11', '21', '22', '23', '24', '25', '26', '27', '28'];
+    const LOWER_TEETH = ['48', '47', '46', '45', '44', '43', '42', '41', '31', '32', '33', '34', '35', '36', '37', '38'];
+
+    // Render patient records
+    function renderPatientRecords() {
+      const container = document.getElementById('patient-records-container');
+      if (!container) return;
+      let html = '';
+      for (const [category, records] of Object.entries(PATIENT_RECORDS_DATA)) {
+        html += '<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle(\'collapsed\');this.nextElementSibling.classList.toggle(\'collapsed\')">' + category + '</div><div class="diag-category-content">';
+        records.forEach(record => {
+          html += '<div class="record-item" style="background:#fff; border:1px solid var(--border); border-radius:6px; padding:16px; margin-bottom:12px;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><div style="font-weight:700; color:var(--green-dark);">' + record.icon + ' ' + record.name + '</div><div style="display:flex; gap:8px; align-items:center;"><input type="date" class="date-input" id="date-' + record.id + '" style="padding:6px 12px; border:1px solid var(--border); border-radius:4px; font-size:13px;"><button class="btn-view" onclick="viewRecord(\'' + record.id + '\')" style="background:var(--green-med); color:white; border:none; padding:6px 16px; font-size:13px; font-weight:600; border-radius:4px; cursor:pointer;">👁️ View</button></div></div><div class="upload-area" style="border:2px dashed var(--border); border-radius:6px; padding:24px; text-align:center; color:var(--text-muted); cursor:pointer;" onclick="document.getElementById(\'file-' + record.id + '\').click()"><div>📁 Click or Drag file to upload</div><div style="font-size:12px; margin-top:4px;">Supports: JPG, PNG, PDF</div><input type="file" id="file-' + record.id + '" style="display:none;" accept="image/*,.pdf" onchange="handleFileSelect(event, \'' + record.id + '\')"></div></div>';
+        });
+        html += '</div></div>';
+      }
+      container.innerHTML = html;
+    }
+
+    function viewRecord(recordId) {
+      alert('📂 Opening viewer for: ' + recordId);
+    }
+
+    function handleFileSelect(event, recordId) {
+      const file = event.target.files[0];
+      if (file) {
+        alert('✅ File uploaded: ' + file.name);
+      }
+    }
+
+    // Render procedures
+    function renderProcCheckboxes(filter) {
+      const f = (filter || '').toLowerCase();
+      const c = document.getElementById('proc-checkbox-container');
+      if (!c) return;
+      let html = '', total = 0;
+      for (const [cat, items] of Object.entries(PROCEDURES_DATA)) {
+        const fi = items.filter(i => i.toLowerCase().includes(f));
+        if (!fi.length) continue;
+        const catId = cat.replace(/\s+/g, '-');
+        html += '<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle(\'collapsed\');document.getElementById(\'' + catId + '-proc-body\').classList.toggle(\'collapsed\')">' + cat + ' <span style="font-size:12px;font-weight:normal;color:var(--text-muted)">(' + fi.length + ' items)</span></div><div class="diag-category-content" id="' + catId + '-proc-body">';
+        fi.forEach(i => {
+          const cleanItem = i.replace(' *', '');
+          const ch = procSelected.has(cleanItem);
+          if (ch) total++;
+          const hl = f ? i.replace(new RegExp('(' + f + ')', 'gi'), '<span class="diag-highlight">$1</span>') : i;
+          html += '<div class="diag-check-item"><input type="checkbox" ' + (ch ? 'checked' : '') + ' onchange="toggleProc(\'' + cleanItem.replace(/'/g, "\\'") + '\')"><label>' + hl + '</label></div>';
+        });
+        html += '</div></div>';
+      }
+      c.innerHTML = html || '<div class="diag-no-results">No procedures found</div>';
+      const el = document.getElementById('proc-count');
+      if (el) el.textContent = total + ' selected';
+    }
+
+    function toggleProc(item) {
+      procSelected.has(item) ? procSelected.delete(item) : procSelected.add(item);
+      const search = document.getElementById('proc-search');
+      renderProcCheckboxes(search ? search.value : '');
+      updateMaterialsFromProcedures();
+    }
+
+    function clearProcSelections() {
+      procSelected.clear();
+      renderProcCheckboxes('');
+    }
+
+    function saveProcSelections() {
+      if (procSelected.size === 0) {
+        alert('Select at least one procedure before saving.');
+        return;
+      }
+      alert(procSelected.size + ' procedures recorded.');
+    }
+
+    // Render materials
+    function renderMaterials() {
+      const container = document.getElementById('materials-container');
+      if (!container) return;
+      let html = '';
+      for (const [cat, materials] of Object.entries(MATERIALS_DATA)) {
+        html += '<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle(\'collapsed\');this.nextElementSibling.classList.toggle(\'collapsed\')">' + cat + '</div><div class="diag-category-content"><table class="materials-table" style="width:100%; border-collapse:collapse;"><thead><tr><th style="background:var(--green-light); color:var(--green-dark); padding:10px; text-align:left; font-weight:700; font-size:13px; border-bottom:2px solid var(--border);">Material</th><th style="background:var(--green-light); color:var(--green-dark); padding:10px; text-align:left; font-weight:700; font-size:13px; border-bottom:2px solid var(--border);">Specification</th><th style="background:var(--green-light); color:var(--green-dark); padding:10px; text-align:left; font-weight:700; font-size:13px; border-bottom:2px solid var(--border);">Qty</th><th style="background:var(--green-light); color:var(--green-dark); padding:10px; text-align:left; font-weight:700; font-size:13px; border-bottom:2px solid var(--border);">Unit</th></tr></thead><tbody>';
+        materials.forEach(mat => {
+          const matId = mat.name.replace(/\s+/g, '-').toLowerCase();
+          const qty = materialsQuantities[matId]?.qty || '';
+          const unit = materialsQuantities[matId]?.unit || '';
+          html += '<tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 10px; font-size:14px;">' + mat.name + '</td><td style="padding:8px 10px; font-size:14px; color:var(--text-muted);">' + (mat.spec || '-') + '</td><td style="padding:8px 10px;"><input type="text" value="' + qty + '" placeholder="0" style="width:70px; padding:4px 8px; border:1px solid var(--border); border-radius:4px; font-size:13px; text-align:center;" onchange="updateMaterial(\'' + matId + '\', \'qty\', this.value)"></td><td style="padding:8px 10px;"><input type="text" value="' + unit + '" placeholder="pcs" style="width:70px; padding:4px 8px; border:1px solid var(--border); border-radius:4px; font-size:13px; text-align:center;" onchange="updateMaterial(\'' + matId + '\', \'unit\', this.value)"></td></tr>';
+        });
+        html += '</tbody></table></div></div>';
+      }
+      container.innerHTML = html;
+    }
+
+    function updateMaterial(matId, field, value) {
+      if (!materialsQuantities[matId]) {
+        materialsQuantities[matId] = { qty: '', unit: '' };
+      }
+      materialsQuantities[matId][field] = value;
+    }
+
+    function saveMaterials() {
+      alert('Materials saved successfully!');
+    }
+
+    function updateMaterialsFromProcedures() {
+      const bracketBandMaterials = ["Metal (stainless steel) brackets", "Ceramic brackets", "Self-ligating brackets", "Lingual brackets", "Molar bands", "Bondable tubes"];
+      const archwireMaterials = ["Stainless steel archwire", "NiTi archwire", "Copper NiTi archwire", "Beta-titanium (TMA) archwire", "Multi-strand / braided wire"];
+      const auxiliariesMaterials = ["Elastomeric ligatures / modules", "Power chain", "Elastics", "Coil springs", "Separators"];
+
+      const hasBracketBand = procSelected.has('Bonding of brackets') || procSelected.has('Banding of molars') || procSelected.has('Power chain application') || procSelected.has('Coil spring placement');
+      const hasArchwireProc = procSelected.has('Archwire insertion / change');
+
+      if (hasBracketBand) {
+        bracketBandMaterials.forEach(mat => {
+          const matId = mat.replace(/\s+/g, '-').toLowerCase();
+          if (!materialsQuantities[matId]) {
+            materialsQuantities[matId] = { qty: '', unit: '' };
+          }
+        });
+      }
+
+      if (hasArchwireProc) {
+        archwireMaterials.forEach(mat => {
+          const matId = mat.replace(/\s+/g, '-').toLowerCase();
+          if (!materialsQuantities[matId]) {
+            materialsQuantities[matId] = { qty: '', unit: '' };
+          }
+        });
+      }
+
+      renderMaterials();
     }
 
     // ===================== DIAGNOSIS & INVESTIGATIONS CHECKBOX FUNCTIONS =====================
