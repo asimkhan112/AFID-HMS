@@ -90,11 +90,20 @@ This document provides a comprehensive record of all features implemented in the
     - Study Models / Digital Scan File
 
 #### Technical Implementation:
-- File upload support (JPG, PNG, PDF)
+- File attach support (JPG, PNG, PDF) via click or drag-and-drop
 - Date-stamping for each record
 - Expandable categories
-- Direct viewing without leaving patient chart
+- Direct viewing without leaving patient chart — images open in an in-page
+  lightbox, PDFs in the browser viewer
 - File input with accept filters
+
+> **Known limitation:** attached files are held **in the browser for the length
+> of the session only**. The API has no upload endpoint yet (`routers/procedures.py`
+> exposes checklist, materials, pharmacy, diagnostics and notes), so the file
+> itself is not stored server-side. The **filename and date do reach the saved
+> record** — they are written to the master summary and to the procedure's
+> clinical note on session completion. Persisting the files themselves needs a
+> backend upload endpoint plus object storage.
 
 ---
 

@@ -150,9 +150,13 @@
       border-radius: 6px;
       overflow: hidden;
     }
+    /* AFID green, not the stock blue these headers shipped with (#dbeafe /
+       #1e40af). They are the category bars on every clinical tab -- Diagnosis,
+       Investigations, Procedures, Materials and Patient Records -- so the blue
+       was the last thing breaking the green theme across the portal. */
     .diag-category-header {
-      background: #dbeafe;
-      color: #1e40af;
+      background: var(--green-light);
+      color: var(--green-dark);
       padding: 10px 16px;
       font-size: 14px;
       font-weight: 700;
@@ -164,7 +168,7 @@
       border-bottom: 1px solid var(--border);
     }
     .diag-category-header:hover {
-      background: #bfdbfe;
+      background: var(--green-soft);
     }
     .diag-category-header::after {
       content: '▼';
@@ -182,6 +186,116 @@
     }
     .diag-category-content.collapsed {
       display: none;
+    }
+
+    /* ── Procedure detail popups: tooth chart + archwire ──────────────────────
+       Both panels live inline at the bottom of the Procedures tab and are shown
+       only while a procedure that needs them is ticked (see updatePopupPanels).
+       They slide in rather than appearing instantly, so a panel materialising
+       below the checkbox list reads as a response to the tick. */
+    @keyframes proc-panel-in {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .proc-panel {
+      background: #fff;
+      border: 2px solid var(--green-med);
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+      animation: proc-panel-in .25s cubic-bezier(.4, 0, .2, 1);
+    }
+    .proc-panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+    .proc-panel-head h3 {
+      color: var(--green-dark);
+      font-size: 17px;
+      margin: 0;
+    }
+    .proc-panel-hint {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin: 4px 0 16px;
+    }
+    .proc-panel-close {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      padding: 5px 9px;
+      flex-shrink: 0;
+    }
+    .proc-panel-close:hover {
+      background: var(--green-soft);
+      color: var(--green-dark);
+    }
+    .arch-section { margin-bottom: 18px; }
+    .arch-section:last-child { margin-bottom: 0; }
+    .arch-label {
+      font-weight: 700;
+      color: var(--green-dark);
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+    /* 16 teeth per arch. auto-fit rather than a fixed repeat(16) so the row
+       wraps instead of overflowing the panel on a narrow clinic screen. */
+    .tooth-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(38px, 1fr));
+      gap: 6px;
+    }
+    .tooth-checkbox {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 2px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+    }
+    .tooth-checkbox:hover { background: var(--green-soft); }
+    .tooth-checkbox.is-selected {
+      background: var(--green-light);
+      border-color: var(--green-med);
+    }
+    .tooth-checkbox input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--green-med);
+    }
+    .tooth-checkbox label {
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+      color: var(--text-dark);
+    }
+    .radio-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+    }
+    .radio-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .radio-item input { accent-color: var(--green-med); cursor: pointer; }
+    .radio-item label {
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      margin: 0;
     }
     .diag-check-item {
       display: flex;
@@ -1739,10 +1853,16 @@
                   <div class="form-group">
                     <label style="font-weight: 700; color: var(--text-dark);">📝 Clinical Notes & Observations</label>
                     <textarea id="clinical-notes-textarea" rows="4" placeholder="Document case observations..."></textarea>
+                    <div style="text-align:right; margin-top:8px;">
+                      <button class="btn btn-sm" onclick="saveClinicalNotes()">💾 Save Notes</button>
+                    </div>
                   </div>
                   <div class="form-group" style="margin-top: 16px;">
                     <label style="font-weight: 700; color: var(--red);">⚠️ COMPLICATIONS / ADVERSE EVENTS</label>
-                    <input type="text" id="complications-input" placeholder="Enter any complications or adverse events..." onchange="updateComplicationsAlert()" />
+                    <input type="text" id="complications-input" placeholder="Enter any complications or adverse events..." oninput="updateComplicationsAlert()" />
+                    <div style="text-align:right; margin-top:8px;">
+                      <button class="btn btn-sm" onclick="saveComplications()">💾 Save Complications</button>
+                    </div>
                   </div>
                   <div class="alert-box" id="complications-alert-box" style="margin-bottom:12px; display:none;"></div>
                   <div style="text-align: center; margin-bottom: 12px;">
@@ -2028,10 +2148,40 @@
       }
     }
 
+    // Reads the complications field, trimmed. Single source of truth for the
+    // banner, the summary sheet and the saved note -- complications used to be
+    // displayed on screen and nowhere else, so they never reached the record.
+    function getComplicationsText() {
+      const el = document.getElementById('complications-input');
+      return el ? el.value.trim() : '';
+    }
+
+    async function saveClinicalNotes() {
+      const notes = document.getElementById('clinical-notes-textarea');
+      if (!notes || !notes.value.trim()) {
+        await uiAlert('Write the clinical note before saving.', { title: 'Clinical Notes', tone: 'warn' });
+        return;
+      }
+      // The note is POSTed to /procedures/{id}/notes by confirmTimeOut(), which
+      // is the point at which the procedure row this note hangs off actually
+      // exists. Say that plainly rather than implying it has already been sent.
+      showDoctorToast('Clinical note recorded — it is filed when you complete the session.');
+    }
+
+    async function saveComplications() {
+      if (!getComplicationsText()) {
+        await uiAlert('Enter the complication or adverse event before saving.',
+          { title: 'Complications', tone: 'warn' });
+        return;
+      }
+      updateComplicationsAlert();
+      showDoctorToast('Complication recorded — it is filed when you complete the session.');
+    }
+
     function updateComplicationsAlert() {
       const complicationsInput = document.getElementById('complications-input');
       const complicationsBox = document.getElementById('complications-alert-box');
-      
+
       if (complicationsBox && complicationsInput) {
         const complicationsText = complicationsInput.value.trim();
         if (complicationsText !== "") {
@@ -2360,9 +2510,41 @@
         ? `${Math.max(0, Math.round((new Date(currentPatient.check_out_time) - new Date(currentPatient.check_in_time)) / 60000))} min`
         : '—';
 
-      const materialsHtml = activeMaterials.map(m => `<div>• ${m.name} <span class="qty-val">QTY: ${m.qty}</span></div>`).join('') || "No clinical components allocated.";
+      const materialsHtml = activeMaterials.map(m => `<div>• ${m.name} <span class="qty-val">QTY: ${m.qty}${m.unit ? ' ' + m.unit : ''}</span></div>`).join('') || "No clinical components allocated.";
       const pharmacyRows = activePharmacy.map(p => `<tr><td>${p.med}</td><td>${p.dose}</td><td>${p.freq}</td></tr>`).join('') || '<tr><td colspan="3">None ordered.</td></tr>';
       const diagnosticsRows = activeDiagnostics.map(d => `<tr><td>${d.name}</td><td>${d.urgency}</td></tr>`).join('') || '<tr><td colspan="2">No systemic diagnostic runs flagged.</td></tr>';
+
+      // Procedures performed, the teeth they were performed on, the archwire
+      // spec, attached records and complications were all collected by the UI
+      // but never printed on the discharge order. They are clinical record, so
+      // they belong on the sheet.
+      const proceduresHtml = procSelected.size
+        ? Array.from(procSelected).sort().map(p => `<div>• ${p}</div>`).join('')
+        : 'No procedures recorded.';
+
+      const upperTreated = UPPER_TEETH.filter(t => selectedTeeth.has(t));
+      const lowerTreated = LOWER_TEETH.filter(t => selectedTeeth.has(t));
+      const teethHtml = selectedTeeth.size
+        ? `${upperTreated.length ? `<div><strong>Upper:</strong> ${upperTreated.join(', ')}</div>` : ''}
+           ${lowerTreated.length ? `<div><strong>Lower:</strong> ${lowerTreated.join(', ')}</div>` : ''}`
+        : '';
+
+      const archwireHtml = hasArchwireDetails()
+        ? `<div>${[
+            archwireData.arch     ? `<strong>Arch:</strong> ${archwireData.arch}` : '',
+            archwireData.material ? `<strong>Material:</strong> ${archwireData.material}` : '',
+            archwireData.size     ? `<strong>Size / gauge:</strong> ${archwireData.size}` : '',
+            archwireData.date     ? `<strong>Date placed:</strong> ${archwireData.date}` : ''
+          ].filter(Boolean).join(' &nbsp;·&nbsp; ')}</div>`
+        : '';
+
+      const recordRows = Object.entries(PATIENT_RECORDS_DATA).flatMap(([, records]) =>
+        records.filter(r => patientRecordFiles[r.id]).map(r => {
+          const a = patientRecordFiles[r.id];
+          return `<tr><td>${r.name}</td><td>${a.name}</td><td>${a.date || '—'}</td></tr>`;
+        }));
+
+      const complicationsText = getComplicationsText();
 
       const targetReportBox = document.getElementById('master-summary-injection-point');
       targetReportBox.innerHTML = `
@@ -2427,6 +2609,40 @@
               </table>
             </div>
           </div>
+
+          <div class="summary-field">
+            <label>Procedures Performed</label>
+            <div>${proceduresHtml}</div>
+          </div>
+
+          ${teethHtml ? `
+          <div class="summary-field">
+            <label>Teeth Treated (FDI Notation)</label>
+            <div>${teethHtml}</div>
+          </div>` : ''}
+
+          ${archwireHtml ? `
+          <div class="summary-field">
+            <label>Archwire Detail</label>
+            <div>${archwireHtml}</div>
+          </div>` : ''}
+
+          ${recordRows.length ? `
+          <div class="summary-field">
+            <label>Records Attached This Session</label>
+            <div style="background:#fff; padding:0;">
+              <table style="width:100%;">
+                <thead><tr><th>Record</th><th>File</th><th>Date</th></tr></thead>
+                <tbody>${recordRows.join('')}</tbody>
+              </table>
+            </div>
+          </div>` : ''}
+
+          ${complicationsText ? `
+          <div class="summary-field">
+            <label style="color:var(--red);">⚠️ Complications / Adverse Events</label>
+            <div style="color:var(--red); font-weight:700;">${complicationsText}</div>
+          </div>` : ''}
 
           <div class="summary-field">
             <label>Specialist Progress Summary & Care Directives</label>
@@ -2730,9 +2946,21 @@
           } catch (e) { failures.push(`Diagnostic “${d.name}”: ${e.message}`); }
         }
 
-        if (notesValue && notesValue.trim()) {
+        // The clinical note carries the parts of the session the API has no
+        // dedicated collection for: the procedures ticked in the Procedures tab,
+        // the teeth from the tooth chart, the archwire spec, the records
+        // attached and any complication. Without this they existed only in the
+        // browser and were lost the moment the session completed.
+        const noteSections = [
+          notesValue && notesValue.trim() ? notesValue.trim() : '',
+          buildProcedureDetailBlock(),
+          buildRecordsBlock(),
+          getComplicationsText() ? `COMPLICATIONS / ADVERSE EVENTS:\n  ${getComplicationsText()}` : ''
+        ].filter(Boolean);
+
+        if (noteSections.length) {
           try {
-            await api.post(`/procedures/${proc.id}/notes`, { note_text: notesValue });
+            await api.post(`/procedures/${proc.id}/notes`, { note_text: noteSections.join('\n\n') });
           } catch (e) { failures.push(`Clinical notes: ${e.message}`); }
         }
 
@@ -3037,33 +3265,172 @@
     let procSelected = new Set();
     let selectedTeeth = new Set();
     let materialsQuantities = {};
+    let archwireData = {};
     const UPPER_TEETH = ['18', '17', '16', '15', '14', '13', '12', '11', '21', '22', '23', '24', '25', '26', '27', '28'];
     const LOWER_TEETH = ['48', '47', '46', '45', '44', '43', '42', '41', '31', '32', '33', '34', '35', '36', '37', '38'];
 
-    // Render patient records
+    // A trailing "*" in PROCEDURES_DATA marks a procedure that is performed on
+    // specific teeth rather than the mouth as a whole, so ticking one has to
+    // open the tooth chart. Derive the set from the catalogue itself instead of
+    // repeating the list here -- a new "* " procedure then works automatically.
+    // procSelected stores names with the marker stripped (see renderProcCheckboxes),
+    // so strip it here too or nothing would ever match.
+    const TOOTH_SPECIFIC_PROCEDURES = new Set(
+      Object.values(PROCEDURES_DATA).flat()
+        .filter(p => p.trim().endsWith('*'))
+        .map(p => p.replace(' *', '').trim())
+    );
+    const ARCHWIRE_PROCEDURE = 'Archwire insertion / change';
+
+    /* ── Patient Records ───────────────────────────────────────────────────────
+       Attached files are held in the browser for the length of the session:
+       there is no upload endpoint on the API (the router exposes checklist,
+       materials, pharmacy, diagnostics and notes only), so nothing here can be
+       persisted server-side yet. The panel says so rather than showing the old
+       "✅ File uploaded" alert, which claimed a save that never happened.
+       Filenames and dates DO reach the saved record, via the summary and the
+       clinical note. */
+    let patientRecordFiles = {};   // recordId -> { name, size, type, url, date }
+
     function renderPatientRecords() {
       const container = document.getElementById('patient-records-container');
       if (!container) return;
-      let html = '';
-      for (const [category, records] of Object.entries(PATIENT_RECORDS_DATA)) {
-        html += '<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle(\'collapsed\');this.nextElementSibling.classList.toggle(\'collapsed\')">' + category + '</div><div class="diag-category-content">';
-        records.forEach(record => {
-          html += '<div class="record-item" style="background:#fff; border:1px solid var(--border); border-radius:6px; padding:16px; margin-bottom:12px;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><div style="font-weight:700; color:var(--green-dark);">' + record.icon + ' ' + record.name + '</div><div style="display:flex; gap:8px; align-items:center;"><input type="date" class="date-input" id="date-' + record.id + '" style="padding:6px 12px; border:1px solid var(--border); border-radius:4px; font-size:13px;"><button class="btn-view" onclick="viewRecord(\'' + record.id + '\')" style="background:var(--green-med); color:white; border:none; padding:6px 16px; font-size:13px; font-weight:600; border-radius:4px; cursor:pointer;">👁️ View</button></div></div><div class="upload-area" style="border:2px dashed var(--border); border-radius:6px; padding:24px; text-align:center; color:var(--text-muted); cursor:pointer;" onclick="document.getElementById(\'file-' + record.id + '\').click()"><div>📁 Click or Drag file to upload</div><div style="font-size:12px; margin-top:4px;">Supports: JPG, PNG, PDF</div><input type="file" id="file-' + record.id + '" style="display:none;" accept="image/*,.pdf" onchange="handleFileSelect(event, \'' + record.id + '\')"></div></div>';
-        });
-        html += '</div></div>';
-      }
-      container.innerHTML = html;
+
+      container.innerHTML = Object.entries(PATIENT_RECORDS_DATA).map(([category, records]) => `
+        <div class="diag-category">
+          <div class="diag-category-header"
+               onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed')">
+            ${category} <span style="font-size:12px;font-weight:normal;color:var(--text-muted)">(${records.length} items)</span>
+          </div>
+          <div class="diag-category-content" style="display:block;">
+            ${records.map(record => {
+              const att = patientRecordFiles[record.id];
+              return `
+              <div class="record-item" style="background:#fff; border:1px solid var(--border); border-radius:6px; padding:16px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
+                  <div style="font-weight:700; color:var(--green-dark);">${record.icon} ${record.name}</div>
+                  <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="date" class="date-input" id="date-${record.id}" value="${att?.date || ''}"
+                           onchange="updateRecordDate('${record.id}', this.value)"
+                           style="padding:6px 12px; border:1px solid var(--border); border-radius:4px; font-size:13px;">
+                    <button class="btn-view" onclick="viewRecord('${record.id}')"
+                            style="background:${att ? 'var(--green-med)' : '#9ca3af'}; color:white; border:none; padding:6px 16px; font-size:13px; font-weight:600; border-radius:4px; cursor:pointer;">
+                      👁️ View
+                    </button>
+                    ${att ? `<button class="btn btn-sm btn-danger" onclick="removeRecordFile('${record.id}')" style="padding:6px 10px; font-size:12px;">Remove</button>` : ''}
+                  </div>
+                </div>
+                <div class="upload-area" id="drop-${record.id}"
+                     style="border:2px dashed ${att ? 'var(--green-med)' : 'var(--border)'}; background:${att ? 'var(--green-soft)' : 'transparent'}; border-radius:6px; padding:${att ? '16px' : '24px'}; text-align:center; color:var(--text-muted); cursor:pointer;"
+                     onclick="document.getElementById('file-${record.id}').click()"
+                     ondragover="handleDragOver(event)"
+                     ondragleave="handleDragLeave(event)"
+                     ondrop="handleDrop(event, '${record.id}')">
+                  ${att
+                    ? `<div style="color:var(--green-dark); font-weight:700;">📎 ${att.name}</div>
+                       <div style="font-size:12px; margin-top:4px;">${formatFileSize(att.size)} · attached for this session — click or drop to replace</div>`
+                    : `<div>📁 Click or drag a file to attach</div>
+                       <div style="font-size:12px; margin-top:4px;">Supports: JPG, PNG, PDF</div>`}
+                  <input type="file" id="file-${record.id}" style="display:none;" accept="image/*,.pdf"
+                         onchange="handleFileSelect(event, '${record.id}')">
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`).join('');
     }
 
-    function viewRecord(recordId) {
-      alert('📂 Opening viewer for: ' + recordId);
+    function formatFileSize(bytes) {
+      if (!bytes && bytes !== 0) return '';
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function attachRecordFile(file, recordId) {
+      if (!file) return;
+      const dateEl = document.getElementById(`date-${recordId}`);
+      // Replacing an attachment leaks the old blob URL unless it is released.
+      if (patientRecordFiles[recordId]?.url) URL.revokeObjectURL(patientRecordFiles[recordId].url);
+      patientRecordFiles[recordId] = {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        url: URL.createObjectURL(file),
+        date: dateEl ? dateEl.value : ''
+      };
+      renderPatientRecords();
+      showDoctorToast(`${file.name} attached (held for this session only).`);
     }
 
     function handleFileSelect(event, recordId) {
-      const file = event.target.files[0];
-      if (file) {
-        alert('✅ File uploaded: ' + file.name);
+      attachRecordFile(event.target.files[0], recordId);
+    }
+
+    function handleDragOver(event) {
+      event.preventDefault();
+      event.currentTarget.style.borderColor = 'var(--green-med)';
+      event.currentTarget.style.background = 'var(--green-light)';
+    }
+
+    function handleDragLeave(event) {
+      event.currentTarget.style.borderColor = '';
+      event.currentTarget.style.background = '';
+    }
+
+    function handleDrop(event, recordId) {
+      event.preventDefault();
+      handleDragLeave(event);
+      attachRecordFile(event.dataTransfer.files?.[0], recordId);
+    }
+
+    function updateRecordDate(recordId, value) {
+      if (patientRecordFiles[recordId]) patientRecordFiles[recordId].date = value;
+    }
+
+    function removeRecordFile(recordId) {
+      if (patientRecordFiles[recordId]?.url) URL.revokeObjectURL(patientRecordFiles[recordId].url);
+      delete patientRecordFiles[recordId];
+      renderPatientRecords();
+    }
+
+    // Opens the attached file in a lightbox -- images inline, PDFs in the
+    // browser's own viewer. Used to be alert('Opening viewer for: <id>').
+    async function viewRecord(recordId) {
+      const att = patientRecordFiles[recordId];
+      if (!att) {
+        await uiAlert('No file is attached to this record yet. Click the upload area below it to attach one.',
+          { title: 'Nothing To View', tone: 'warn' });
+        return;
       }
+      if (att.type === 'application/pdf') { window.open(att.url, '_blank', 'noopener'); return; }
+
+      const backdrop = document.createElement('div');
+      backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(3,37,26,.82);z-index:100000;'
+        + 'display:flex;align-items:center;justify-content:center;padding:32px;cursor:zoom-out;';
+      backdrop.innerHTML = `
+        <div style="max-width:100%; max-height:100%; display:flex; flex-direction:column; gap:10px; align-items:center;">
+          <img src="${att.url}" alt="${att.name}"
+               style="max-width:100%; max-height:80vh; border-radius:8px; box-shadow:0 20px 50px rgba(0,0,0,.45); background:#fff;">
+          <div style="color:#fff; font-size:13px; font-weight:700;">
+            ${att.name}${att.date ? ` · ${att.date}` : ''} <span style="font-weight:400; opacity:.75;">— click anywhere to close</span>
+          </div>
+        </div>`;
+      const close = () => { backdrop.remove(); document.removeEventListener('keydown', onKey, true); };
+      const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+      backdrop.addEventListener('click', close);
+      document.addEventListener('keydown', onKey, true);
+      document.body.appendChild(backdrop);
+    }
+
+    // Filenames + dates for the summary sheet and the saved clinical note.
+    function buildRecordsBlock() {
+      const rows = Object.entries(PATIENT_RECORDS_DATA).flatMap(([, records]) =>
+        records.filter(r => patientRecordFiles[r.id]).map(r => {
+          const a = patientRecordFiles[r.id];
+          return `  - ${r.name}: ${a.name}${a.date ? ` (${a.date})` : ''}`;
+        }));
+      return rows.length ? ['RECORDS ATTACHED THIS SESSION:', ...rows].join('\n') : '';
     }
 
     // Render procedures
@@ -3103,15 +3470,216 @@
 
     function clearProcSelections() {
       procSelected.clear();
+      // The tooth chart and archwire details only mean anything in the context
+      // of the procedures that opened them, so clearing the procedures has to
+      // clear them too -- otherwise teeth ticked for a since-removed bonding
+      // would still be printed on the summary sheet.
+      selectedTeeth.clear();
+      archwireData = {};
       renderProcCheckboxes('');
     }
 
-    function saveProcSelections() {
-      if (procSelected.size === 0) {
-        alert('Select at least one procedure before saving.');
+    /* ── Procedure detail popups ───────────────────────────────────────────────
+       renderProcCheckboxes() has always ended with a call to updatePopupPanels(),
+       but the function was never written -- so every render threw
+       "updatePopupPanels is not defined". The throw happened after the checkbox
+       markup was already assigned, which is why the list still appeared while
+       everything downstream died: toggleProc() never reached its
+       updateMaterialsFromProcedures() call on the next line, so the Materials
+       tab never auto-populated either. Defining it fixes both. */
+    function updatePopupPanels() {
+      renderToothChart();
+      renderArchwirePanel();
+    }
+
+    // True while at least one tooth-specific ("*") procedure is ticked.
+    function needsToothChart() {
+      return Array.from(procSelected).some(p => TOOTH_SPECIFIC_PROCEDURES.has(p));
+    }
+
+    function renderToothChart() {
+      const container = document.getElementById('tooth-chart-container');
+      if (!container) return;
+
+      if (!needsToothChart()) {
+        container.innerHTML = '';
         return;
       }
-      alert(procSelected.size + ' procedures recorded.');
+
+      const triggers = Array.from(procSelected).filter(p => TOOTH_SPECIFIC_PROCEDURES.has(p));
+      const archRow = teeth => teeth.map(t => `
+        <div class="tooth-checkbox ${selectedTeeth.has(t) ? 'is-selected' : ''}">
+          <input type="checkbox" id="tooth-${t}" ${selectedTeeth.has(t) ? 'checked' : ''}
+                 onchange="toggleTooth('${t}')">
+          <label for="tooth-${t}">${t}</label>
+        </div>`).join('');
+
+      container.innerHTML = `
+        <div class="proc-panel">
+          <div class="proc-panel-head">
+            <h3>🦷 Tooth-Specific Procedure Chart</h3>
+            <button class="proc-panel-close" onclick="closeToothChart()" title="Clear selected teeth and hide">✕ Close</button>
+          </div>
+          <p class="proc-panel-hint">
+            Opened by: ${triggers.join(', ')}. Select the teeth the procedure was performed on (FDI notation).
+          </p>
+          <div class="arch-section">
+            <div class="arch-label">Upper Arch — Right → Left</div>
+            <div class="tooth-grid">${archRow(UPPER_TEETH)}</div>
+          </div>
+          <div class="arch-section">
+            <div class="arch-label">Lower Arch — Right → Left</div>
+            <div class="tooth-grid">${archRow(LOWER_TEETH)}</div>
+          </div>
+          <div class="diag-action-row" style="margin-top:16px;">
+            <span class="diag-selected-count">${selectedTeeth.size} teeth selected</span>
+          </div>
+        </div>`;
+    }
+
+    function toggleTooth(tooth) {
+      selectedTeeth.has(tooth) ? selectedTeeth.delete(tooth) : selectedTeeth.add(tooth);
+      renderToothChart();   // repaint so the count and the highlight follow the tick
+    }
+
+    // Manual dismiss. The chart reappears the moment the tooth-specific
+    // procedure is re-ticked, so closing it also drops the teeth -- leaving them
+    // set behind a hidden panel would silently attach them to the session.
+    function closeToothChart() {
+      selectedTeeth.clear();
+      const container = document.getElementById('tooth-chart-container');
+      if (container) container.innerHTML = '';
+    }
+
+    function renderArchwirePanel() {
+      const container = document.getElementById('archwire-container');
+      if (!container) return;
+
+      if (!procSelected.has(ARCHWIRE_PROCEDURE)) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const materials = ['Stainless Steel', 'NiTi', 'Copper NiTi', 'Beta-Titanium (TMA)', 'Other'];
+      const arches = [['upper', 'Upper'], ['lower', 'Lower'], ['both', 'Both']];
+
+      container.innerHTML = `
+        <div class="proc-panel">
+          <div class="proc-panel-head">
+            <h3>🔧 Archwire Detail Panel</h3>
+            <button class="proc-panel-close" onclick="closeArchwirePanel()" title="Clear archwire details and hide">✕ Close</button>
+          </div>
+          <p class="proc-panel-hint">Opened by: ${ARCHWIRE_PROCEDURE}.</p>
+
+          <div class="form-group">
+            <label>Arch</label>
+            <div class="radio-group">
+              ${arches.map(([val, lbl]) => `
+                <div class="radio-item">
+                  <input type="radio" id="arch-${val}" name="archwire-arch" value="${val}"
+                         ${archwireData.arch === val ? 'checked' : ''}
+                         onchange="updateArchwire('arch', '${val}')">
+                  <label for="arch-${val}">${lbl}</label>
+                </div>`).join('')}
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Material</label>
+            <div class="radio-group">
+              ${materials.map((mat, i) => `
+                <div class="radio-item">
+                  <input type="radio" id="archwire-mat-${i}" name="archwire-material" value="${mat}"
+                         ${archwireData.material === mat ? 'checked' : ''}
+                         onchange="updateArchwire('material', this.value)">
+                  <label for="archwire-mat-${i}">${mat}</label>
+                </div>`).join('')}
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Size / Gauge</label>
+            <input type="text" id="archwire-size" value="${archwireData.size || ''}"
+                   placeholder="e.g. 0.016 x 0.022"
+                   onchange="updateArchwire('size', this.value)">
+          </div>
+
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Date Placed</label>
+            <input type="date" id="archwire-date" value="${archwireData.date || ''}"
+                   onchange="updateArchwire('date', this.value)">
+          </div>
+        </div>`;
+    }
+
+    // Written straight into archwireData without repainting: re-rendering here
+    // would tear out the text input the doctor is still typing in.
+    function updateArchwire(field, value) {
+      archwireData[field] = value;
+    }
+
+    function closeArchwirePanel() {
+      archwireData = {};
+      const container = document.getElementById('archwire-container');
+      if (container) container.innerHTML = '';
+    }
+
+    // True once anything has actually been entered on the archwire panel.
+    function hasArchwireDetails() {
+      return Object.values(archwireData).some(v => v !== '' && v != null);
+    }
+
+    /* ── Procedures -> the session record ──────────────────────────────────────
+       This used to be a bare alert() -- the tick boxes went nowhere. There is no
+       backend collection for "procedures performed", the tooth chart or the
+       archwire spec, so they are persisted as a structured block on the
+       procedure's clinical note (POST /procedures/{id}/notes) and printed on the
+       master summary. That keeps the whole session in one saved record without
+       inventing endpoints the API does not have. */
+    function buildProcedureDetailBlock() {
+      if (!procSelected.size && !selectedTeeth.size && !hasArchwireDetails()) return '';
+
+      const lines = [];
+      if (procSelected.size) {
+        lines.push('PROCEDURES PERFORMED:');
+        Array.from(procSelected).sort().forEach(p => lines.push(`  - ${p}`));
+      }
+      if (selectedTeeth.size) {
+        const inArch = arch => arch.filter(t => selectedTeeth.has(t));
+        const upper = inArch(UPPER_TEETH);
+        const lower = inArch(LOWER_TEETH);
+        lines.push('TEETH TREATED (FDI):');
+        if (upper.length) lines.push(`  Upper: ${upper.join(', ')}`);
+        if (lower.length) lines.push(`  Lower: ${lower.join(', ')}`);
+      }
+      if (hasArchwireDetails()) {
+        lines.push('ARCHWIRE:');
+        if (archwireData.arch)     lines.push(`  Arch: ${archwireData.arch}`);
+        if (archwireData.material) lines.push(`  Material: ${archwireData.material}`);
+        if (archwireData.size)     lines.push(`  Size / gauge: ${archwireData.size}`);
+        if (archwireData.date)     lines.push(`  Date placed: ${archwireData.date}`);
+      }
+      return lines.join('\n');
+    }
+
+    async function saveProcSelections() {
+      if (procSelected.size === 0) {
+        await uiAlert('Select at least one procedure before saving.', { title: 'Procedures', tone: 'warn' });
+        return;
+      }
+      // A tooth-specific procedure with no teeth ticked is almost always an
+      // oversight, so say so rather than saving a half-filled record.
+      if (needsToothChart() && selectedTeeth.size === 0) {
+        await uiAlert(
+          'Tooth-specific procedures are selected but no teeth are marked on the chart below. '
+          + 'Select the teeth treated, then save again.',
+          { title: 'Teeth Not Selected', tone: 'warn' }
+        );
+        return;
+      }
+      const n = procSelected.size;
+      const extra = selectedTeeth.size ? ` · ${selectedTeeth.size} teeth` : '';
+      showDoctorToast(`${n} procedure${n === 1 ? '' : 's'}${extra} recorded for this session.`);
     }
 
     // Render materials
@@ -3139,8 +3707,63 @@
       materialsQuantities[matId][field] = value;
     }
 
-    function saveMaterials() {
-      alert('Materials saved successfully!');
+    /* ── Materials tab -> the session's material log ───────────────────────────
+       Was a bare alert('Materials saved successfully!') with no body: every
+       quantity typed here was discarded, while the message claimed otherwise.
+
+       confirmTimeOut() POSTs activeMaterials (to /procedures/{id}/materials), so
+       that is what the tab has to write into. Rows are tagged with a source so a
+       re-save replaces only what this tab contributed and leaves the procedure
+       preset's own rows -- seeded by applyProcedure() -- untouched. */
+    const MATERIAL_ID_TO_NAME = Object.values(MATERIALS_DATA).flat()
+      .reduce((map, mat) => {
+        map[mat.name.replace(/\s+/g, '-').toLowerCase()] = mat.name;
+        return map;
+      }, {});
+
+    async function saveMaterials() {
+      const rows = [];
+      const invalid = [];
+
+      for (const [matId, entry] of Object.entries(materialsQuantities)) {
+        const raw = String(entry?.qty ?? '').trim();
+        if (!raw) continue;                       // blank = not used, not an error
+        const name = MATERIAL_ID_TO_NAME[matId];
+        if (!name) continue;
+
+        // The backend column is an integer; a non-numeric or zero quantity would
+        // 422 at POST time, long after the doctor has left this tab.
+        const qty = Number.parseInt(raw, 10);
+        if (!Number.isFinite(qty) || qty <= 0) { invalid.push(`${name} (“${raw}”)`); continue; }
+
+        rows.push({ name, qty, unit: String(entry.unit || '').trim(), source: 'materials-tab' });
+      }
+
+      if (invalid.length) {
+        await uiAlert(
+          'These quantities are not whole numbers, so they cannot be saved:\n\n'
+          + invalid.join('\n') + '\n\nEnter a whole number (e.g. 2) and save again.',
+          { title: 'Check Quantities', tone: 'warn' }
+        );
+        return;
+      }
+
+      if (!rows.length) {
+        await uiAlert('Enter a quantity against at least one material before saving.',
+          { title: 'Materials', tone: 'warn' });
+        return;
+      }
+
+      activeMaterials = activeMaterials.filter(m => m.source !== 'materials-tab');
+      rows.forEach(r => {
+        const existing = activeMaterials.find(m => m.name.toLowerCase() === r.name.toLowerCase());
+        if (existing) { existing.qty = r.qty; existing.unit = r.unit; existing.source = 'materials-tab'; }
+        else activeMaterials.push(r);
+      });
+      activeMaterials.sort(sortByProp('name'));
+      renderMaterialsList();   // no-ops if the legacy log table isn't present
+
+      showDoctorToast(`${rows.length} material${rows.length === 1 ? '' : 's'} recorded for this session.`);
     }
 
     function updateMaterialsFromProcedures() {
@@ -3182,8 +3805,34 @@
     function resetSelectionPickers() {
       diagSelected.clear();
       invSelected.clear();
+      // Procedures, teeth, archwire, material quantities and attached files are
+      // per-session state too. Only the diagnosis/investigation sets were being
+      // cleared, so procedures ticked and quantities typed for one patient
+      // stayed selected when the next patient's chart was opened.
+      procSelected.clear();
+      selectedTeeth.clear();
+      archwireData = {};
+      materialsQuantities = {};
+      Object.values(patientRecordFiles).forEach(f => { if (f.url) URL.revokeObjectURL(f.url); });
+      patientRecordFiles = {};
+
+      const complications = document.getElementById('complications-input');
+      if (complications) complications.value = '';
+      updateComplicationsAlert();
+
+      // Paint every picker. renderPatientRecords() had no caller at all and the
+      // procedures/materials renderers only ran off a keystroke or a tick, so
+      // those three tabs opened blank until the user happened to interact with
+      // them. Rendering here means a freshly opened chart shows all of them
+      // populated and empty of the previous patient's data.
+      const searches = ['diag-search', 'inv-search', 'proc-search'];
+      searches.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+
       if (document.getElementById('diag-checkbox-container')) renderDiagCheckboxes('');
       if (document.getElementById('inv-checkbox-container')) renderInvCheckboxes('');
+      if (document.getElementById('proc-checkbox-container')) renderProcCheckboxes('');
+      renderMaterials();
+      renderPatientRecords();
     }
 
     function renderDiagCheckboxes(filter) {
