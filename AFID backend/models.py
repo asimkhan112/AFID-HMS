@@ -227,12 +227,15 @@ class Procedure(Base):
     """One procedure session performed on a patient by a doctor."""
     __tablename__ = "procedures"
 
-    id           = Column(Integer, primary_key=True, index=True)
-    patient_id   = Column(Integer, ForeignKey("patients.id", ondelete="CASCADE"))
-    doctor_id    = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    name         = Column(String(120), nullable=False)  # e.g. "Root Canal Treatment"
-    session_date = Column(DateTime, default=datetime.utcnow)
-    is_completed = Column(Boolean, default=False)
+    id               = Column(Integer, primary_key=True, index=True)
+    patient_id       = Column(Integer, ForeignKey("patients.id", ondelete="CASCADE"))
+    doctor_id        = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    name             = Column(String(120), nullable=False)  # e.g. "Root Canal Treatment"
+    session_date     = Column(DateTime, default=datetime.utcnow)
+    is_completed     = Column(Boolean, default=False)
+    start_time       = Column(DateTime, nullable=True)       # when the doctor began the procedure
+    end_time         = Column(DateTime, nullable=True)       # when the procedure was completed
+    duration_minutes = Column(Integer, nullable=True)        # calculated duration in minutes
 
     patient      = relationship("Patient", back_populates="procedures")
     doctor       = relationship("User", back_populates="procedures")

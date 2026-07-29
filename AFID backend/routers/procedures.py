@@ -36,6 +36,8 @@ def create_procedure(
     # doctor who performed it.
     if not data.get("doctor_id"):
         data["doctor_id"] = current_user.id if current_user.role == models.UserRole.doctor else None
+    # Record the start time when a procedure is created
+    data["start_time"] = datetime.utcnow()
     proc = models.Procedure(**data)
     db.add(proc)
     db.commit()
@@ -57,6 +59,11 @@ def complete_procedure(proc_id: int, db: Session = Depends(get_db), _=Depends(ge
     if not proc:
         raise HTTPException(404, "Procedure not found")
     proc.is_completed = True
+    proc.end_time = datetime.utcnow()
+    # Calculate duration in minutes from start_time to end_time
+    if proc.start_time and proc.end_time:
+        delta = proc.end_time - proc.start_time
+        proc.duration_minutes = int(delta.total_seconds() // 60)
     if proc.patient and not proc.patient.check_out_time:
         proc.patient.check_out_time = datetime.now()
     db.commit()

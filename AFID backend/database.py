@@ -9,16 +9,21 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from config import settings
 
 # ── Engine ────────────────────────────────────────────────────────────────────
-# PostgreSQL only -- no SQLite fallback / check_same_thread shim needed.
+# Supports both SQLite (local dev) and PostgreSQL (production).
 # Normalize the legacy "postgres://" scheme that some hosts hand out to the
-# "postgresql://" scheme SQLAlchemy 2.0 requires. (Neon already uses
-# "postgresql://"; this is just a safety net for pasted URLs.)
+# "postgresql://" scheme SQLAlchemy 2.0 requires.
 _db_url = settings.DATABASE_URL
 if _db_url.startswith("postgres://"):
     _db_url = "postgresql://" + _db_url[len("postgres://"):]
 
+# SQLite needs check_same_thread=False for FastAPI's threaded request handling
+_connect_args = {}
+if _db_url.startswith("sqlite"):
+    _connect_args["check_same_thread"] = False
+
 engine = create_engine(
     _db_url,
+    connect_args=_connect_args if _connect_args else {},
     pool_pre_ping=True,
 )
 

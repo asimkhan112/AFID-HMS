@@ -2997,10 +2997,15 @@
         // 1. Save procedure session. doctor_id is omitted so the backend
         //    attributes it to the signed-in doctor -- it used to send null,
         //    which saved every procedure with no doctor attached at all.
+        const checkIn = currentPatient.check_in_time ? new Date(currentPatient.check_in_time) : null;
+        const now = new Date();
+        const duration_minutes = checkIn && !isNaN(checkIn) ? Math.max(0, Math.round((now - checkIn) / 60000)) : 0;
+
         const proc = await api.post('/procedures/', {
           patient_id: currentPatient.id,
           name: procedureTitle,
-          is_completed: true
+          is_completed: true,
+          duration_minutes: duration_minutes
         });
 
         // 2. Save materials, pharmacy, diagnostics and notes. Collect failures
@@ -3070,7 +3075,6 @@
           failures.push(`Timeline entry: ${e.message}`);
         }
 
-        // 4. Mark patient as completed (backend stamps check_out_time).
         const updated = await api.patch(`/patients/${currentPatient.id}/status`, { status: 'COMPLETED' });
         currentPatient = updated;
         const updatedTimeOut = updated.check_out_time ? new Date(updated.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
@@ -3093,6 +3097,14 @@
         activePharmacy = [];
         activeDiagnostics = [];
         resetSelectionPickers();
+
+        // Refresh procedures list so analytics can see the new completed procedure
+        try {
+          const fresh = await api.get('/patients/');
+          if (fresh) cachedPatients = fresh;
+        } catch (e) {
+          console.warn('Failed to refresh patient list after completion:', e);
+        }
 
         if (failures.length) {
           await uiAlert(
