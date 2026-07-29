@@ -251,6 +251,121 @@
       border-top: 1px solid var(--border);
     }
 
+    /* Popup Panels for Tooth Chart and Archwire */
+    .popup-panel {
+      background: white;
+      border: 2px solid var(--green-med);
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 16px;
+      display: none;
+      animation: slideDown 0.3s ease-out;
+    }
+
+    .popup-panel.active {
+      display: block;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .popup-panel h3 {
+      color: var(--green-dark);
+      margin-bottom: 16px;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .popup-panel .close-btn {
+      float: right;
+      background: var(--red);
+      color: white;
+      border: none;
+      padding: 4px 12px;
+      font-size: 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .popup-panel .close-btn:hover {
+      background: #7f1d1d;
+    }
+
+    .tooth-grid {
+      display: grid;
+      grid-template-columns: repeat(16, 1fr);
+      gap: 6px;
+      margin-bottom: 20px;
+    }
+
+    .tooth-checkbox {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tooth-checkbox input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--green-med);
+    }
+
+    .tooth-checkbox label {
+      font-size: 11px;
+      cursor: pointer;
+      user-select: none;
+      color: var(--text-dark);
+    }
+
+    .arch-section {
+      margin-bottom: 20px;
+    }
+
+    .arch-label {
+      font-weight: 700;
+      color: var(--green-dark);
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 16px;
+      margin-top: 6px;
+    }
+
+    .radio-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .radio-item input[type="radio"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: var(--green-med);
+    }
+
+    .radio-item label {
+      cursor: pointer;
+      font-size: 14px;
+      user-select: none;
+    }
+
     @media print {
       .sidebar, .dashboard-title-row button, .nav-item, .panel, .tab-bar, .afid-header, .dashboard-title-row, .print-action-row, .print-hide { display: none !important; }
       body { background: white; }
@@ -2974,6 +3089,9 @@
       c.innerHTML = html || '<div class="diag-no-results">No procedures found</div>';
       const el = document.getElementById('proc-count');
       if (el) el.textContent = total + ' selected';
+      
+      // Show/hide popup panels based on selected procedures
+      updatePopupPanels();
     }
 
     function toggleProc(item) {
