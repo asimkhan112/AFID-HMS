@@ -63,7 +63,9 @@
 
     .btn { background: var(--green-med); color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: 600; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background 0.15s; }
     .btn:hover { background: var(--green-dark); }
-    .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 4px; }
+    /* Was 6px/12px at 12px type -- too small to read or hit comfortably for the
+       Save / Clear actions that close out every clinical tab. */
+    .btn-sm { padding: 9px 16px; font-size: 13px; border-radius: 6px; }
     .btn-danger { background: var(--red); }
     .btn-danger:hover { background: #7f1d1d; }
 
@@ -90,8 +92,11 @@
     .patient-details-grid .value { font-size: 14px; font-weight: 600; color: var(--text-dark); }
 
     /* Tabs Engine */
-    .tab-bar { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; gap: 4px; overflow-x: auto; }
-    .tab-button { background: none; border: none; padding: 12px 16px; font-size: 13px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+    /* Eight clinical tabs no longer fit on one line, and overflow-x left the
+       last one ("Allergy & Medical Record") cut off behind a scrollbar with no
+       hint it was there. Wrapping shows every tab at once instead. */
+    .tab-bar { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 20px; gap: 2px; }
+    .tab-button { background: none; border: none; padding: 12px 16px; font-size: 13px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; border-radius: 6px 6px 0 0; }
     .tab-button:hover { color: var(--green-med); }
     .tab-button.active { color: var(--green-med); border-bottom-color: var(--green-med); }
     .tab-content { display: none; }
@@ -183,6 +188,15 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 4px;
+    }
+    /* The multi-column grid above is right for checkbox lists and wrong for
+       anything that is one wide thing: a materials table or a record card
+       became a single ~280px grid item, so the Materials tab rendered its
+       tables squeezed into the left third of the panel with dead space beside
+       them, and every material name wrapped over three lines. */
+    .diag-category-content.is-block {
+      display: block;
+      padding: 12px;
     }
     .diag-category-content.collapsed {
       display: none;
@@ -351,134 +365,189 @@
       color: var(--text-muted);
       font-style: italic;
     }
+    /* Reads as a badge, not a stray glyph -- a faint emoji at the end of a label
+       is invisible in a list of 57 procedures. */
+    .tooth-flag {
+      display: inline-block;
+      background: var(--green-med);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 10px;
+      vertical-align: middle;
+      margin-left: 4px;
+      cursor: help;
+      white-space: nowrap;
+    }
+    .proc-legend {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 10px 14px;
+      background: var(--green-soft);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
     .diag-highlight {
       background: #fef08a;
       padding: 1px 3px;
       border-radius: 2px;
     }
+    /* Shared footer bar for every clinical tab: count on the left, actions on
+       the right, same height and spacing everywhere. It used to be a bare
+       border-top with 10px padding, so each tab's actions sat at a slightly
+       different offset and read as unaligned. */
     .diag-action-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 0;
-      margin-top: 8px;
-      border-top: 1px solid var(--border);
-    }
-
-    /* Popup Panels for Tooth Chart and Archwire */
-    .popup-panel {
-      background: white;
-      border: 2px solid var(--green-med);
-      border-radius: 8px;
-      padding: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 14px 16px;
       margin-top: 16px;
-      display: none;
-      animation: slideDown 0.3s ease-out;
+      background: var(--green-soft);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .diag-action-row .action-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
     }
 
-    .popup-panel.active {
-      display: block;
+    /* ── Materials table ───────────────────────────────────────────────────────
+       Had no stylesheet rules at all -- every cell was styled by a long inline
+       string in renderMaterials(), which is why the columns did not line up
+       between categories. */
+    .materials-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      table-layout: fixed;
     }
-
-    @keyframes slideDown {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .popup-panel h3 {
+    .materials-table th {
+      background: var(--green-light);
       color: var(--green-dark);
-      margin-bottom: 16px;
-      font-size: 18px;
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      border-bottom: 2px solid var(--border);
+    }
+    .materials-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      color: var(--text-dark);
+    }
+    .materials-table tr:last-child td { border-bottom: none; }
+    .materials-table tbody tr:hover { background: var(--green-soft); }
+    .materials-table .col-material { width: 38%; font-weight: 600; }
+    .materials-table .col-spec     { width: 30%; color: var(--text-muted); font-size: 12px; }
+    .materials-table .col-qty      { width: 16%; }
+    .materials-table .col-unit     { width: 16%; }
+    .materials-table input {
+      width: 100%;
+      max-width: 92px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      text-align: center;
+    }
+    .materials-table input:focus {
+      outline: none;
+      border-color: var(--green-med);
+      box-shadow: 0 0 0 3px rgba(15,98,68,0.1);
+    }
+    /* A row the doctor has actually filled in, so used items stand out from the
+       long list of zeros. */
+    .materials-table tr.has-qty { background: #f2f9f6; }
+    .materials-table tr.has-qty .col-material { color: var(--green-dark); }
+
+    /* ── Patient record cards ──────────────────────────────────────────────────
+       Also had no rules: the title and the drop-zone text fell back to the
+       browser's default 16px while the rest of the portal runs at 13-14px, so
+       they rendered oversized next to a tiny View button. */
+    .record-item {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+    .record-item:last-child { margin-bottom: 0; }
+    .record-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .record-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--green-dark);
       display: flex;
       align-items: center;
       gap: 8px;
     }
-
-    .popup-panel .close-btn {
-      float: right;
-      background: var(--red);
-      color: white;
-      border: none;
-      padding: 4px 12px;
-      font-size: 12px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .popup-panel .close-btn:hover {
-      background: #7f1d1d;
-    }
-
-    .tooth-grid {
-      display: grid;
-      grid-template-columns: repeat(16, 1fr);
-      gap: 6px;
-      margin-bottom: 20px;
-    }
-
-    .tooth-checkbox {
+    .record-actions {
       display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 4px;
+      gap: 8px;
     }
-
-    .tooth-checkbox input[type="checkbox"] {
-      width: 16px;
-      height: 16px;
-      cursor: pointer;
-      accent-color: var(--green-med);
-    }
-
-    .tooth-checkbox label {
-      font-size: 11px;
-      cursor: pointer;
-      user-select: none;
+    .record-actions input[type="date"] {
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: inherit;
       color: var(--text-dark);
     }
-
-    .arch-section {
-      margin-bottom: 20px;
-    }
-
-    .arch-label {
+    .btn-view {
+      background: var(--green-med);
+      color: #fff;
+      border: none;
+      padding: 8px 14px;
+      font-size: 12px;
       font-weight: 700;
-      color: var(--green-dark);
-      margin-bottom: 8px;
-      font-size: 14px;
-    }
-
-    .radio-group {
-      display: flex;
-      gap: 16px;
-      margin-top: 6px;
-    }
-
-    .radio-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      border-radius: 6px;
       cursor: pointer;
+      white-space: nowrap;
     }
-
-    .radio-item input[type="radio"] {
-      width: 18px;
-      height: 18px;
+    .btn-view:hover { background: var(--green-dark); }
+    .btn-view.is-empty { background: #9ca3af; cursor: pointer; }
+    .btn-view.is-empty:hover { background: #6b7280; }
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      text-align: center;
+      color: var(--text-muted);
       cursor: pointer;
-      accent-color: var(--green-med);
+      font-size: 13px;
+      transition: border-color .15s, background .15s;
     }
-
-    .radio-item label {
-      cursor: pointer;
-      font-size: 14px;
-      user-select: none;
+    .upload-area:hover { border-color: var(--green-med); background: var(--green-soft); }
+    .upload-area .upload-hint { font-size: 11px; margin-top: 4px; opacity: .8; }
+    .upload-area.has-file {
+      border-color: var(--green-med);
+      background: var(--green-soft);
+      padding: 14px;
     }
+    .upload-area .file-name { color: var(--green-dark); font-weight: 700; font-size: 13px; }
 
     @media print {
       .sidebar, .dashboard-title-row button, .nav-item, .panel, .tab-bar, .afid-header, .dashboard-title-row, .print-action-row, .print-hide { display: none !important; }
@@ -532,6 +601,13 @@
     ];
 
     const sortByProp = (prop) => (a, b) => (a[prop] || '').localeCompare(b[prop] || '', undefined, { sensitivity: 'base' });
+
+    // The search boxes build a RegExp out of whatever is typed to highlight the
+    // match. Plenty of items in these catalogues contain brackets -- "Interproximal
+    // reduction (IPR)", "Class II subdivision (R/L)", "Crowding - mild (<4mm)" --
+    // so the moment a doctor typed "(" the unescaped pattern became invalid and
+    // threw, blanking the list mid-search.
+    const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     const PROCEDURE_MASTER = {
       1:  { name: "U/L Bracketing", duration: 45 },
@@ -1750,8 +1826,8 @@
                   <div id="diag-checkbox-container"></div>
                   <div class="diag-action-row">
                     <span class="diag-selected-count" id="diag-count">0 selected</span>
-                    <div>
-                      <button class="btn btn-sm btn-danger" onclick="clearDiagSelections()" style="margin-right:8px;">Clear All</button>
+                    <div class="action-group">
+                      <button class="btn btn-sm btn-danger" onclick="clearDiagSelections()">Clear All</button>
                       <button class="btn btn-sm" onclick="saveDiagSelections()">💾 Save Diagnosis</button>
                     </div>
                   </div>
@@ -1768,8 +1844,8 @@
                   <div id="inv-checkbox-container"></div>
                   <div class="diag-action-row">
                     <span class="diag-selected-count" id="inv-count">0 selected</span>
-                    <div>
-                      <button class="btn btn-sm btn-danger" onclick="clearInvSelections()" style="margin-right:8px;">Clear All</button>
+                    <div class="action-group">
+                      <button class="btn btn-sm btn-danger" onclick="clearInvSelections()">Clear All</button>
                       <button class="btn btn-sm" onclick="saveInvSelections()">💾 Save Investigations</button>
                     </div>
                   </div>
@@ -1783,6 +1859,14 @@
                 <div class="panel-header">📁 Patient Records — Upload and view patient files</div>
                 <div class="panel-body">
                   <div id="patient-records-container"></div>
+                  <div class="diag-action-row">
+                    <span class="diag-selected-count" id="records-count">0 attached</span>
+                    <div class="action-group">
+                      <span style="font-size:12px; color:var(--text-muted);">
+                        Files are held for this session; the filename and date are saved with the record.
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1793,16 +1877,24 @@
                 <div class="panel-header">⚕️ Orthodontic Procedures — Select procedures performed</div>
                 <div class="panel-body">
                   <input class="diag-search-box" id="proc-search" placeholder="🔍 Search procedures... (type any word to filter)" onkeyup="renderProcCheckboxes(this.value)">
+                  <div class="proc-legend">
+                    <span class="tooth-flag">🦷 teeth</span>
+                    marks a tooth-specific procedure — selecting one opens the tooth chart below so you can record which teeth were treated.
+                  </div>
                   <div id="proc-checkbox-container"></div>
+                  <!-- The detail panels belong between the list and the Save
+                       bar: they are part of what gets saved, so burying the
+                       action row above them made Save look like it applied only
+                       to the checkboxes. -->
+                  <div id="tooth-chart-container"></div>
+                  <div id="archwire-container"></div>
                   <div class="diag-action-row">
                     <span class="diag-selected-count" id="proc-count">0 selected</span>
-                    <div>
-                      <button class="btn btn-sm btn-danger" onclick="clearProcSelections()" style="margin-right:8px;">Clear All</button>
+                    <div class="action-group">
+                      <button class="btn btn-sm btn-danger" onclick="clearProcSelections()">Clear All</button>
                       <button class="btn btn-sm" onclick="saveProcSelections()">💾 Save Procedures</button>
                     </div>
                   </div>
-                  <div id="tooth-chart-container"></div>
-                  <div id="archwire-container"></div>
                 </div>
               </div>
             </div>
@@ -1816,9 +1908,9 @@
                     <strong>ℹ️ AUTO-UPDATE:</strong> Materials are automatically added when you select procedures in the Procedures tab. You can edit quantities and units below.
                   </div>
                   <div id="materials-container"></div>
-                  <div class="diag-action-row" style="margin-top: 16px;">
+                  <div class="diag-action-row">
                     <span class="diag-selected-count" id="materials-count">0 items</span>
-                    <div>
+                    <div class="action-group">
                       <button class="btn btn-sm" onclick="saveMaterials()">💾 Save Materials</button>
                     </div>
                   </div>
@@ -3296,48 +3388,61 @@
       const container = document.getElementById('patient-records-container');
       if (!container) return;
 
-      container.innerHTML = Object.entries(PATIENT_RECORDS_DATA).map(([category, records]) => `
+      // Presentation lives in .record-item / .upload-area / .btn-view. The
+      // previous inline styling set no font-size, so the record name and the
+      // drop-zone text fell back to the browser default 16px while the rest of
+      // the portal runs at 13-14px -- a huge title beside a tiny View button.
+      container.innerHTML = Object.entries(PATIENT_RECORDS_DATA).map(([category, records]) => {
+        const attached = records.filter(r => patientRecordFiles[r.id]).length;
+        return `
         <div class="diag-category">
           <div class="diag-category-header"
                onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed')">
-            ${category} <span style="font-size:12px;font-weight:normal;color:var(--text-muted)">(${records.length} items)</span>
+            ${category}
+            <span style="font-size:12px;font-weight:normal;color:var(--text-muted)">
+              ${attached ? `${attached} of ${records.length} attached` : `${records.length} items`}
+            </span>
           </div>
-          <div class="diag-category-content" style="display:block;">
+          <div class="diag-category-content is-block">
             ${records.map(record => {
               const att = patientRecordFiles[record.id];
               return `
-              <div class="record-item" style="background:#fff; border:1px solid var(--border); border-radius:6px; padding:16px; margin-bottom:12px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
-                  <div style="font-weight:700; color:var(--green-dark);">${record.icon} ${record.name}</div>
-                  <div style="display:flex; gap:8px; align-items:center;">
-                    <input type="date" class="date-input" id="date-${record.id}" value="${att?.date || ''}"
-                           onchange="updateRecordDate('${record.id}', this.value)"
-                           style="padding:6px 12px; border:1px solid var(--border); border-radius:4px; font-size:13px;">
-                    <button class="btn-view" onclick="viewRecord('${record.id}')"
-                            style="background:${att ? 'var(--green-med)' : '#9ca3af'}; color:white; border:none; padding:6px 16px; font-size:13px; font-weight:600; border-radius:4px; cursor:pointer;">
-                      👁️ View
+              <div class="record-item">
+                <div class="record-head">
+                  <div class="record-title">${record.icon} ${record.name}</div>
+                  <div class="record-actions">
+                    <input type="date" id="date-${record.id}" value="${att?.date || ''}"
+                           onchange="updateRecordDate('${record.id}', this.value)">
+                    <button class="btn-view ${att ? '' : 'is-empty'}" onclick="viewRecord('${record.id}')">
+                      👁 View
                     </button>
-                    ${att ? `<button class="btn btn-sm btn-danger" onclick="removeRecordFile('${record.id}')" style="padding:6px 10px; font-size:12px;">Remove</button>` : ''}
+                    ${att ? `<button class="btn btn-sm btn-danger" onclick="removeRecordFile('${record.id}')">Remove</button>` : ''}
                   </div>
                 </div>
-                <div class="upload-area" id="drop-${record.id}"
-                     style="border:2px dashed ${att ? 'var(--green-med)' : 'var(--border)'}; background:${att ? 'var(--green-soft)' : 'transparent'}; border-radius:6px; padding:${att ? '16px' : '24px'}; text-align:center; color:var(--text-muted); cursor:pointer;"
+                <div class="upload-area ${att ? 'has-file' : ''}" id="drop-${record.id}"
                      onclick="document.getElementById('file-${record.id}').click()"
                      ondragover="handleDragOver(event)"
                      ondragleave="handleDragLeave(event)"
                      ondrop="handleDrop(event, '${record.id}')">
                   ${att
-                    ? `<div style="color:var(--green-dark); font-weight:700;">📎 ${att.name}</div>
-                       <div style="font-size:12px; margin-top:4px;">${formatFileSize(att.size)} · attached for this session — click or drop to replace</div>`
+                    ? `<div class="file-name">📎 ${att.name}</div>
+                       <div class="upload-hint">${formatFileSize(att.size)} · attached for this session — click or drop to replace</div>`
                     : `<div>📁 Click or drag a file to attach</div>
-                       <div style="font-size:12px; margin-top:4px;">Supports: JPG, PNG, PDF</div>`}
+                       <div class="upload-hint">Supports: JPG, PNG, PDF</div>`}
                   <input type="file" id="file-${record.id}" style="display:none;" accept="image/*,.pdf"
                          onchange="handleFileSelect(event, '${record.id}')">
                 </div>
               </div>`;
             }).join('')}
           </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
+
+      const count = document.getElementById('records-count');
+      if (count) {
+        const n = Object.keys(patientRecordFiles).length;
+        count.textContent = `${n} attached`;
+      }
     }
 
     function formatFileSize(bytes) {
@@ -3448,7 +3553,10 @@
           const cleanItem = i.replace(' *', '');
           const ch = procSelected.has(cleanItem);
           if (ch) total++;
-          const hl = f ? i.replace(new RegExp('(' + f + ')', 'gi'), '<span class="diag-highlight">$1</span>') : i;
+          let hl = f ? i.replace(new RegExp('(' + escapeRegExp(f) + ')', 'gi'), '<span class="diag-highlight">$1</span>') : i;
+          // Turn the bare trailing "*" into a labelled marker. On its own it
+          // read as a typo; it is what decides whether the tooth chart opens.
+          hl = hl.replace(/\s\*$/, ' <span class="tooth-flag" title="Tooth-specific — opens the tooth chart">🦷 teeth</span>');
           html += '<div class="diag-check-item"><input type="checkbox" ' + (ch ? 'checked' : '') + ' onchange="toggleProc(\'' + cleanItem.replace(/'/g, "\\'") + '\')"><label>' + hl + '</label></div>';
         });
         html += '</div></div>';
@@ -3531,7 +3639,7 @@
             <div class="arch-label">Lower Arch — Right → Left</div>
             <div class="tooth-grid">${archRow(LOWER_TEETH)}</div>
           </div>
-          <div class="diag-action-row" style="margin-top:16px;">
+          <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border);">
             <span class="diag-selected-count">${selectedTeeth.size} teeth selected</span>
           </div>
         </div>`;
@@ -3686,18 +3794,65 @@
     function renderMaterials() {
       const container = document.getElementById('materials-container');
       if (!container) return;
-      let html = '';
-      for (const [cat, materials] of Object.entries(MATERIALS_DATA)) {
-        html += '<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle(\'collapsed\');this.nextElementSibling.classList.toggle(\'collapsed\')">' + cat + '</div><div class="diag-category-content"><table class="materials-table" style="width:100%; border-collapse:collapse;"><thead><tr><th style="background:var(--green-light); color:var(--green-dark); padding:10px; text-align:left; font-weight:700; font-size:13px; border-bottom:2px solid var(--border);">Material</th><th style="background:var(--green-light); color:var(--green-dark); padding:10px; text-align:left; font-weight:700; font-size:13px; border-bottom:2px solid var(--border);">Specification</th><th style="background:var(--green-light); color:var(--green-dark); padding:10px; text-align:left; font-weight:700; font-size:13px; border-bottom:2px solid var(--border);">Qty</th><th style="background:var(--green-light); color:var(--green-dark); padding:10px; text-align:left; font-weight:700; font-size:13px; border-bottom:2px solid var(--border);">Unit</th></tr></thead><tbody>';
-        materials.forEach(mat => {
-          const matId = mat.name.replace(/\s+/g, '-').toLowerCase();
-          const qty = materialsQuantities[matId]?.qty || '';
-          const unit = materialsQuantities[matId]?.unit || '';
-          html += '<tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 10px; font-size:14px;">' + mat.name + '</td><td style="padding:8px 10px; font-size:14px; color:var(--text-muted);">' + (mat.spec || '-') + '</td><td style="padding:8px 10px;"><input type="text" value="' + qty + '" placeholder="0" style="width:70px; padding:4px 8px; border:1px solid var(--border); border-radius:4px; font-size:13px; text-align:center;" onchange="updateMaterial(\'' + matId + '\', \'qty\', this.value)"></td><td style="padding:8px 10px;"><input type="text" value="' + unit + '" placeholder="pcs" style="width:70px; padding:4px 8px; border:1px solid var(--border); border-radius:4px; font-size:13px; text-align:center;" onchange="updateMaterial(\'' + matId + '\', \'unit\', this.value)"></td></tr>';
-        });
-        html += '</tbody></table></div></div>';
-      }
-      container.innerHTML = html;
+
+      // Styling moved to the .materials-table rules in <style>. It used to be a
+      // ~600-character inline style string repeated on every cell, which is why
+      // columns drifted out of alignment between one category and the next.
+      container.innerHTML = Object.entries(MATERIALS_DATA).map(([cat, materials]) => {
+        const used = materials.filter(m => materialsQuantities[m.name.replace(/\s+/g, '-').toLowerCase()]?.qty).length;
+        return `
+        <div class="diag-category">
+          <div class="diag-category-header"
+               onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed')">
+            ${cat}
+            <span style="font-size:12px;font-weight:normal;color:var(--text-muted)">
+              ${used ? `${used} of ${materials.length} used` : `${materials.length} items`}
+            </span>
+          </div>
+          <div class="diag-category-content is-block">
+            <table class="materials-table">
+              <thead>
+                <tr>
+                  <th class="col-material">Material</th>
+                  <th class="col-spec">Specification</th>
+                  <th class="col-qty">Qty</th>
+                  <th class="col-unit">Unit</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${materials.map(mat => {
+                  const matId = mat.name.replace(/\s+/g, '-').toLowerCase();
+                  const qty  = materialsQuantities[matId]?.qty  || '';
+                  const unit = materialsQuantities[matId]?.unit || '';
+                  return `
+                  <tr class="${qty ? 'has-qty' : ''}">
+                    <td class="col-material">${mat.name}</td>
+                    <td class="col-spec">${mat.spec || '—'}</td>
+                    <td class="col-qty">
+                      <input type="text" inputmode="numeric" value="${qty}" placeholder="0"
+                             onchange="updateMaterial('${matId}', 'qty', this.value)">
+                    </td>
+                    <td class="col-unit">
+                      <input type="text" value="${unit}" placeholder="pcs"
+                             onchange="updateMaterial('${matId}', 'unit', this.value)">
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      }).join('');
+
+      updateMaterialsCount();
+    }
+
+    // Keeps the footer badge in step with what has actually been entered.
+    function updateMaterialsCount() {
+      const el = document.getElementById('materials-count');
+      if (!el) return;
+      const n = Object.values(materialsQuantities).filter(v => String(v?.qty ?? '').trim()).length;
+      el.textContent = `${n} item${n === 1 ? '' : 's'}`;
     }
 
     function updateMaterial(matId, field, value) {
@@ -3705,6 +3860,16 @@
         materialsQuantities[matId] = { qty: '', unit: '' };
       }
       materialsQuantities[matId][field] = value;
+
+      // Update the row highlight and the footer count in place. A full
+      // renderMaterials() here would rebuild the table under the cursor and
+      // throw away the focus mid-entry.
+      if (field === 'qty') {
+        const input = document.querySelector(`.materials-table input[onchange*="'${matId}', 'qty'"]`);
+        const row = input ? input.closest('tr') : null;
+        if (row) row.classList.toggle('has-qty', !!String(value).trim());
+      }
+      updateMaterialsCount();
     }
 
     /* ── Materials tab -> the session's material log ───────────────────────────
@@ -3849,7 +4014,7 @@
         fi.forEach(i => {
           const ch = diagSelected.has(i);
           if (ch) total++;
-          const hl = f ? i.replace(new RegExp('('+f+')','gi'),'<span class="diag-highlight">$1</span>') : i;
+          const hl = f ? i.replace(new RegExp('('+escapeRegExp(f)+')','gi'),'<span class="diag-highlight">$1</span>') : i;
           html += '<div class="diag-check-item"><input type="checkbox" ' + (ch?'checked':'') + ' onchange="toggleDiag(\''+i.replace(/'/g,"\\'")+'\')"><label>' + hl + '</label></div>';
         });
         html += '</div></div>';
@@ -3873,7 +4038,7 @@
         fi.forEach(i => {
           const ch = invSelected.has(i);
           if (ch) total++;
-          const hl = f ? i.replace(new RegExp('('+f+')','gi'),'<span class="diag-highlight">$1</span>') : i;
+          const hl = f ? i.replace(new RegExp('('+escapeRegExp(f)+')','gi'),'<span class="diag-highlight">$1</span>') : i;
           html += '<div class="diag-check-item"><input type="checkbox" ' + (ch?'checked':'') + ' onchange="toggleInv(\''+i.replace(/'/g,"\\'")+'\')"><label>' + hl + '</label></div>';
         });
         html += '</div></div>';
