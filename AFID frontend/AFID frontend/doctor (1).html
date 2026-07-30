@@ -174,14 +174,16 @@
     .materials-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text-dark); }
     .materials-table tr:last-child td { border-bottom: none; }
     .materials-table tbody tr:hover { background: var(--green-soft); }
-    .materials-table .col-material { width: 50%; font-weight: 600; }
-    .materials-table .col-qty { width: 25%; }
-    .materials-table .col-unit { width: 25%; }
+    .materials-table .col-material { width: 48%; font-weight: 600; }
+    .materials-table .col-qty { width: 19%; }
+    .materials-table .col-unit { width: 19%; }
     .materials-table input { width: 100%; max-width: 92px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit; text-align: center; }
     .materials-table input:focus { outline: none; border-color: var(--green-med); box-shadow: 0 0 0 3px rgba(15,98,68,0.1); }
     .materials-table tr.has-qty { background: #f2f9f6; }
     .materials-table tr.has-qty .col-material { color: var(--green-dark); }
-    .materials-table .col-act { width: 76px; text-align: right; }
+    /* Sits beside the header's ::after caret instead of being centred by space-between. */
+    .diag-category-header .cat-meta { margin-left: auto; margin-right: 10px; font-size: 12px; font-weight: 400; color: var(--text-muted); }
+    .materials-table .col-act { width: 14%; text-align: right; }
     .materials-table .col-act .btn { padding: 3px 8px; font-size: 11px; }
     .materials-table .col-material .mat-spec { display: block; font-weight: 400; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
     .mat-badge { display: inline-block; background: var(--green-med); color: #fff; font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 2px 6px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
@@ -802,7 +804,7 @@
       if (!container) return;
       container.innerHTML = Object.entries(PATIENT_RECORDS_DATA).map(([category, records]) => {
         const attached = records.filter(r => patientRecordFiles[r.id]).length;
-        return `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed')">${category}<span style="font-size:12px;font-weight:normal;color:var(--text-muted)">▼</span></div><div class="diag-category-content is-block collapsed">${records.map(record => { const att = patientRecordFiles[record.id]; return `<div class="record-item"><div class="record-head"><div class="record-title">${record.icon} ${record.name}</div><div class="record-actions"><input type="date" id="date-${record.id}" value="${att?.date || ''}" onchange="updateRecordDate('${record.id}', this.value)"><button class="btn-view ${att ? '' : 'is-empty'}" onclick="viewRecord('${record.id}')">👁 View</button>${att ? `<button class="btn btn-sm btn-danger" onclick="removeRecordFile('${record.id}')">Remove</button>` : ''}</div></div><div class="upload-area ${att ? 'has-file' : ''}" id="drop-${record.id}" onclick="document.getElementById('file-${record.id}').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${record.id}')">${att ? `<div class="file-name">📎 ${att.name}</div><div class="upload-hint">${formatFileSize(att.size)} · attached for this session — click or drop to replace</div>` : `<div>📁 Click or drag a file to attach</div><div class="upload-hint">Supports: JPG, PNG, PDF</div>`}<input type="file" id="file-${record.id}" style="display:none;" accept="image/*,.pdf" onchange="handleFileSelect(event, '${record.id}')"></div></div>`; }).join('')}</div></div>`;
+        return `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed')">${category}</div><div class="diag-category-content is-block collapsed">${records.map(record => { const att = patientRecordFiles[record.id]; return `<div class="record-item"><div class="record-head"><div class="record-title">${record.icon} ${record.name}</div><div class="record-actions"><input type="date" id="date-${record.id}" value="${att?.date || ''}" onchange="updateRecordDate('${record.id}', this.value)"><button class="btn-view ${att ? '' : 'is-empty'}" onclick="viewRecord('${record.id}')">👁 View</button>${att ? `<button class="btn btn-sm btn-danger" onclick="removeRecordFile('${record.id}')">Remove</button>` : ''}</div></div><div class="upload-area ${att ? 'has-file' : ''}" id="drop-${record.id}" onclick="document.getElementById('file-${record.id}').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${record.id}')">${att ? `<div class="file-name">📎 ${att.name}</div><div class="upload-hint">${formatFileSize(att.size)} · attached for this session — click or drop to replace</div>` : `<div>📁 Click or drag a file to attach</div><div class="upload-hint">Supports: JPG, PNG, PDF</div>`}<input type="file" id="file-${record.id}" style="display:none;" accept="image/*,.pdf" onchange="handleFileSelect(event, '${record.id}')"></div></div>`; }).join('')}</div></div>`;
       }).join('');
       const count = document.getElementById('records-count');
       if (count) { const n = Object.keys(patientRecordFiles).length; count.textContent = `${n} attached`; }
@@ -827,7 +829,7 @@
         const fi = items.filter(i => i.toLowerCase().includes(f));
         if (!fi.length) continue;
         const catId = cat.replace(/\s+/g, '-');
-        html += `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');document.getElementById('${catId}-proc-body').classList.toggle('collapsed')">${cat} <span style="font-size:12px;font-weight:normal;color:var(--text-muted)">▼</span></div><div class="diag-category-content collapsed" id="${catId}-proc-body">`;
+        html += `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');document.getElementById('${catId}-proc-body').classList.toggle('collapsed')">${cat} </div><div class="diag-category-content collapsed" id="${catId}-proc-body">`;
         fi.forEach(i => {
           const cleanItem = i.replace(' *', '').replace(' ⚡', '');
           const ch = procSelected.has(cleanItem);
@@ -1199,7 +1201,7 @@
           const spec = mat.spec ? `<span class="mat-spec">${escapeHtml(mat.spec)}</span>` : '';
           return `<tr class="${qty ? 'has-qty' : ''}" data-mat="${escapeAttr(id)}"><td class="col-material">${escapeHtml(mat.name)}${badge}${spec}</td><td class="col-qty"><input type="text" inputmode="numeric" value="${escapeAttr(qty)}" placeholder="0" oninput="updateMaterial('${escapeAttr(id)}', 'qty', this.value)"></td><td class="col-unit"><input type="text" value="${escapeAttr(unit)}" placeholder="pcs" oninput="updateMaterial('${escapeAttr(id)}', 'unit', this.value)"></td><td class="col-act"><button class="btn btn-sm btn-danger" onclick="removeMaterialRow('${escapeAttr(id)}')" title="Remove this material from the list">✕</button></td></tr>`;
         }).join('');
-        return `<div class="diag-category"><div class="diag-category-header ${open ? '' : 'collapsed'}" onclick="this.classList.toggle('collapsed');document.getElementById('${bodyId}').classList.toggle('collapsed')">${escapeHtml(cat)}<span style="font-size:12px;font-weight:normal;color:var(--text-muted)">${meta}</span></div><div class="diag-category-content is-block ${open ? '' : 'collapsed'}" id="${bodyId}"><table class="materials-table"><thead><tr><th class="col-material">Material</th><th class="col-qty">Qty</th><th class="col-unit">Unit</th><th class="col-act"></th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+        return `<div class="diag-category"><div class="diag-category-header ${open ? '' : 'collapsed'}" onclick="this.classList.toggle('collapsed');document.getElementById('${bodyId}').classList.toggle('collapsed')">${escapeHtml(cat)}${meta ? `<span class="cat-meta">${meta}</span>` : ''}</div><div class="diag-category-content is-block ${open ? '' : 'collapsed'}" id="${bodyId}"><table class="materials-table"><thead><tr><th class="col-material">Material</th><th class="col-qty">Qty</th><th class="col-unit">Unit</th><th class="col-act"></th></tr></thead><tbody>${body}</tbody></table></div></div>`;
       }).join('');
       renderMaterialsRestore();
       renderMaterialCategoryOptions();
@@ -1341,7 +1343,7 @@
         const fi = items.filter(i => i.toLowerCase().includes(f));
         if (!fi.length) continue;
         const catId = cat.replace(/\s+/g,'-');
-        html += `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');document.getElementById('${catId}-body').classList.toggle('collapsed')">${cat} <span style="font-size:12px;font-weight:normal;color:var(--text-muted)">▼</span></div><div class="diag-category-content collapsed" id="${catId}-body">`;
+        html += `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');document.getElementById('${catId}-body').classList.toggle('collapsed')">${cat} </div><div class="diag-category-content collapsed" id="${catId}-body">`;
         fi.forEach(i => {
           const ch = diagSelected.has(i);
           if (ch) total++;
@@ -1364,7 +1366,7 @@
         const fi = items.filter(i => i.toLowerCase().includes(f));
         if (!fi.length) continue;
         const catId = cat.replace(/\s+/g,'-');
-        html += `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');document.getElementById('${catId}-inv-body').classList.toggle('collapsed')">${cat} <span style="font-size:12px;font-weight:normal;color:var(--text-muted)">▼</span></div><div class="diag-category-content collapsed" id="${catId}-inv-body">`;
+        html += `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');document.getElementById('${catId}-inv-body').classList.toggle('collapsed')">${cat} </div><div class="diag-category-content collapsed" id="${catId}-inv-body">`;
         fi.forEach(i => {
           const ch = invSelected.has(i);
           if (ch) total++;
