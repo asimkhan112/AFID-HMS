@@ -227,6 +227,64 @@
     </div>
   </div>
 
+  <!-- Doctor Performance Modal -->
+  <div class="modal-overlay" id="analytics-doctor-modal">
+    <div class="modal-card" style="width: 800px; max-width: 95%;">
+      <div class="modal-header">
+        <span>📊 Doctor Performance Summary</span>
+        <button onclick="closeDoctorPerformanceModal()" style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0; max-height: 70vh; overflow-y: auto;">
+        <div class="stats-table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Doctor</th>
+                <th>Procedures Performed</th>
+                <th>Avg Duration</th>
+                <th>Min Duration</th>
+                <th>Max Duration</th>
+              </tr>
+            </thead>
+            <tbody id="analytics-doctor-modal-body">
+              <tr><td colspan="5" style="text-align:center; color:#6b7280; padding: 40px;">Select a procedure first</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Completion Logs Modal -->
+  <div class="modal-overlay" id="analytics-completions-modal">
+    <div class="modal-card" style="width: 900px; max-width: 95%;">
+      <div class="modal-header">
+        <span>📋 Individual Procedure Completion Logs</span>
+        <button onclick="closeCompletionLogsModal()" style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0; max-height: 70vh; overflow-y: auto;">
+        <div class="stats-table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Doctor</th>
+                <th>MR Number</th>
+                <th>Patient Name</th>
+                <th>Session Date</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody id="analytics-completions-modal-body">
+              <tr><td colspan="7" style="text-align:center; color:#6b7280; padding: 40px;">Select a procedure first</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     window.api = window.api || { get: async () => null, patch: async () => null };
     let currentView = 'overview';
@@ -240,6 +298,8 @@
     let cachedProcedureNames = [];
     let procedureAnalyticsChart = null;
     let procedureTrendChart = null;
+    let cachedDoctorPerformanceData = [];
+    let cachedCompletionLogsData = [];
     let cachedDoctorUsers = [];  // { id, full_name } for doctor lookup
     let cachedDepartmentSummary = null;
     let activeDoctorStatsModal = null;
@@ -670,6 +730,43 @@
       const alerts = cachedRooms.filter(r => r.status === 'busy' && r.time_in_mins > 30 && !r.approved);
       const ongoingPatients = (cachedPatients || []).filter(p => (p.status || '').toString().toUpperCase() === 'WAITING' || (p.status || '').toString().toUpperCase() === 'ACTIVE');
       return `
+        ${cachedDepartmentSummary ? `
+        <div class="container-card">
+          <div class="container-title">🤖 Department Summary <span style="font-size:11px; font-weight:400; text-transform:none; color:#6b7280;">— What the orthodontics dept has accomplished</span></div>
+          <div style="font-size: 14px; line-height: 1.7; color: #374151; padding: 16px; background: #fff; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+            ${cachedDepartmentSummary.summary || 'Summary not available.'}
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px;">
+            <div style="text-align: center; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <div style="font-size: 24px; font-weight: 800; color: var(--primary-green);">${cachedDepartmentSummary.stats?.procedures_last_week || 0}</div>
+              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #6b7280;">Procedures (Week)</div>
+            </div>
+            <div style="text-align: center; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <div style="font-size: 24px; font-weight: 800; color: var(--primary-green);">${cachedDepartmentSummary.stats?.procedures_last_month || 0}</div>
+              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #6b7280;">Procedures (Month)</div>
+            </div>
+            <div style="text-align: center; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <div style="font-size: 24px; font-weight: 800; color: var(--primary-green);">${cachedDepartmentSummary.stats?.completed_all_time || 0}</div>
+              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #6b7280;">Completed (All)</div>
+            </div>
+            <div style="text-align: center; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <div style="font-size: 24px; font-weight: 800; color: var(--primary-green);">${cachedDepartmentSummary.stats?.active_patients || 0}</div>
+              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #6b7280;">Active Patients</div>
+            </div>
+          </div>
+          ${(cachedDepartmentSummary.stats?.top_procedures || []).length > 0 ? `
+          <div style="margin-top: 8px;">
+            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--primary-green); margin-bottom: 8px;">Top Procedures This Month</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              ${cachedDepartmentSummary.stats.top_procedures.map(p => `<span class="meta-tag" style="background: #def7ec;">${p.name} (${p.count})</span>`).join('')}
+            </div>
+          </div>
+          ` : ''}
+          <div style="margin-top: 10px; font-size: 11px; color: #9ca3af; text-align: right;">
+            Generated: ${new Date(cachedDepartmentSummary.generated_at).toLocaleString()}
+          </div>
+        </div>
+        ` : ''}
         ${alerts.length ? `
           <div style="background:#fef2f2; border-left:6px solid #dc2626; border-radius:12px; padding:16px; margin-bottom:24px;">
             <div style="color:#991b1b; font-size:13px; font-weight:800; margin-bottom:10px;">🚨 PROLONGED PROCEDURE ALERTS (${alerts.length})</div>
@@ -918,57 +1015,55 @@
             </div>
           </div>
 
-          <div class="panel" style="margin-bottom: 20px;">
-            <div class="panel-header">📊 Doctor Performance Summary</div>
-            <div class="panel-body" style="padding: 0;">
-              <div class="inner-card" style="border: none; border-radius: 0;">
-                <div class="stats-table-container">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Doctor</th>
-                        <th>Procedures Performed</th>
-                        <th>Avg Duration</th>
-                        <th>Min Duration</th>
-                        <th>Max Duration</th>
-                      </tr>
-                    </thead>
-                    <tbody id="analytics-table-body">
-                      <tr><td colspan="5" style="text-align:center; color:#6b7280; padding: 40px 20px; font-size: 15px;">Select a procedure above to view statistics</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+          <div style="display: flex; gap: 16px; margin-bottom: 20px;">
+            <div style="flex: 1; background: #fff; border: 2px solid var(--primary-green); border-radius: 12px; padding: 24px; text-align: center; cursor: pointer; box-shadow: var(--shadow-sm); transition: var(--transition-smooth);" onclick="openDoctorPerformanceModal()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+              <div style="font-size: 48px; margin-bottom: 12px;">📊</div>
+              <div style="font-size: 16px; font-weight: 800; color: var(--primary-green);">Doctor Performance Summary</div>
+              <div style="font-size: 12px; color: #6b7280; margin-top: 6px;">Click to view per-doctor procedure statistics</div>
             </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">📋 Individual Procedure Completion Logs</div>
-            <div class="panel-body" style="padding: 0;">
-              <div class="inner-card" style="border: none; border-radius: 0;">
-                <div class="stats-table-container">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Doctor</th>
-                        <th>MR Number</th>
-                        <th>Patient Name</th>
-                        <th>Session Date</th>
-                        <th>Start Time</th>
-                        <th>End Time</th>
-                        <th>Duration</th>
-                      </tr>
-                    </thead>
-                    <tbody id="analytics-completions-body">
-                      <tr><td colspan="7" style="text-align:center; color:#6b7280; padding: 40px 20px; font-size: 15px;">Select a procedure above to view individual completion records</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+            <div style="flex: 1; background: #fff; border: 2px solid var(--primary-green); border-radius: 12px; padding: 24px; text-align: center; cursor: pointer; box-shadow: var(--shadow-sm); transition: var(--transition-smooth);" onclick="openCompletionLogsModal()" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+              <div style="font-size: 48px; margin-bottom: 12px;">📋</div>
+              <div style="font-size: 16px; font-weight: 800; color: var(--primary-green);">Individual Procedure Completion Logs</div>
+              <div style="font-size: 12px; color: #6b7280; margin-top: 6px;">Click to view detailed completion records</div>
             </div>
           </div>
         </div>
       `;
+    }
+
+    // ── Doctor Performance Modal ──────────────────────────────────────────
+    function openDoctorPerformanceModal() {
+      const modal = document.getElementById('analytics-doctor-modal');
+      const body = document.getElementById('analytics-doctor-modal-body');
+      if (!modal || !body) return;
+      if (!cachedDoctorPerformanceData.length) {
+        body.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#6b7280; padding: 40px;">Select a procedure first to load data</td></tr>';
+      } else {
+        body.innerHTML = cachedDoctorPerformanceData.map(d => '<tr><td><strong>' + (d.doctor_name || '—') + '</strong></td><td>' + (d.procedure_count != null ? d.procedure_count : '—') + '</td><td>' + (d.avg_duration_minutes != null ? d.avg_duration_minutes + ' min' : '—') + '</td><td>' + (d.min_duration_minutes != null ? d.min_duration_minutes + ' min' : '—') + '</td><td>' + (d.max_duration_minutes != null ? d.max_duration_minutes + ' min' : '—') + '</td></tr>').join('');
+      }
+      modal.classList.add('active');
+    }
+
+    function closeDoctorPerformanceModal() {
+      document.getElementById('analytics-doctor-modal').classList.remove('active');
+    }
+
+    // ── Completion Logs Modal ─────────────────────────────────────────────
+    function openCompletionLogsModal() {
+      const modal = document.getElementById('analytics-completions-modal');
+      const body = document.getElementById('analytics-completions-modal-body');
+      if (!modal || !body) return;
+      const completionsBody = document.getElementById('analytics-completions-body');
+      if (!cachedCompletionLogsData.length) {
+        body.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#6b7280; padding: 40px;">Select a procedure first to load data</td></tr>';
+      } else {
+        body.innerHTML = cachedCompletionLogsData.map(c => '<tr><td><strong>' + (c.doctor_name || '—') + '</strong></td><td>' + (c.patient_mr || '—') + '</td><td>' + (c.patient_name || '—') + '</td><td>' + (c.session_date || '—') + '</td><td>' + (c.start_time || '—') + '</td><td>' + (c.end_time || '—') + '</td><td><span class="qty-val">' + c.duration_minutes + ' min</span></td></tr>').join('');
+      }
+      modal.classList.add('active');
+    }
+
+    function closeCompletionLogsModal() {
+      document.getElementById('analytics-completions-modal').classList.remove('active');
     }
 
     async function loadProcedureAnalyticsData() {
@@ -1056,6 +1151,7 @@
       }
 
       const validData = (data || []).filter(d => d.avg_duration_minutes != null && !isNaN(d.avg_duration_minutes));
+      cachedDoctorPerformanceData = validData;
 
       // Render Statistics Table
       if (tableBody) {
@@ -1130,6 +1226,7 @@
 
       // Render Individual Completions Table & Trend Line Chart
       const validCompletions = (completions || []).filter(c => c.duration_minutes != null && !isNaN(c.duration_minutes));
+      cachedCompletionLogsData = validCompletions;
 
       if (completionsBody) {
         if (!validCompletions.length) {

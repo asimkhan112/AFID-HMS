@@ -4,6 +4,7 @@ HOD procedure analytics endpoints:
   GET /hod/procedure-analytics/procedure-list  – distinct procedure names
   GET /hod/procedure-analytics/doctor-times    – per-doctor stats for a procedure
   GET /hod/procedure-analytics/completions     – every completed instance with doctor + time
+  GET /hod/procedure-analytics/all-summary     – summary stats for ALL procedures
 """
 
 from typing import List, Optional
@@ -42,6 +43,19 @@ class DoctorProcedureCompletion(BaseModel):
     duration_minutes: int
     start_time: Optional[str] = None
     end_time: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AllProcedureSummaryOut(BaseModel):
+    """Summary stats for a single procedure across all doctors."""
+    procedure_name: str
+    total_performed: int
+    total_completed: int
+    avg_duration_minutes: Optional[float] = None
+    min_duration_minutes: Optional[int] = None
+    max_duration_minutes: Optional[int] = None
+    unique_doctors: int
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -161,6 +175,44 @@ def get_procedure_completions(
             duration_minutes=row.duration_minutes or 0,
             start_time=row.start_time.strftime("%H:%M") if row.start_time else None,
             end_time=row.end_time.strftime("%H:%M") if row.end_time else None,
+        )
+        for row in results
+    ]
+
+
+@router.get("/all-summary", response_model=List[AllProcedureSummaryOut])
+def get_all_procedures_summary(
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+    __=Depends(require_role(models.UserRole.hod, models.UserRole.admin)),
+):
+    """Return summary statistics for ALL procedures across all doctors."""
+    results = (
+        db.query(
+            models.Procedure.name.label("procedure_name"),
+            func.count(models.Procedure.id).label("total_performed"),
+            func.sum(
+                func.cast(models.Procedure.is_completed, func.Integer())
+            ).label("total_completed"),
+            func.avg(models.Procedure.duration_minutes).label("avg_duration"),
+            func.min(models.Procedure.duration_minutes).label("min_duration"),
+            func.max(models.Procedure.duration_minutes).label("max_duration"),
+            func.count(func.distinct(models.Procedure.doctor_id)).label("unique_doctors"),
+        )
+        .group_by(models.Procedure.name)
+        .order_by(models.Procedure.name)
+        .all()
+    )
+
+    return [
+        AllProcedureSummaryOut(
+            procedure_name=row.procedure_name,
+            total_performed=row.total_performed,
+            total_completed=row.total_completed or 0,
+            avg_duration_minutes=round(float(row.avg_duration), 1) if row.avg_duration else None,
+            min_duration_minutes=row.min_duration,
+            max_duration_minutes=row.max_duration,
+            unique_doctors=row.unique_doctors,
         )
         for row in results
     ]
