@@ -370,6 +370,7 @@ class RoomAllocationBase(BaseModel):
     room: str
     department: Optional[str] = None
     chair: Optional[str] = None
+    allocation_date: Optional[date] = None
 
 
 class RoomAllocationCreate(RoomAllocationBase):
@@ -499,6 +500,7 @@ class DoctorAllocationOut(BaseModel):
     room: str
     department: Optional[str] = None
     chair: Optional[str] = None
+    allocation_date: Optional[date] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

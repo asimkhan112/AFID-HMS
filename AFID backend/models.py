@@ -130,15 +130,16 @@ class StaffMember(Base):
 # ── Doctor Room Allocations ───────────────────────────────────────────────────
 
 class DoctorAllocation(Base):
-    """Maps a doctor to a clinic room, chair, and department for the day."""
+    """Maps a doctor to a clinic room, chair, and department for a specific day."""
     __tablename__ = "doctor_allocations"
 
-    id          = Column(Integer, primary_key=True, index=True)
-    doctor_name = Column(String(120), nullable=False)
-    room        = Column(String(30), nullable=False)   # e.g. "Room 10"
-    department  = Column(String(80))
-    chair       = Column(String(80))                   # e.g. "Dental Chair A"
-    created_at  = Column(DateTime, default=datetime.utcnow)
+    id              = Column(Integer, primary_key=True, index=True)
+    doctor_name     = Column(String(120), nullable=False)
+    room            = Column(String(30), nullable=False)   # e.g. "Room 10"
+    department      = Column(String(80))
+    chair           = Column(String(80))                   # e.g. "Dental Chair A"
+    allocation_date = Column(Date, default=date.today)     # which day this allocation is for
+    created_at      = Column(DateTime, default=datetime.utcnow)
 
 
 # ── Patients ──────────────────────────────────────────────────────────────────

@@ -3,8 +3,9 @@ routers/doctors.py
 Doctor profiles and room allocations.
 """
 
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List, Optional
+from datetime import date
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -49,16 +50,20 @@ def upsert_doctor_profile(
 
 # ── Room allocations ──────────────────────────────────────────────────────────
 @router.get("/allocations", response_model=List[schemas.DoctorAllocationOut])
-def list_allocations(db: Session = Depends(get_db), _=Depends(get_current_user)):
-    return db.query(models.DoctorAllocation).order_by(models.DoctorAllocation.created_at.desc()).all()
+def list_allocations(
+    allocation_date: Optional[date] = Query(None, description="Filter by date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    q = db.query(models.DoctorAllocation)
+    if allocation_date:
+        q = q.filter(models.DoctorAllocation.allocation_date == allocation_date)
+    return q.order_by(models.DoctorAllocation.allocation_date.desc(), models.DoctorAllocation.created_at.desc()).all()
 
 
-# A doctor occupies exactly ONE room at a time, so this is an UPSERT keyed on
-# doctor_name, not a blind insert. Previously, re-allocating a doctor who
-# already had a room simply appended a second row, and every consumer that
-# lists allocations (the staff portal's doctor matrix, the registration form's
-# dentist dropdown) then showed the same doctor sitting in two rooms at once
-# with the stale allocation never going away.
+# A doctor can have different room allocations on different days.
+# The UPSERT is keyed on (doctor_name, allocation_date) so a doctor can be
+# assigned Room 10 on Monday and Room 12 on Tuesday.
 @router.post("/allocations", response_model=schemas.DoctorAllocationOut, status_code=201)
 def create_allocation(
     payload: schemas.DoctorAllocationCreate,
@@ -75,21 +80,35 @@ def create_allocation(
     data["doctor_name"] = doctor_name
     data["room"] = room
 
-    # A room is a physical resource -- refuse to seat a second doctor in one.
+    # Default allocation_date to today if not provided
+    alloc_date = data.get("allocation_date")
+    if alloc_date is None:
+        alloc_date = date.today()
+        data["allocation_date"] = alloc_date
+
+    # A room is a physical resource per day -- refuse to seat a second doctor in one on the same day.
     room_holder = (
         db.query(models.DoctorAllocation)
-        .filter(models.DoctorAllocation.room == room, models.DoctorAllocation.doctor_name != doctor_name)
+        .filter(
+            models.DoctorAllocation.room == room,
+            models.DoctorAllocation.allocation_date == alloc_date,
+            models.DoctorAllocation.doctor_name != doctor_name
+        )
         .first()
     )
     if room_holder:
         raise HTTPException(
             status_code=400,
-            detail=f"{room} is already allocated to {room_holder.doctor_name}. Reassign that doctor first.",
+            detail=f"{room} on {alloc_date} is already allocated to {room_holder.doctor_name}. Reassign that doctor first.",
         )
 
+    # UPSERT: one allocation per doctor per day
     existing = (
         db.query(models.DoctorAllocation)
-        .filter(models.DoctorAllocation.doctor_name == doctor_name)
+        .filter(
+            models.DoctorAllocation.doctor_name == doctor_name,
+            models.DoctorAllocation.allocation_date == alloc_date
+        )
         .first()
     )
     if existing:
