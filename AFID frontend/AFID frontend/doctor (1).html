@@ -174,10 +174,9 @@
     .materials-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text-dark); }
     .materials-table tr:last-child td { border-bottom: none; }
     .materials-table tbody tr:hover { background: var(--green-soft); }
-    .materials-table .col-material { width: 38%; font-weight: 600; }
-    .materials-table .col-spec { width: 30%; color: var(--text-muted); font-size: 12px; }
-    .materials-table .col-qty { width: 16%; }
-    .materials-table .col-unit { width: 16%; }
+    .materials-table .col-material { width: 50%; font-weight: 600; }
+    .materials-table .col-qty { width: 25%; }
+    .materials-table .col-unit { width: 25%; }
     .materials-table input { width: 100%; max-width: 92px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit; text-align: center; }
     .materials-table input:focus { outline: none; border-color: var(--green-med); box-shadow: 0 0 0 3px rgba(15,98,68,0.1); }
     .materials-table tr.has-qty { background: #f2f9f6; }
@@ -732,7 +731,7 @@
       "Removable & Functional Appliance Therapy": ["Hawley appliance", "Twin block", "Activator", "Bionator", "Frankel appliance", "Headgear – cervical pull", "Headgear – occipital pull", "Chin cup therapy", "Removable expansion plate"],
       "Expansion Procedures": ["RPE (Hyrax / Haas)", "MARPE", "SARPE", "Quad helix", "W-arch"],
       "Growth Modification": ["Functional appliance therapy", "Headgear therapy", "Herbst appliance", "MARA appliance", "Forsus / fixed functional appliance", "Facemask (protraction) therapy", "Alt-RAMEC protocol", "Miniplate protraction (De Clerck)"],
-      "TAD Procedures": ["TAD / miniscrew placement *", "TAD-assisted space closure", "TAD-assisted intrusion / extrusion", "TAD-assisted molar distalization"],
+      "TAD Procedures": ["TAD / miniscrew placement *", "TAD-assisted space closure *", "TAD-assisted intrusion / extrusion *", "TAD-assisted molar distalization *"],
       "Surgical Orthodontics": ["Orthognathic surgery referral", "LeFort I osteotomy", "Bilateral sagittal split osteotomy", "Genioplasty", "Surgical exposure of impacted tooth *", "Corticotomy / piezocision", "Frenectomy", "Distraction osteogenesis"],
       "Aligner Therapy": ["Aligner treatment planning", "Aligner / attachment bonding *", "Aligner progress review"],
       "Retention Phase": ["Fixed retainer (bonded)", "Removable retainer – Hawley", "Removable retainer – Essix", "Positioner therapy", "Retention review"]
@@ -753,7 +752,7 @@
     let archwireData = {};
     const UPPER_TEETH = ['18', '17', '16', '15', '14', '13', '12', '11', '21', '22', '23', '24', '25', '26', '27', '28'];
     const LOWER_TEETH = ['48', '47', '46', '45', '44', '43', '42', '41', '31', '32', '33', '34', '35', '36', '37', '38'];
-    const TOOTH_SPECIFIC_PROCEDURES = new Set(["Bonding of brackets", "Banding of molars", "Interproximal reduction (IPR)", "Serial extraction", "TAD / miniscrew placement", "Surgical exposure of impacted tooth", "Debonding", "Power chain application", "Coil spring placement"]);
+    const TOOTH_SPECIFIC_PROCEDURES = new Set(["Bonding of brackets", "Banding of molars", "Interproximal reduction (IPR)", "Serial extraction", "TAD / miniscrew placement", "TAD-assisted space closure", "TAD-assisted intrusion / extrusion", "TAD-assisted molar distalization", "Surgical exposure of impacted tooth", "Debonding", "Power chain application", "Coil spring placement"]);
     const ARCHWIRE_PROCEDURE = 'Archwire insertion / change';
     let patientRecordFiles = {};
 
@@ -855,7 +854,7 @@
       if (!container) return;
       container.innerHTML = Object.entries(MATERIALS_DATA).map(([cat, materials]) => {
         const used = materials.filter(m => materialsQuantities[m.name.replace(/\s+/g, '-').toLowerCase()]?.qty).length;
-        return `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed')">${cat}<span style="font-size:12px;font-weight:normal;color:var(--text-muted)">▼</span></div><div class="diag-category-content is-block collapsed"><table class="materials-table"><thead><tr><th class="col-material">Material</th><th class="col-spec">Specification</th><th class="col-qty">Qty</th><th class="col-unit">Unit</th></tr></thead><tbody>${materials.map(mat => { const matId = mat.name.replace(/\s+/g, '-').toLowerCase(); const qty = materialsQuantities[matId]?.qty || ''; const unit = materialsQuantities[matId]?.unit || ''; return `<tr class="${qty ? 'has-qty' : ''}"><td class="col-material">${mat.name}</td><td class="col-spec">${mat.spec || '—'}</td><td class="col-qty"><input type="text" inputmode="numeric" value="${qty}" placeholder="0" onchange="updateMaterial('${matId}', 'qty', this.value)"></td><td class="col-unit"><input type="text" value="${unit}" placeholder="pcs" onchange="updateMaterial('${matId}', 'unit', this.value)"></td></tr>`; }).join('')}</tbody></table></div></div>`;
+        return `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed')">${cat}<span style="font-size:12px;font-weight:normal;color:var(--text-muted)">▼</span></div><div class="diag-category-content is-block"><table class="materials-table"><thead><tr><th class="col-material">Material</th><th class="col-qty">Qty</th><th class="col-unit">Unit</th></tr></thead><tbody>${materials.map(mat => { const matId = mat.name.replace(/\s+/g, '-').toLowerCase(); const qty = materialsQuantities[matId]?.qty || ''; const unit = materialsQuantities[matId]?.unit || ''; return `<tr class="${qty ? 'has-qty' : ''}"><td class="col-material">${mat.name}</td><td class="col-qty"><input type="text" inputmode="numeric" value="${qty}" placeholder="0" onchange="updateMaterial('${matId}', 'qty', this.value)"></td><td class="col-unit"><input type="text" value="${unit}" placeholder="pcs" onchange="updateMaterial('${matId}', 'unit', this.value)"></td></tr>`; }).join('')}</tbody></table></div></div>`;
       }).join('');
       updateMaterialsCount();
     }
