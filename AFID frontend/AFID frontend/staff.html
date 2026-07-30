@@ -493,6 +493,38 @@
     .timeline-detail-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
     .timeline-badge { background: var(--green-soft); color: var(--green-dark); font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 6px; }
     .timeline-steps-list { display: flex; flex-direction: column; gap: 12px; }
+
+    /* Box Card Heading Extension */
+    .stat-card-title {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--green-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(15, 98, 68, 0.15);
+    }
+
+    /* Dashboard Metrics Single Row Styling */
+    .dashboard-metrics-container {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+      width: 100%;
+    }
+    .metric-card {
+      flex: 1 1 0;
+      min-width: 120px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: var(--shadow-sm);
+      text-align: left;
+    }
   </style>
 </head>
 <body>
@@ -758,8 +790,9 @@
   function renderPatientTimeline() {
     return `
       <div class="container-card">
-        <div class="container-title"><span>Patient Procedure Timeline</span></div>
+        <div class="container-title"><span>PATIENT PROCEDURE TIMELINE</span></div>
         <div class="timeline-search-container">
+          <div class="stat-card-title">Patient Search & Lookup</div>
           <div class="timeline-search-row">
             <div style="flex: 1;">
               <select id="timeline-filter-type">
@@ -785,6 +818,7 @@
           </div>
           <div id="timeline-detail-area" style="margin-top:24px; display:none;">
             <div class="timeline-detail-card">
+              <div class="stat-card-title">Patient Progress History</div>
               <div class="timeline-detail-header">
                 <div>
                   <h2 class="timeline-detail-title" id="timeline-patient-title">Patient</h2>
@@ -814,11 +848,11 @@
     const unassigned = patientLogs.filter(p => !p.assignedDoctor || p.assignedDoctor === '—').length;
     const allocated = doctorDirectory.filter(d => allocationRoomFor(d.full_name)).length;
 
-    const card = (value, label) => `
-      <div style="flex: 1 1 0; min-width: 140px; background: #ffffff; border: 1px solid var(--border);
-                  border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow-sm); text-align: left;">
-        <div style="font-size: 32px; font-weight: 800; color: var(--green-dark); line-height: 1.1;">${value}</div>
-        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-top: 8px;
+    const card = (title, value, label) => `
+      <div class="metric-card">
+        <div class="stat-card-title">${title}</div>
+        <div style="font-size: 28px; font-weight: 800; color: var(--green-dark); line-height: 1.1;">${value}</div>
+        <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); margin-top: 6px;
                     text-transform: uppercase; letter-spacing: .5px;">${label}</div>
       </div>`;
 
@@ -838,12 +872,12 @@
       <p>Live front-desk overview for ${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}.</p>
     </div>
 
-    <div style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 16px; margin-bottom: 24px; width: 100%; overflow-x: auto;">
-      ${card(registeredToday, 'Registered Today')}
-      ${card(waiting, 'Waiting')}
-      ${card(active, 'In Procedure')}
-      ${card(completed, 'Completed')}
-      ${card(`${allocated}/${doctorDirectory.length}`, 'Doctors Allocated')}
+    <div class="dashboard-metrics-container">
+      ${card('Metric Overview', registeredToday, 'Registered Today')}
+      ${card('Metric Overview', waiting, 'Waiting')}
+      ${card('Metric Overview', active, 'In Procedure')}
+      ${card('Metric Overview', completed, 'Completed')}
+      ${card('Metric Overview', `${allocated}/${doctorDirectory.length}`, 'Doctors Allocated')}
     </div>
 
     ${unassigned ? `
@@ -856,6 +890,7 @@
       <div class="panel" style="height:auto;">
         <div class="panel-header">Quick Actions</div>
         <div class="panel-body" style="overflow:visible; display:flex; flex-direction:column; gap:10px;">
+          <div class="stat-card-title">System Controls</div>
           <button class="btn-primary" onclick="userNavigate('patient_reg')">＋ Register New Patient</button>
           <button class="btn-secondary" onclick="userNavigate('patient_mgmt')">Open Patient Queue</button>
           <button class="btn-secondary" onclick="userNavigate('patient_timeline')">Look Up Patient Timeline</button>
@@ -868,6 +903,7 @@
       <div class="panel" style="height:auto;">
         <div class="panel-header">Queue By Dentist</div>
         <div class="panel-body">
+          <div class="stat-card-title">Live Doctor Workload</div>
           <div class="table-container">
             <table class="table-wide">
               <thead><tr><th>Dentist</th><th>Room</th><th>Waiting</th><th>In Procedure</th></tr></thead>
@@ -910,6 +946,7 @@
       <div class="panel">
         <div class="panel-header">Dental Registration Form</div>
         <div class="panel-body">
+          <div class="stat-card-title">New Patient Profile</div>
           <form id="patient-form" onsubmit="addPatient(event)">
             <div class="form-row">
               <label>MR Number</label>
@@ -1045,6 +1082,7 @@
     <div class="panel">
       <div class="panel-header">Active Doctor Queues & Appointment Register</div>
       <div class="panel-body">
+        <div class="stat-card-title">Live Clinic Patients Table</div>
         <div class="table-container">
           <table class="table-wide">
             <thead>
@@ -1120,6 +1158,7 @@
         <div class="panel" style="height:auto;">
           <div class="panel-header">Room Allocation & Chair Setup</div>
           <div class="panel-body" style="overflow:visible;">
+            <div class="stat-card-title">Assign Operatory Room</div>
             <form id="doctor-form" onsubmit="addDoctorAllocation(event)">
               <div class="form-row">
                 <label>Doctor</label>
@@ -1141,6 +1180,7 @@
       <div class="panel">
         <div class="panel-header">Active Doctor Matrix & Live Queue Status</div>
         <div class="panel-body">
+          <div class="stat-card-title">Doctor Rosters & Room Status</div>
           <div class="table-container">
             <table class="table-wide">
               <thead>
@@ -1169,6 +1209,7 @@
     const modalHTML = `
       <div class="modal-backdrop" id="appt-modal">
         <div class="modal-box">
+          <div class="stat-card-title">Schedule Follow-Up</div>
           <h2 style="font-size:18px; font-weight:800; color:var(--green-dark); margin-bottom:4px;">Schedule Next Appointment</h2>
           <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Scheduling follow-up for <strong>${name} (${mr})</strong></p>
 
