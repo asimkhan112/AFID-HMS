@@ -228,8 +228,7 @@ This document provides a comprehensive record of all features implemented in the
 ```
 AFID frontend/
 ├── AFID frontend/
-│   ├── doctor (1).html          # Main doctor portal with all tabs
-│   └── diagnosis-investigations.html  # Reference file
+│   └── doctor (1).html          # Main doctor portal with all tabs
 ├── ORTHODONTIC_HMS_README.md    # This file
 ├── package.json
 ├── package-lock.json

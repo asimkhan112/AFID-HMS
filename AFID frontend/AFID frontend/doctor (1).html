@@ -181,6 +181,30 @@
     .materials-table input:focus { outline: none; border-color: var(--green-med); box-shadow: 0 0 0 3px rgba(15,98,68,0.1); }
     .materials-table tr.has-qty { background: #f2f9f6; }
     .materials-table tr.has-qty .col-material { color: var(--green-dark); }
+    .materials-table .col-act { width: 76px; text-align: right; }
+    .materials-table .col-act .btn { padding: 3px 8px; font-size: 11px; }
+    .materials-table .col-material .mat-spec { display: block; font-weight: 400; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .mat-badge { display: inline-block; background: var(--green-med); color: #fff; font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 2px 6px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+    .mat-badge.is-custom { background: var(--green-dark); }
+    .mat-add-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding: 14px 16px; margin-bottom: 16px; background: var(--green-soft); border: 1px solid var(--border); border-radius: 8px; }
+    .mat-add-row .mat-add-field { display: flex; flex-direction: column; gap: 4px; }
+    .mat-add-row label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
+    .mat-add-row input, .mat-add-row select { padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit; }
+    .mat-add-row .grow { flex: 1 1 180px; }
+    .mat-add-row .grow input { width: 100%; }
+    .mat-restore { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; margin-bottom: 16px; background: #fff8e6; border: 1px solid #f0d89a; border-radius: 8px; font-size: 12px; color: #7a5a10; }
+
+    .chart-foot { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .chart-foot .action-group { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+    .chart-summary { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-top: 16px; }
+    .chart-summary-head { background: var(--green-light); color: var(--green-dark); padding: 10px 16px; font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+    .chart-summary-head span { font-weight: 400; font-size: 12px; color: var(--text-muted); }
+    .chart-summary-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: #fff; }
+    .chart-summary-row:last-child { border-bottom: none; }
+    .chart-summary-row.is-empty { background: #fff8e6; }
+    .chart-summary-proc { font-size: 13px; font-weight: 700; color: var(--green-dark); }
+    .chart-summary-detail { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+    .chart-summary-row .btn { flex-shrink: 0; }
 
     .record-item { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
     .record-item:last-child { margin-bottom: 0; }
@@ -239,6 +263,8 @@
     ];
     const sortByProp = (prop) => (a, b) => (a[prop] || '').localeCompare(b[prop] || '', undefined, { sensitivity: 'base' });
     const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const escapeAttr = (s) => escapeHtml(s).replace(/\\/g, '\\\\');
 
     const PROCEDURE_MASTER = {
       1: { name: "U/L Bracketing", duration: 45 },
@@ -533,8 +559,8 @@
             <div id="subtab-diagnosis" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Orthodontic Diagnosis — Select all applicable findings</div><div class="panel-body"><input class="diag-search-box" id="diag-search" placeholder="🔍 Search diagnosis items..." onkeyup="renderDiagCheckboxes(this.value)"><div id="diag-checkbox-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="diag-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearDiagSelections()">Clear All</button><button class="btn btn-sm" onclick="saveDiagSelections()">💾 Save Diagnosis</button></div></div></div></div></div>
             <div id="subtab-investigations" class="tab-content active"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Investigations — Select all that apply</div><div class="panel-body"><input class="diag-search-box" id="inv-search" placeholder="🔍 Search investigations..." onkeyup="renderInvCheckboxes(this.value)"><div id="inv-checkbox-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="inv-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearInvSelections()">Clear All</button><button class="btn btn-sm" onclick="saveInvSelections()">💾 Save Investigations</button></div></div></div></div></div>
             <div id="subtab-patient-records" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Patient Records — Upload and view patient files</div><div class="panel-body"><div id="patient-records-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="records-count">0 attached</span><div class="action-group"><span style="font-size:12px; color:var(--text-muted);">Files are held for this session; the filename and date are saved with the record.</span></div></div></div></div></div>
-            <div id="subtab-procedures" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Orthodontic Procedures — Select procedures performed</div><div class="panel-body"><input class="diag-search-box" id="proc-search" placeholder="🔍 Search procedures..." onkeyup="renderProcCheckboxes(this.value)"><div class="proc-legend"><span class="tooth-flag">🦷 teeth</span> marks a tooth-specific procedure — selecting one opens the tooth chart below so you can record which teeth were treated.</div><div id="proc-checkbox-container"></div><div id="tooth-chart-container"></div><div id="archwire-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="proc-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearProcSelections()">Clear All</button><button class="btn btn-sm" onclick="saveProcSelections()">💾 Save Procedures</button></div></div></div></div></div>
-            <div id="subtab-materials" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Materials Used — Auto-populated from selected procedures</div><div class="panel-body"><div class="alert-box" style="background: var(--green-soft); border-color: var(--green-med); margin-bottom: 16px; color: var(--green-dark);"><strong>ℹ️ AUTO-UPDATE:</strong> Materials are automatically added when you select procedures in the Procedures tab. You can edit quantities and units below.</div><div id="materials-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="materials-count">0 items</span><div class="action-group"><button class="btn btn-sm" onclick="saveMaterials()">💾 Save Materials</button></div></div></div></div></div>
+            <div id="subtab-procedures" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Orthodontic Procedures — Select procedures performed</div><div class="panel-body"><input class="diag-search-box" id="proc-search" placeholder="🔍 Search procedures..." onkeyup="renderProcCheckboxes(this.value)"><div class="proc-legend"><span class="tooth-flag">🦷 teeth</span> marks a tooth-specific procedure — ticking one opens its own tooth chart once, and each procedure's teeth are saved separately. Reopen any chart from the Procedure Charts list below.</div><div id="proc-checkbox-container"></div><div id="chart-summary-host"></div><div id="chart-modal-host"></div><div class="diag-action-row"><span class="diag-selected-count" id="proc-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearProcSelections()">Clear All</button><button class="btn btn-sm" onclick="saveProcSelections()">💾 Save Procedures</button></div></div></div></div></div>
+            <div id="subtab-materials" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Materials Used — Auto-populated from selected procedures</div><div class="panel-body"><div class="alert-box" style="background: var(--green-soft); border-color: var(--green-med); margin-bottom: 16px; color: var(--green-dark);"><strong>ℹ️ AUTO-UPDATE:</strong> Selecting procedures in the Procedures tab automatically flags the materials those procedures consume (marked <span class="mat-badge">auto</span>). Every row's quantity and unit can be edited, any row can be removed, and you can add your own materials below.</div><div class="mat-add-row"><div class="mat-add-field grow"><label for="mat-add-name">Add material</label><input type="text" id="mat-add-name" placeholder="e.g. Bracket removal plier tips" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomMaterial();}"></div><div class="mat-add-field"><label for="mat-add-category">Category</label><select id="mat-add-category"></select></div><div class="mat-add-field"><label for="mat-add-qty">Qty</label><input type="text" inputmode="numeric" id="mat-add-qty" value="1" style="width:70px; text-align:center;"></div><div class="mat-add-field"><label for="mat-add-unit">Unit</label><input type="text" id="mat-add-unit" placeholder="pcs" style="width:80px; text-align:center;"></div><button class="btn btn-sm" onclick="addCustomMaterial()">＋ Add</button></div><div id="materials-restore-host"></div><div id="materials-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="materials-count">0 items</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="resetMaterialsTable()">Reset Table</button><button class="btn btn-sm" onclick="saveMaterials()">💾 Save Materials</button></div></div></div></div></div>
             <div id="subtab-pharmacy" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Pharmacy Dispensing Log</div><div class="panel-body"><div class="flex-row-inputs"><input type="text" id="pharmacy-input" placeholder="Medication..." style="flex:1;" /><input type="text" id="pharmacy-dose" placeholder="Dose (e.g. 500mg)" style="width:120px;" /><input type="text" id="pharmacy-freq" placeholder="Frequency" style="width:150px;" /><button class="btn btn-sm" style="height: 45px;" onclick="addPharmacyItem()">+ Add</button></div><table><thead><tr><th>Medication</th><th>Dose</th><th>Frequency</th><th style="width:80px; text-align:right;">Action</th></tr></thead><tbody id="pharmacy-log-list"></tbody></table></div></div></div>
             <div id="subtab-notes" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Ongoing Clinical Notes</div><div class="panel-body"><div class="form-group"><label style="font-weight: 700; color: var(--text-dark);">Clinical Notes & Observations</label><textarea id="clinical-notes-textarea" rows="4" placeholder="Document case observations..."></textarea><div style="text-align:right; margin-top:8px;"><button class="btn btn-sm" onclick="saveClinicalNotes()">💾 Save Notes</button></div></div><div class="form-group" style="margin-top: 16px;"><label style="font-weight: 700; color: var(--red);">⚠️ COMPLICATIONS / ADVERSE EVENTS</label><input type="text" id="complications-input" placeholder="Enter any complications or adverse events..." oninput="updateComplicationsAlert()" /><div style="text-align:right; margin-top:8px;"><button class="btn btn-sm" onclick="saveComplications()">💾 Save Complications</button></div></div><div class="alert-box" id="complications-alert-box" style="margin-bottom:12px; display:none;"></div><div style="text-align: center; margin-bottom: 12px;"><button id="transcribe-btn" style="background: var(--green-light); color: var(--green-dark); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">🎤 Transcribe</button></div><div style="text-align: center;"><button class="btn" onclick="compileMasterSummary()">📋 Use Template & Compile Master Summary Report</button></div></div></div></div>
             <div id="subtab-records" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Comprehensive Medical History & Allergies Sheet</div><div class="panel-body"><div class="form-group"><label style="color:var(--red); font-weight:700;">🚨 SYSTEM LEVEL DETECTED ALLERGIES</label><input type="text" id="record-allergy-input" placeholder="e.g. Penicillin, Latex, None..." onchange="updatePatientMedicalRecord()" /></div><div class="form-group" style="margin-top:16px;"><label>Structural Baseline Diagnostic History</label><textarea id="record-diagnostic-history" rows="4" placeholder="Enter diagnostic history..." onchange="updatePatientMedicalRecord()"></textarea></div><div class="form-group"><label>Systemic Status Records</label><textarea id="record-systemic-status" rows="4" placeholder="Enter systemic status..." onchange="updatePatientMedicalRecord()"></textarea></div><div style="text-align: right; margin-top: 12px;"><button class="btn btn-sm" onclick="saveMedicalRecordChanges()">💾 Save Changes</button></div></div></div></div>
@@ -617,10 +643,14 @@
       const pharmacyRows = activePharmacy.map(p => `<tr><td>${p.med}</td><td>${p.dose}</td><td>${p.freq}</td></tr>`).join('') || '<tr><td colspan="3">None ordered.</td></tr>';
       const diagnosticsRows = activeDiagnostics.map(d => `<tr><td>${d.name}</td><td>${d.urgency}</td></tr>`).join('') || '<tr><td colspan="2">No systemic diagnostic runs flagged.</td></tr>';
       const proceduresHtml = procSelected.size ? Array.from(procSelected).sort().map(p => `<div>• ${p}</div>`).join('') : 'No procedures recorded.';
-      const upperTreated = UPPER_TEETH.filter(t => selectedTeeth.has(t));
-      const lowerTreated = LOWER_TEETH.filter(t => selectedTeeth.has(t));
-      const teethHtml = selectedTeeth.size ? `${upperTreated.length ? `<div><strong>Upper:</strong> ${upperTreated.join(', ')}</div>` : ''}${lowerTreated.length ? `<div><strong>Lower:</strong> ${lowerTreated.join(', ')}</div>` : ''}` : '';
-      const archwireHtml = hasArchwireDetails() ? `<div>${[archwireData.arch ? `<strong>Arch:</strong> ${archwireData.arch}` : '', archwireData.material ? `<strong>Material:</strong> ${archwireData.material}` : '', archwireData.size ? `<strong>Size / gauge:</strong> ${archwireData.size}` : '', archwireData.date ? `<strong>Date placed:</strong> ${archwireData.date}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ')}</div>` : '';
+      // Each tooth-specific procedure reports its own chart, so multiple procedures stay distinguishable.
+      const teethHtml = activeToothProcedures().filter(p => toothSelections[p]?.size).map(p => {
+        const set = toothSelections[p];
+        const upper = UPPER_TEETH.filter(t => set.has(t));
+        const lower = LOWER_TEETH.filter(t => set.has(t));
+        return `<div style="margin-bottom:6px;"><strong>${escapeHtml(p)}</strong>${upper.length ? `<div style="padding-left:12px;">Upper: ${upper.join(', ')}</div>` : ''}${lower.length ? `<div style="padding-left:12px;">Lower: ${lower.join(', ')}</div>` : ''}</div>`;
+      }).join('');
+      const archwireHtml = activeArchwireEntries().map(([p, d]) => `<div style="margin-bottom:6px;"><strong>${escapeHtml(p)}</strong><div style="padding-left:12px;">${[d.arch ? `<strong>Arch:</strong> ${escapeHtml(d.arch)}` : '', d.material ? `<strong>Material:</strong> ${escapeHtml(d.material)}` : '', d.size ? `<strong>Size / gauge:</strong> ${escapeHtml(d.size)}` : '', d.date ? `<strong>Date placed:</strong> ${escapeHtml(d.date)}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ')}</div></div>`).join('');
       const recordRows = Object.entries(PATIENT_RECORDS_DATA).flatMap(([, records]) => records.filter(r => patientRecordFiles[r.id]).map(r => { const a = patientRecordFiles[r.id]; return `<tr><td>${r.name}</td><td>${a.name}</td><td>${a.date || '—'}</td></tr>`; }));
       const complicationsText = getComplicationsText();
       const targetReportBox = document.getElementById('master-summary-injection-point');
@@ -742,14 +772,25 @@
       "Bonding & Cementation": [{ name: "Composite bonding adhesive", spec: "" }, { name: "Phosphoric acid etchant", spec: "" }, { name: "Primer / bonding agent", spec: "" }, { name: "Glass ionomer cement (GIC)", spec: "" }, { name: "Resin-modified GIC (RMGIC)", spec: "" }, { name: "Band cement", spec: "" }],
       "Auxiliaries": [{ name: "Elastomeric ligatures / modules", spec: "" }, { name: "Power chain", spec: "Short / Long pitch" }, { name: "Elastics", spec: "Latex / Non-latex, force" }, { name: "Coil springs", spec: "Open / Closed" }, { name: "Separators", spec: "Elastomeric / Brass wire" }, { name: "Lip bumper", spec: "" }, { name: "Finger / retraction springs", spec: "" }, { name: "Ligature wire (steel)", spec: "" }],
       "TAD & Surgical": [{ name: "Titanium miniscrews / TADs", spec: "Length / Diameter" }, { name: "Miniplates", spec: "" }, { name: "Surgical exposure kit", spec: "" }],
+      "Extraoral & Headgear": [{ name: "Facebow", spec: "" }, { name: "Headgear straps", spec: "Cervical / Occipital" }, { name: "Facemask components", spec: "Pads / elastics" }],
       "Impression & Model Materials": [{ name: "Alginate", spec: "" }, { name: "Polyvinyl siloxane (PVS)", spec: "" }, { name: "Dental stone", spec: "Type III / IV" }, { name: "Digital scan file", spec: "N/A" }],
-      "Retention Materials": [{ name: "Retainer wire", spec: "0.032–0.036\" SS / spiral" }, { name: "Thermoplastic sheet", spec: "Essix / Aligner" }, { name: "Retainer resin / adhesive", spec: "" }]
+      "Retention Materials": [{ name: "Retainer wire", spec: "0.032–0.036\" SS / spiral" }, { name: "Thermoplastic sheet", spec: "Essix / Aligner" }, { name: "Retainer resin / adhesive", spec: "" }],
+      "Miscellaneous Consumables": [{ name: "IPR strips / discs", spec: "" }, { name: "Orthodontic relief wax", spec: "" }, { name: "Bite registration material", spec: "" }]
     };
 
     let procSelected = new Set();
-    let selectedTeeth = new Set();
     let materialsQuantities = {};
-    let archwireData = {};
+    // Per-procedure chart data. Each tooth-specific procedure keeps its own tooth set,
+    // and each archwire procedure its own detail record, so multiple selected procedures
+    // never share (or overwrite) one another's chart.
+    let toothSelections = {};   // { [procedureName]: Set<fdiToothCode> }
+    let archwireEntries = {};   // { [procedureName]: { arch, material, size, date } }
+    let chartQueue = [];        // charts still waiting to be shown, one at a time
+    let activeChart = null;     // { type: 'tooth' | 'archwire', proc, snapshot }
+    let chartsAutoOpened = new Set(); // procedures whose chart has already auto-opened once
+    let removedMaterials = new Set(); // catalog rows the doctor removed from Materials Used
+    let customMaterials = [];         // { name, spec, category } rows the doctor added
+    let autoMaterials = new Set();    // rows auto-added by the current procedure selection
     const UPPER_TEETH = ['18', '17', '16', '15', '14', '13', '12', '11', '21', '22', '23', '24', '25', '26', '27', '28'];
     const LOWER_TEETH = ['48', '47', '46', '45', '44', '43', '42', '41', '31', '32', '33', '34', '35', '36', '37', '38'];
     const TOOTH_SPECIFIC_PROCEDURES = new Set(["Bonding of brackets", "Banding of molars", "Interproximal reduction (IPR)", "Serial extraction", "TAD / miniscrew placement", "TAD-assisted space closure", "TAD-assisted intrusion / extrusion", "TAD-assisted molar distalization", "Surgical exposure of impacted tooth", "Debonding", "Power chain application", "Coil spring placement"]);
@@ -803,72 +844,486 @@
       updatePopupPanels();
     }
 
-    function toggleProc(item) { procSelected.has(item) ? procSelected.delete(item) : procSelected.add(item); const search = document.getElementById('proc-search'); renderProcCheckboxes(search ? search.value : ''); updateMaterialsFromProcedures(); }
-    function clearProcSelections() { procSelected.clear(); selectedTeeth.clear(); archwireData = {}; renderProcCheckboxes(''); }
-    function updatePopupPanels() { renderToothChart(); renderArchwirePanel(); }
-    function needsToothChart() { return Array.from(procSelected).some(p => TOOTH_SPECIFIC_PROCEDURES.has(p)); }
-
-    function renderToothChart() {
-      const container = document.getElementById('tooth-chart-container');
-      if (!container) return;
-      if (!needsToothChart()) { container.innerHTML = ''; return; }
-      const triggers = Array.from(procSelected).filter(p => TOOTH_SPECIFIC_PROCEDURES.has(p));
-      const archRow = teeth => teeth.map(t => `<div class="tooth-checkbox ${selectedTeeth.has(t) ? 'is-selected' : ''}"><input type="checkbox" id="tooth-${t}" ${selectedTeeth.has(t) ? 'checked' : ''} onchange="toggleTooth('${t}')"><label for="tooth-${t}">${t}</label></div>`).join('');
-      const panelContent = `<div class="proc-panel"><div class="proc-panel-head"><h3>🦷 Tooth-Specific Procedure Chart</h3><button class="proc-panel-close" onclick="closeToothChart()" title="Clear selected teeth and hide">✕ Close</button></div><p class="proc-panel-hint">Opened by: ${triggers.join(', ')}. Select the teeth the procedure was performed on (FDI notation).</p><div class="arch-section"><div class="arch-label">Upper Arch — Right → Left</div><div class="tooth-grid">${archRow(UPPER_TEETH)}</div></div><div class="arch-section"><div class="arch-label">Lower Arch — Right → Left</div><div class="tooth-grid">${archRow(LOWER_TEETH)}</div></div><div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border);"><span class="diag-selected-count">${selectedTeeth.size} teeth selected</span></div></div>`;
-      container.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)closeToothChart()">${panelContent}</div>`;
+    // ---------------------------------------------------------------------
+    // Procedure selection → per-procedure charts
+    // ---------------------------------------------------------------------
+    function chartTypeFor(proc) {
+      if (TOOTH_SPECIFIC_PROCEDURES.has(proc)) return 'tooth';
+      if (proc === ARCHWIRE_PROCEDURE) return 'archwire';
+      return null;
     }
 
-    function toggleTooth(tooth) { selectedTeeth.has(tooth) ? selectedTeeth.delete(tooth) : selectedTeeth.add(tooth); renderToothChart(); }
-    function closeToothChart() { selectedTeeth.clear(); const container = document.getElementById('tooth-chart-container'); if (container) container.innerHTML = ''; }
+    function toggleProc(item) {
+      if (procSelected.has(item)) {
+        procSelected.delete(item);
+        // Deselecting drops only this procedure's chart data — other charts are untouched.
+        delete toothSelections[item];
+        delete archwireEntries[item];
+        chartsAutoOpened.delete(item);
+        chartQueue = chartQueue.filter(c => c.proc !== item);
+        if (activeChart && activeChart.proc === item) { activeChart = null; renderChartHost(); }
+      } else {
+        procSelected.add(item);
+        const type = chartTypeFor(item);
+        // Queue the chart only for the procedure that needs one, and only the first
+        // time it is ticked — a normal procedure ticked later must not reopen it.
+        if (type && !chartsAutoOpened.has(item)) {
+          chartQueue.push({ type, proc: item });
+          // Keep the "N more charts to complete" note on an already-open chart honest.
+          if (activeChart) renderChartHost();
+        }
+      }
+      const search = document.getElementById('proc-search');
+      renderProcCheckboxes(search ? search.value : '');
+      updateMaterialsFromProcedures();
+      openNextChart();
+    }
 
-    function renderArchwirePanel() {
-      const container = document.getElementById('archwire-container');
-      if (!container) return;
-      if (!procSelected.has(ARCHWIRE_PROCEDURE)) { container.innerHTML = ''; return; }
-      const materials = ['Stainless Steel', 'NiTi', 'Copper NiTi', 'Beta-Titanium (TMA)', 'Other'];
+    function clearProcSelections() {
+      procSelected.clear(); toothSelections = {}; archwireEntries = {};
+      chartQueue = []; chartsAutoOpened.clear(); activeChart = null; autoMaterials = new Set();
+      renderChartHost(); renderProcCheckboxes(''); renderMaterials();
+    }
+
+    // Called at the end of renderProcCheckboxes — refreshes the chart list, never reopens a modal.
+    function updatePopupPanels() { renderChartSummary(); }
+
+    function activeToothProcedures() { return Array.from(procSelected).filter(p => TOOTH_SPECIFIC_PROCEDURES.has(p)).sort(); }
+    function activeArchwireProcedures() { return Array.from(procSelected).filter(p => p === ARCHWIRE_PROCEDURE); }
+    function archwireFilledCount(d) { return d ? ['arch', 'material', 'size', 'date'].filter(k => String(d[k] ?? '').trim()).length : 0; }
+    function activeArchwireEntries() { return activeArchwireProcedures().filter(p => archwireFilledCount(archwireEntries[p])).map(p => [p, archwireEntries[p]]); }
+    function allSelectedTeeth() { const out = new Set(); activeToothProcedures().forEach(p => (toothSelections[p] || new Set()).forEach(t => out.add(t))); return out; }
+
+    // --- one chart at a time -----------------------------------------------
+    function openNextChart() {
+      if (activeChart || !chartQueue.length) return;
+      const next = chartQueue.shift();
+      chartsAutoOpened.add(next.proc);
+      openChart(next.type, next.proc);
+    }
+
+    function openChart(type, proc) {
+      if (type === 'tooth') { if (!toothSelections[proc]) toothSelections[proc] = new Set(); }
+      else if (!archwireEntries[proc]) archwireEntries[proc] = { arch: '', material: '', size: '', date: '' };
+      const snapshot = type === 'tooth' ? new Set(toothSelections[proc]) : { ...archwireEntries[proc] };
+      activeChart = { type, proc, snapshot };
+      renderChartHost();
+    }
+
+    // Reopen a chart on demand from the Procedure Charts list.
+    function editChart(proc) {
+      const type = chartTypeFor(proc);
+      if (!type || activeChart || !procSelected.has(proc)) return;
+      chartQueue = chartQueue.filter(c => c.proc !== proc);
+      chartsAutoOpened.add(proc);
+      openChart(type, proc);
+    }
+
+    function renderChartHost() {
+      const host = document.getElementById('chart-modal-host');
+      if (!host) return;
+      if (!activeChart) { host.innerHTML = ''; return; }
+      host.innerHTML = `<div class="modal-overlay">${activeChart.type === 'tooth' ? toothChartMarkup() : archwireChartMarkup()}</div>`;
+    }
+
+    function queuedChartNote() {
+      const n = chartQueue.length;
+      return n ? ` <em>${n} more chart${n === 1 ? '' : 's'} to complete after this one.</em>` : '';
+    }
+
+    function toothChartMarkup() {
+      const proc = activeChart.proc;
+      const teeth = toothSelections[proc] || new Set();
+      const archRow = list => list.map(t => `<div class="tooth-checkbox ${teeth.has(t) ? 'is-selected' : ''}"><input type="checkbox" id="tooth-${t}" ${teeth.has(t) ? 'checked' : ''} onchange="toggleTooth('${t}')"><label for="tooth-${t}">${t}</label></div>`).join('');
+      return `<div class="proc-panel"><div class="proc-panel-head"><h3>🦷 Tooth Chart — ${escapeHtml(proc)}</h3><button class="proc-panel-close" onclick="dismissActiveChart()" title="Discard unsaved changes to this chart">✕ Cancel</button></div><p class="proc-panel-hint">Record the teeth treated for <strong>${escapeHtml(proc)}</strong> (FDI notation). This chart is saved against this procedure only.${queuedChartNote()}</p><div class="arch-section"><div class="arch-label">Upper Arch — Right → Left</div><div class="tooth-grid">${archRow(UPPER_TEETH)}</div></div><div class="arch-section"><div class="arch-label">Lower Arch — Right → Left</div><div class="tooth-grid">${archRow(LOWER_TEETH)}</div></div><div class="chart-foot"><span class="diag-selected-count" id="chart-count">${teeth.size} teeth selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearActiveChart()">Clear Teeth</button><button class="btn btn-sm" onclick="saveActiveChart()">💾 Save Chart</button></div></div></div>`;
+    }
+
+    function archwireChartMarkup() {
+      const proc = activeChart.proc;
+      const d = archwireEntries[proc] || {};
+      const mats = ['Stainless steel', 'NiTi', 'Copper NiTi', 'Beta-titanium (TMA)', 'Multi-strand / braided', 'Other'];
       const arches = [['upper', 'Upper'], ['lower', 'Lower'], ['both', 'Both']];
-      const panelContent = `<div class="proc-panel"><div class="proc-panel-head"><h3>⚡ Archwire Detail Panel</h3><button class="proc-panel-close" onclick="closeArchwirePanel()" title="Clear archwire details and hide">✕ Close</button></div><p class="proc-panel-hint">Opened by: ${ARCHWIRE_PROCEDURE}.</p><div class="form-group"><label>Arch</label><div class="radio-group">${arches.map(([val, lbl]) => `<div class="radio-item"><input type="radio" id="arch-${val}" name="archwire-arch" value="${val}" ${archwireData.arch === val ? 'checked' : ''} onchange="updateArchwire('arch', '${val}')"><label for="arch-${val}">${lbl}</label></div>`).join('')}</div></div><div class="form-group"><label>Material</label><div class="radio-group">${materials.map((mat, i) => `<div class="radio-item"><input type="radio" id="archwire-mat-${i}" name="archwire-material" value="${mat}" ${archwireData.material === mat ? 'checked' : ''} onchange="updateArchwire('material', this.value)"><label for="archwire-mat-${i}">${mat}</label></div>`).join('')}</div></div><div class="form-group"><label>Size / Gauge</label><input type="text" id="archwire-size" value="${archwireData.size || ''}" placeholder="e.g. 0.016 x 0.022" onchange="updateArchwire('size', this.value)"></div><div class="form-group" style="margin-bottom:0;"><label>Date Placed</label><input type="date" id="archwire-date" value="${archwireData.date || ''}" onchange="updateArchwire('date', this.value)"></div></div>`;
-      container.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)closeArchwirePanel()">${panelContent}</div>`;
+      return `<div class="proc-panel"><div class="proc-panel-head"><h3>⚡ Archwire Chart — ${escapeHtml(proc)}</h3><button class="proc-panel-close" onclick="dismissActiveChart()" title="Discard unsaved changes to this chart">✕ Cancel</button></div><p class="proc-panel-hint">Record the archwire placed for <strong>${escapeHtml(proc)}</strong>.${queuedChartNote()}</p><div class="form-group"><label>Arch</label><div class="radio-group">${arches.map(([v, l]) => `<div class="radio-item"><input type="radio" id="arch-${v}" name="archwire-arch" value="${l}" ${d.arch === l ? 'checked' : ''} onchange="updateArchwire('arch', '${l}')"><label for="arch-${v}">${l}</label></div>`).join('')}</div></div><div class="form-group"><label>Material</label><div class="radio-group">${mats.map((m, i) => `<div class="radio-item"><input type="radio" id="archwire-mat-${i}" name="archwire-material" value="${escapeAttr(m)}" ${d.material === m ? 'checked' : ''} onchange="updateArchwire('material', this.value)"><label for="archwire-mat-${i}">${escapeHtml(m)}</label></div>`).join('')}</div></div><div class="form-group"><label>Size / Gauge</label><input type="text" value="${escapeAttr(d.size || '')}" placeholder="e.g. 0.016 x 0.022" oninput="updateArchwire('size', this.value)"></div><div class="form-group"><label>Date Placed</label><input type="date" value="${escapeAttr(d.date || '')}" onchange="updateArchwire('date', this.value)"></div><div class="chart-foot"><span class="diag-selected-count" id="chart-count">${archwireFilledCount(d)} of 4 details set</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearActiveChart()">Clear Fields</button><button class="btn btn-sm" onclick="saveActiveChart()">💾 Save Chart</button></div></div></div>`;
     }
-    function updateArchwire(field, value) { archwireData[field] = value; }
-    function closeArchwirePanel() { archwireData = {}; const container = document.getElementById('archwire-container'); if (container) container.innerHTML = ''; }
-    function hasArchwireDetails() { return Object.values(archwireData).some(v => v !== '' && v != null); }
+
+    // Patch just the toggled tooth and the counter so the grid never re-renders under the cursor.
+    function toggleTooth(tooth) {
+      if (!activeChart || activeChart.type !== 'tooth') return;
+      const set = toothSelections[activeChart.proc] || (toothSelections[activeChart.proc] = new Set());
+      set.has(tooth) ? set.delete(tooth) : set.add(tooth);
+      const box = document.getElementById(`tooth-${tooth}`);
+      if (box) { box.checked = set.has(tooth); const cell = box.closest('.tooth-checkbox'); if (cell) cell.classList.toggle('is-selected', set.has(tooth)); }
+      const count = document.getElementById('chart-count');
+      if (count) count.textContent = `${set.size} teeth selected`;
+    }
+
+    function updateArchwire(field, value) {
+      if (!activeChart || activeChart.type !== 'archwire') return;
+      const proc = activeChart.proc;
+      if (!archwireEntries[proc]) archwireEntries[proc] = { arch: '', material: '', size: '', date: '' };
+      archwireEntries[proc][field] = value;
+      const count = document.getElementById('chart-count');
+      if (count) count.textContent = `${archwireFilledCount(archwireEntries[proc])} of 4 details set`;
+    }
+
+    function clearActiveChart() {
+      if (!activeChart) return;
+      if (activeChart.type === 'tooth') toothSelections[activeChart.proc] = new Set();
+      else archwireEntries[activeChart.proc] = { arch: '', material: '', size: '', date: '' };
+      renderChartHost();
+    }
+
+    async function saveActiveChart() {
+      if (!activeChart) return;
+      const { type, proc } = activeChart;
+      if (type === 'tooth') {
+        const set = toothSelections[proc] || new Set();
+        if (!set.size) { await uiAlert(`Select at least one tooth for "${proc}" before saving, or cancel this chart.`, { title: 'No Teeth Selected', tone: 'warn' }); return; }
+        showDoctorToast(`${proc} — ${set.size} ${set.size === 1 ? 'tooth' : 'teeth'} saved.`);
+      } else {
+        if (!archwireFilledCount(archwireEntries[proc])) { await uiAlert(`Enter at least one archwire detail for "${proc}" before saving, or cancel this chart.`, { title: 'Archwire Chart Empty', tone: 'warn' }); return; }
+        showDoctorToast(`${proc} — archwire detail saved.`);
+      }
+      activeChart = null;
+      renderChartHost(); renderChartSummary();
+      openNextChart();
+    }
+
+    // Cancel rolls this procedure back to whatever was last saved for it.
+    function dismissActiveChart() {
+      if (!activeChart) return;
+      const { type, proc, snapshot } = activeChart;
+      if (type === 'tooth') { if (snapshot.size) toothSelections[proc] = new Set(snapshot); else delete toothSelections[proc]; }
+      else if (archwireFilledCount(snapshot)) archwireEntries[proc] = { ...snapshot };
+      else delete archwireEntries[proc];
+      activeChart = null;
+      renderChartHost(); renderChartSummary();
+      openNextChart();
+    }
+
+    function renderChartSummary() {
+      const host = document.getElementById('chart-summary-host');
+      if (!host) return;
+      const rows = [];
+      const row = (proc, detail, filled) => `<div class="chart-summary-row ${filled ? '' : 'is-empty'}"><div><div class="chart-summary-proc">${filled ? '✅' : '⚠️'} ${escapeHtml(proc)}</div><div class="chart-summary-detail">${escapeHtml(detail)}</div></div><button class="btn btn-sm" onclick="editChart('${escapeAttr(proc).replace(/'/g, "\\'")}')">${filled ? '✏️ Edit chart' : '📝 Open chart'}</button></div>`;
+      activeToothProcedures().forEach(p => {
+        const set = toothSelections[p] || new Set();
+        const upper = UPPER_TEETH.filter(t => set.has(t));
+        const lower = LOWER_TEETH.filter(t => set.has(t));
+        const detail = set.size ? [upper.length ? `Upper: ${upper.join(', ')}` : '', lower.length ? `Lower: ${lower.join(', ')}` : ''].filter(Boolean).join('  ·  ') : 'No teeth recorded yet';
+        rows.push(row(p, detail, set.size > 0));
+      });
+      activeArchwireProcedures().forEach(p => {
+        const d = archwireEntries[p] || {};
+        const filled = archwireFilledCount(d) > 0;
+        const detail = filled ? [d.arch ? `Arch: ${d.arch}` : '', d.material ? `Material: ${d.material}` : '', d.size ? `Size: ${d.size}` : '', d.date ? `Placed: ${d.date}` : ''].filter(Boolean).join('  ·  ') : 'No archwire detail recorded yet';
+        rows.push(row(p, detail, filled));
+      });
+      host.innerHTML = rows.length ? `<div class="chart-summary"><div class="chart-summary-head">Procedure Charts<span>${rows.length} chart${rows.length === 1 ? '' : 's'} · click to reopen</span></div>${rows.join('')}</div>` : '';
+    }
 
     function buildProcedureDetailBlock() {
-      if (!procSelected.size && !selectedTeeth.size && !hasArchwireDetails()) return '';
-      const lines = [];
-      if (procSelected.size) { lines.push('PROCEDURES PERFORMED:'); Array.from(procSelected).sort().forEach(p => lines.push(`  - ${p}`)); }
-      if (selectedTeeth.size) { const inArch = arch => arch.filter(t => selectedTeeth.has(t)); const upper = inArch(UPPER_TEETH); const lower = inArch(LOWER_TEETH); lines.push('TEETH TREATED (FDI):'); if (upper.length) lines.push(`  Upper: ${upper.join(', ')}`); if (lower.length) lines.push(`  Lower: ${lower.join(', ')}`); }
-      if (hasArchwireDetails()) { lines.push('ARCHWIRE:'); if (archwireData.arch) lines.push(`  Arch: ${archwireData.arch}`); if (archwireData.material) lines.push(`  Material: ${archwireData.material}`); if (archwireData.size) lines.push(`  Size / gauge: ${archwireData.size}`); if (archwireData.date) lines.push(`  Date placed: ${archwireData.date}`); }
+      if (!procSelected.size) return '';
+      const lines = ['PROCEDURES PERFORMED:'];
+      Array.from(procSelected).sort().forEach(p => lines.push(`  - ${p}`));
+      const charted = activeToothProcedures().filter(p => toothSelections[p]?.size);
+      if (charted.length) {
+        lines.push('TEETH TREATED (FDI), BY PROCEDURE:');
+        charted.forEach(p => {
+          const set = toothSelections[p];
+          const upper = UPPER_TEETH.filter(t => set.has(t));
+          const lower = LOWER_TEETH.filter(t => set.has(t));
+          lines.push(`  ${p}:`);
+          if (upper.length) lines.push(`    Upper: ${upper.join(', ')}`);
+          if (lower.length) lines.push(`    Lower: ${lower.join(', ')}`);
+        });
+      }
+      activeArchwireEntries().forEach(([p, d]) => {
+        lines.push(`ARCHWIRE (${p}):`);
+        if (d.arch) lines.push(`  Arch: ${d.arch}`);
+        if (d.material) lines.push(`  Material: ${d.material}`);
+        if (d.size) lines.push(`  Size / gauge: ${d.size}`);
+        if (d.date) lines.push(`  Date placed: ${d.date}`);
+      });
       return lines.join('\n');
     }
 
     async function saveProcSelections() {
       if (procSelected.size === 0) { await uiAlert('Select at least one procedure before saving.', { title: 'Procedures', tone: 'warn' }); return; }
-      if (needsToothChart() && selectedTeeth.size === 0) { await uiAlert('Tooth-specific procedures are selected but no teeth are marked on the chart below. Select the teeth treated, then save again.', { title: 'Teeth Not Selected', tone: 'warn' }); return; }
-      const n = procSelected.size; const extra = selectedTeeth.size ? ` · ${selectedTeeth.size} teeth` : ''; showDoctorToast(`${n} procedure${n === 1 ? '' : 's'}${extra} recorded for this session.`);
+      const missingTeeth = activeToothProcedures().filter(p => !toothSelections[p]?.size);
+      if (missingTeeth.length) { await uiAlert('These tooth-specific procedures have no teeth recorded yet:\n\n' + missingTeeth.map(p => `• ${p}`).join('\n') + '\n\nOpen each one from the Procedure Charts list, mark the teeth treated, and save the chart.', { title: 'Teeth Not Selected', tone: 'warn' }); return; }
+      const missingArchwire = activeArchwireProcedures().filter(p => !archwireFilledCount(archwireEntries[p]));
+      if (missingArchwire.length) { await uiAlert('The archwire chart has no details recorded yet. Open it from the Procedure Charts list, fill in the archwire placed, and save the chart.', { title: 'Archwire Chart Empty', tone: 'warn' }); return; }
+      const n = procSelected.size;
+      const charts = activeToothProcedures().length;
+      const teeth = allSelectedTeeth().size;
+      const extra = charts ? ` · ${teeth} teeth across ${charts} chart${charts === 1 ? '' : 's'}` : '';
+      showDoctorToast(`${n} procedure${n === 1 ? '' : 's'}${extra} recorded for this session.`);
+    }
+
+    // ---------------------------------------------------------------------
+    // Materials Used
+    // ---------------------------------------------------------------------
+    const materialId = (name) => String(name).trim().replace(/\s+/g, '-').toLowerCase();
+
+    // Which material groups each procedure consumes. Auto-update reads this map, so
+    // adjusting a procedure's materials is a one-line change here.
+    const MATERIAL_GROUPS = {
+      brackets: "Brackets & Bands",
+      archwires: "Archwires",
+      bonding: "Bonding & Cementation",
+      auxiliaries: "Auxiliaries",
+      tad: "TAD & Surgical",
+      extraoral: "Extraoral & Headgear",
+      impression: "Impression & Model Materials",
+      retention: "Retention Materials",
+      misc: "Miscellaneous Consumables"
+    };
+
+    const PROCEDURE_MATERIAL_MAP = {
+      // Preventive & Interceptive
+      "Space maintainer – fixed": ['brackets', 'bonding', 'impression'],
+      "Space maintainer – removable": ['impression', 'retention'],
+      "Space regainer": ['brackets', 'bonding', 'auxiliaries', 'impression'],
+      "Serial extraction": ['misc'],
+      "Habit-breaking appliance": ['impression', 'auxiliaries'],
+      // Fixed Appliance Therapy
+      "Bonding of brackets": ['brackets', 'bonding'],
+      "Banding of molars": ['brackets', 'bonding'],
+      "Archwire insertion / change": ['archwires'],
+      "Ligation (elastomeric / steel)": ['auxiliaries'],
+      "Power chain application": ['auxiliaries'],
+      "Intermaxillary elastics": ['auxiliaries'],
+      "Coil spring placement": ['auxiliaries'],
+      "Interproximal reduction (IPR)": ['misc'],
+      "Debonding": ['misc'],
+      "Rebonding": ['brackets', 'bonding'],
+      // Removable & Functional Appliance Therapy
+      "Hawley appliance": ['impression', 'retention'],
+      "Twin block": ['impression'],
+      "Activator": ['impression'],
+      "Bionator": ['impression'],
+      "Frankel appliance": ['impression'],
+      "Headgear – cervical pull": ['extraoral'],
+      "Headgear – occipital pull": ['extraoral'],
+      "Chin cup therapy": ['extraoral'],
+      "Removable expansion plate": ['impression'],
+      // Expansion Procedures
+      "RPE (Hyrax / Haas)": ['brackets', 'bonding', 'impression'],
+      "MARPE": ['tad', 'bonding', 'impression'],
+      "SARPE": ['tad', 'bonding', 'impression'],
+      "Quad helix": ['brackets', 'bonding'],
+      "W-arch": ['brackets', 'bonding'],
+      // Growth Modification
+      "Functional appliance therapy": ['impression'],
+      "Headgear therapy": ['extraoral'],
+      "Herbst appliance": ['brackets', 'bonding', 'impression'],
+      "MARA appliance": ['brackets', 'bonding', 'impression'],
+      "Forsus / fixed functional appliance": ['brackets', 'auxiliaries'],
+      "Facemask (protraction) therapy": ['extraoral', 'auxiliaries'],
+      "Alt-RAMEC protocol": ['extraoral', 'bonding'],
+      "Miniplate protraction (De Clerck)": ['tad', 'extraoral'],
+      // TAD Procedures
+      "TAD / miniscrew placement": ['tad'],
+      "TAD-assisted space closure": ['tad', 'auxiliaries'],
+      "TAD-assisted intrusion / extrusion": ['tad', 'auxiliaries'],
+      "TAD-assisted molar distalization": ['tad', 'auxiliaries'],
+      // Surgical Orthodontics
+      "Orthognathic surgery referral": ['impression'],
+      "LeFort I osteotomy": ['tad', 'impression'],
+      "Bilateral sagittal split osteotomy": ['tad', 'impression'],
+      "Genioplasty": ['tad'],
+      "Surgical exposure of impacted tooth": ['tad', 'auxiliaries', 'bonding'],
+      "Corticotomy / piezocision": ['tad'],
+      "Frenectomy": ['tad'],
+      "Distraction osteogenesis": ['tad', 'impression'],
+      // Aligner Therapy
+      "Aligner treatment planning": ['impression'],
+      "Aligner / attachment bonding": ['bonding', 'impression'],
+      "Aligner progress review": ['impression'],
+      // Retention Phase
+      "Fixed retainer (bonded)": ['retention', 'bonding'],
+      "Removable retainer – Hawley": ['retention', 'impression'],
+      "Removable retainer – Essix": ['retention', 'impression'],
+      "Positioner therapy": ['retention', 'impression'],
+      "Retention review": ['retention', 'misc']
+    };
+
+    function updateMaterialsFromProcedures() {
+      const groups = new Set();
+      procSelected.forEach(p => (PROCEDURE_MATERIAL_MAP[p] || []).forEach(g => groups.add(g)));
+      autoMaterials = new Set();
+      groups.forEach(key => {
+        (MATERIALS_DATA[MATERIAL_GROUPS[key]] || []).forEach(mat => {
+          const id = materialId(mat.name);
+          autoMaterials.add(id);
+          // A row the doctor removed stays removed for the session — auto-update must not
+          // resurrect it on every subsequent procedure tick. "Restore all" or re-adding it
+          // by name is the way back.
+          if (removedMaterials.has(id)) return;
+          if (!materialsQuantities[id]) materialsQuantities[id] = { qty: '', unit: '' };
+        });
+      });
+      renderMaterials();
+    }
+
+    function materialRowsFor(category) {
+      const catalog = (MATERIALS_DATA[category] || []).map(m => ({ ...m, custom: false }));
+      const custom = customMaterials.filter(m => m.category === category).map(m => ({ ...m, custom: true }));
+      return [...catalog, ...custom].filter(m => !removedMaterials.has(materialId(m.name)));
+    }
+
+    function allMaterialCategories() {
+      const cats = Object.keys(MATERIALS_DATA);
+      customMaterials.forEach(m => { if (!cats.includes(m.category)) cats.push(m.category); });
+      return cats;
     }
 
     function renderMaterials() {
       const container = document.getElementById('materials-container');
       if (!container) return;
-      container.innerHTML = Object.entries(MATERIALS_DATA).map(([cat, materials]) => {
-        const used = materials.filter(m => materialsQuantities[m.name.replace(/\s+/g, '-').toLowerCase()]?.qty).length;
-        return `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed')">${cat}<span style="font-size:12px;font-weight:normal;color:var(--text-muted)">▼</span></div><div class="diag-category-content is-block"><table class="materials-table"><thead><tr><th class="col-material">Material</th><th class="col-qty">Qty</th><th class="col-unit">Unit</th></tr></thead><tbody>${materials.map(mat => { const matId = mat.name.replace(/\s+/g, '-').toLowerCase(); const qty = materialsQuantities[matId]?.qty || ''; const unit = materialsQuantities[matId]?.unit || ''; return `<tr class="${qty ? 'has-qty' : ''}"><td class="col-material">${mat.name}</td><td class="col-qty"><input type="text" inputmode="numeric" value="${qty}" placeholder="0" onchange="updateMaterial('${matId}', 'qty', this.value)"></td><td class="col-unit"><input type="text" value="${unit}" placeholder="pcs" onchange="updateMaterial('${matId}', 'unit', this.value)"></td></tr>`; }).join('')}</tbody></table></div></div>`;
+      container.innerHTML = allMaterialCategories().map(cat => {
+        const rows = materialRowsFor(cat);
+        if (!rows.length) return '';
+        const auto = rows.filter(m => autoMaterials.has(materialId(m.name))).length;
+        const used = rows.filter(m => String(materialsQuantities[materialId(m.name)]?.qty ?? '').trim()).length;
+        // Open the groups the selected procedures actually need; keep the rest tucked away.
+        const open = auto > 0 || used > 0;
+        const bodyId = `mat-body-${materialId(cat)}`;
+        const meta = [auto ? `${auto} auto` : '', used ? `${used} logged` : ''].filter(Boolean).join(' · ');
+        const body = rows.map(mat => {
+          const id = materialId(mat.name);
+          const entry = materialsQuantities[id] || {};
+          const qty = entry.qty || '', unit = entry.unit || '';
+          const badge = mat.custom ? '<span class="mat-badge is-custom">added</span>' : (autoMaterials.has(id) ? '<span class="mat-badge">auto</span>' : '');
+          const spec = mat.spec ? `<span class="mat-spec">${escapeHtml(mat.spec)}</span>` : '';
+          return `<tr class="${qty ? 'has-qty' : ''}" data-mat="${escapeAttr(id)}"><td class="col-material">${escapeHtml(mat.name)}${badge}${spec}</td><td class="col-qty"><input type="text" inputmode="numeric" value="${escapeAttr(qty)}" placeholder="0" oninput="updateMaterial('${escapeAttr(id)}', 'qty', this.value)"></td><td class="col-unit"><input type="text" value="${escapeAttr(unit)}" placeholder="pcs" oninput="updateMaterial('${escapeAttr(id)}', 'unit', this.value)"></td><td class="col-act"><button class="btn btn-sm btn-danger" onclick="removeMaterialRow('${escapeAttr(id)}')" title="Remove this material from the list">✕</button></td></tr>`;
+        }).join('');
+        return `<div class="diag-category"><div class="diag-category-header ${open ? '' : 'collapsed'}" onclick="this.classList.toggle('collapsed');document.getElementById('${bodyId}').classList.toggle('collapsed')">${escapeHtml(cat)}<span style="font-size:12px;font-weight:normal;color:var(--text-muted)">${meta}</span></div><div class="diag-category-content is-block ${open ? '' : 'collapsed'}" id="${bodyId}"><table class="materials-table"><thead><tr><th class="col-material">Material</th><th class="col-qty">Qty</th><th class="col-unit">Unit</th><th class="col-act"></th></tr></thead><tbody>${body}</tbody></table></div></div>`;
       }).join('');
+      renderMaterialsRestore();
+      renderMaterialCategoryOptions();
       updateMaterialsCount();
     }
-    function updateMaterialsCount() { const el = document.getElementById('materials-count'); if (!el) return; const n = Object.values(materialsQuantities).filter(v => String(v?.qty ?? '').trim()).length; el.textContent = `${n} item${n === 1 ? '' : 's'}`; }
-    function updateMaterial(matId, field, value) { if (!materialsQuantities[matId]) { materialsQuantities[matId] = { qty: '', unit: '' }; } materialsQuantities[matId][field] = value; if (field === 'qty') { const input = document.querySelector(`.materials-table input[onchange*="'${matId}', 'qty'"]`); const row = input ? input.closest('tr') : null; if (row) row.classList.toggle('has-qty', !!String(value).trim()); } updateMaterialsCount(); }
-    async function saveMaterials() { const rows = []; const invalid = []; for (const [matId, entry] of Object.entries(materialsQuantities)) { const raw = String(entry?.qty ?? '').trim(); if (!raw) continue; const name = MATERIAL_ID_TO_NAME[matId]; if (!name) continue; const qty = Number.parseInt(raw, 10); if (!Number.isFinite(qty) || qty <= 0) { invalid.push(`${name} ("${raw}")`); continue; } rows.push({ name, qty, unit: String(entry.unit || '').trim(), source: 'materials-tab' }); } if (invalid.length) { await uiAlert('These quantities are not whole numbers, so they cannot be saved:\n\n' + invalid.join('\n') + '\n\nEnter a whole number (e.g. 2) and save again.', { title: 'Check Quantities', tone: 'warn' }); return; } if (!rows.length) { await uiAlert('Enter a quantity against at least one material before saving.', { title: 'Materials', tone: 'warn' }); return; } activeMaterials = activeMaterials.filter(m => m.source !== 'materials-tab'); rows.forEach(r => { const existing = activeMaterials.find(m => m.name.toLowerCase() === r.name.toLowerCase()); if (existing) { existing.qty = r.qty; existing.unit = r.unit; existing.source = 'materials-tab'; } else activeMaterials.push(r); }); activeMaterials.sort(sortByProp('name')); renderMaterialsList(); showDoctorToast(`${rows.length} material${rows.length === 1 ? '' : 's'} recorded for this session.`); }
-    function updateMaterialsFromProcedures() { const bracketBandMaterials = ["Metal (stainless steel) brackets", "Ceramic brackets", "Self-ligating brackets", "Lingual brackets", "Molar bands", "Bondable tubes"]; const archwireMaterials = ["Stainless steel archwire", "NiTi archwire", "Copper NiTi archwire", "Beta-titanium (TMA) archwire", "Multi-strand / braided wire"]; const auxiliariesMaterials = ["Elastomeric ligatures / modules", "Power chain", "Elastics", "Coil springs", "Separators"]; const hasBracketBand = procSelected.has('Bonding of brackets') || procSelected.has('Banding of molars') || procSelected.has('Power chain application') || procSelected.has('Coil spring placement'); const hasArchwireProc = procSelected.has('Archwire insertion / change'); if (hasBracketBand) { bracketBandMaterials.forEach(mat => { const matId = mat.replace(/\s+/g, '-').toLowerCase(); if (!materialsQuantities[matId]) { materialsQuantities[matId] = { qty: '', unit: '' }; } }); } if (hasArchwireProc) { archwireMaterials.forEach(mat => { const matId = mat.replace(/\s+/g, '-').toLowerCase(); if (!materialsQuantities[matId]) { materialsQuantities[matId] = { qty: '', unit: '' }; } }); } renderMaterials(); }
-    const MATERIAL_ID_TO_NAME = Object.values(MATERIALS_DATA).flat().reduce((map, mat) => { map[mat.name.replace(/\s+/g, '-').toLowerCase()] = mat.name; return map; }, {});
+
+    function renderMaterialsRestore() {
+      const host = document.getElementById('materials-restore-host');
+      if (!host) return;
+      const n = removedMaterials.size;
+      host.innerHTML = n ? `<div class="mat-restore"><span><strong>${n}</strong> material${n === 1 ? '' : 's'} removed from this list.</span><button class="btn btn-sm" onclick="restoreRemovedMaterials()">↩ Restore all</button></div>` : '';
+    }
+
+    function renderMaterialCategoryOptions() {
+      const select = document.getElementById('mat-add-category');
+      if (!select) return;
+      const current = select.value;
+      select.innerHTML = allMaterialCategories().map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('');
+      if (current) select.value = current;
+    }
+
+    function updateMaterialsCount() {
+      const el = document.getElementById('materials-count');
+      if (!el) return;
+      const n = visibleMaterialEntries().length;
+      el.textContent = `${n} item${n === 1 ? '' : 's'}`;
+    }
+
+    // Only rows still on screen with a quantity count toward the log.
+    function visibleMaterialEntries() {
+      const visible = new Set();
+      allMaterialCategories().forEach(cat => materialRowsFor(cat).forEach(m => visible.add(materialId(m.name))));
+      return Object.entries(materialsQuantities).filter(([id, e]) => visible.has(id) && String(e?.qty ?? '').trim());
+    }
+
+    function updateMaterial(matId, field, value) {
+      if (!materialsQuantities[matId]) materialsQuantities[matId] = { qty: '', unit: '' };
+      materialsQuantities[matId][field] = value;
+      if (field === 'qty') {
+        const row = document.querySelector(`.materials-table tr[data-mat="${matId}"]`);
+        if (row) row.classList.toggle('has-qty', !!String(value).trim());
+      }
+      updateMaterialsCount();
+    }
+
+    function removeMaterialRow(matId) {
+      removedMaterials.add(matId);
+      autoMaterials.delete(matId);
+      delete materialsQuantities[matId];
+      customMaterials = customMaterials.filter(m => materialId(m.name) !== matId);
+      renderMaterials();
+    }
+
+    function restoreRemovedMaterials() { removedMaterials.clear(); renderMaterials(); }
+
+    async function addCustomMaterial() {
+      const nameEl = document.getElementById('mat-add-name');
+      const catEl = document.getElementById('mat-add-category');
+      const qtyEl = document.getElementById('mat-add-qty');
+      const unitEl = document.getElementById('mat-add-unit');
+      const name = (nameEl?.value || '').trim();
+      if (!name) { await uiAlert('Enter the name of the material you want to add.', { title: 'Add Material', tone: 'warn' }); return; }
+      const id = materialId(name);
+      const category = catEl?.value || Object.keys(MATERIALS_DATA)[0];
+      const inCatalog = Object.values(MATERIALS_DATA).flat().some(m => materialId(m.name) === id);
+      const alreadyCustom = customMaterials.some(m => materialId(m.name) === id);
+      if (inCatalog || alreadyCustom) {
+        // Already known — un-remove it and just set the quantity instead of duplicating the row.
+        removedMaterials.delete(id);
+        if (!materialsQuantities[id]) materialsQuantities[id] = { qty: '', unit: '' };
+        showDoctorToast(`${name} is already in the list — quantity updated.`);
+      } else {
+        customMaterials.push({ name, spec: '', category });
+        showDoctorToast(`${name} added to ${category}.`);
+      }
+      const qty = (qtyEl?.value || '').trim();
+      const unit = (unitEl?.value || '').trim();
+      materialsQuantities[id] = { qty: qty || '1', unit };
+      if (nameEl) nameEl.value = '';
+      if (qtyEl) qtyEl.value = '1';
+      if (unitEl) unitEl.value = '';
+      renderMaterials();
+    }
+
+    function resetMaterialsTable() {
+      materialsQuantities = {}; removedMaterials.clear(); customMaterials = [];
+      updateMaterialsFromProcedures();
+      showDoctorToast('Materials table reset to the current procedure selection.');
+    }
+
+    async function saveMaterials() {
+      const rows = []; const invalid = [];
+      for (const [matId, entry] of visibleMaterialEntries()) {
+        const name = MATERIAL_ID_TO_NAME[matId] || customMaterials.find(m => materialId(m.name) === matId)?.name;
+        if (!name) continue;
+        const raw = String(entry.qty).trim();
+        const qty = Number.parseInt(raw, 10);
+        if (!Number.isFinite(qty) || qty <= 0 || !/^\d+$/.test(raw)) { invalid.push(`${name} ("${raw}")`); continue; }
+        rows.push({ name, qty, unit: String(entry.unit || '').trim(), source: 'materials-tab' });
+      }
+      if (invalid.length) { await uiAlert('These quantities are not whole numbers, so they cannot be saved:\n\n' + invalid.join('\n') + '\n\nEnter a whole number (e.g. 2) and save again.', { title: 'Check Quantities', tone: 'warn' }); return; }
+      if (!rows.length) { await uiAlert('Enter a quantity against at least one material before saving.', { title: 'Materials', tone: 'warn' }); return; }
+      activeMaterials = activeMaterials.filter(m => m.source !== 'materials-tab');
+      rows.forEach(r => {
+        const existing = activeMaterials.find(m => m.name.toLowerCase() === r.name.toLowerCase());
+        if (existing) { existing.qty = r.qty; existing.unit = r.unit; existing.source = 'materials-tab'; }
+        else activeMaterials.push(r);
+      });
+      activeMaterials.sort(sortByProp('name'));
+      renderMaterialsList();
+      showDoctorToast(`${rows.length} material${rows.length === 1 ? '' : 's'} recorded for this session.`);
+    }
+
+    const MATERIAL_ID_TO_NAME = Object.values(MATERIALS_DATA).flat().reduce((map, mat) => { map[materialId(mat.name)] = mat.name; return map; }, {});
 
     let diagSelected = new Set();
     let invSelected = new Set();
 
     function resetSelectionPickers() {
-      diagSelected.clear(); invSelected.clear(); procSelected.clear(); selectedTeeth.clear(); archwireData = {}; materialsQuantities = {}; Object.values(patientRecordFiles).forEach(f => { if (f.url) URL.revokeObjectURL(f.url); }); patientRecordFiles = {};
+      diagSelected.clear(); invSelected.clear(); procSelected.clear(); materialsQuantities = {};
+      toothSelections = {}; archwireEntries = {}; chartQueue = []; chartsAutoOpened.clear(); activeChart = null;
+      autoMaterials = new Set(); removedMaterials.clear(); customMaterials = [];
+      renderChartHost();
+      Object.values(patientRecordFiles).forEach(f => { if (f.url) URL.revokeObjectURL(f.url); }); patientRecordFiles = {};
       const complications = document.getElementById('complications-input'); if (complications) complications.value = ''; updateComplicationsAlert();
       const searches = ['diag-search', 'inv-search', 'proc-search']; searches.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
       if (document.getElementById('diag-checkbox-container')) renderDiagCheckboxes('');
