@@ -223,16 +223,6 @@
     }
     .grid-split > * { min-width: 0; }
 
-    .dashboard-huge-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex: 1;
-      width: 100%;
-      height: 100%;
-      padding: 10px;
-    }
-
     .panel {
       background: var(--mint-container);
       border: 1px solid var(--border);
@@ -244,14 +234,6 @@
       height: 100%;
       min-height: 0;
       transition: var(--transition-smooth);
-    }
-
-    .panel-dashboard-huge {
-      width: 100%;
-      height: 100%;
-      max-width: 1000px;
-      padding: 32px;
-      justify-content: center;
     }
 
     .panel:hover {
@@ -270,13 +252,6 @@
       flex-shrink: 0;
     }
 
-    .panel-header-huge {
-      font-size: 18px;
-      letter-spacing: 1px;
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-    }
-
     .panel-body {
       background: #ffffff;
       border: 1px solid #e2e8f0;
@@ -288,19 +263,8 @@
       min-height: 0;
     }
 
-    .panel-body-huge {
-      padding: 40px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 24px;
-    }
-
     .form-row { margin-bottom: 12px; }
     .form-row label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; }
-
-    .form-row-huge { margin-bottom: 24px; }
-    .form-row-huge label { font-size: 14px; margin-bottom: 8px; letter-spacing: 0.5px; }
 
     input, select, textarea {
       width: 100%;
@@ -312,13 +276,6 @@
       background-color: #ffffff;
       font-family: inherit;
       transition: var(--transition-smooth);
-    }
-
-    .input-huge {
-      padding: 16px 20px;
-      font-size: 16px;
-      border-radius: 8px;
-      font-weight: 600;
     }
 
     input:focus, select:focus, textarea:focus {
@@ -373,7 +330,6 @@
     .table-wide tbody tr:nth-child(even) td:last-child { background-color: #fcfdfd; }
     .table-wide tbody tr:hover td:first-child,
     .table-wide tbody tr:hover td:last-child { background-color: #f1f7f4; }
-    .table-wide td:last-child .action-link { margin-bottom: 2px; }
     tbody tr:last-child td { border-bottom: none; }
     tbody tr:nth-child(even) td { background-color: #fcfdfd; }
     tbody tr:hover td { background-color: #f1f7f4 !important; }
@@ -509,11 +465,6 @@
     .toast.show { opacity: 1; transform: translateY(0); }
 
     /* Patient Timeline Styles */
-    .pt-pill { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-right: 8px; margin-bottom: 8px; cursor: pointer; border: 1px solid transparent; }
-    .pt-pill.active { background: var(--green-med); color: #fff; }
-    .pt-pill.inactive { background: #fff; color: var(--text-dark); border-color: var(--border); }
-    .pill-container { margin-bottom: 16px; }
-    .checklist-v { display: flex; flex-direction: column; gap: 10px; }
     .check-item { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; }
     .check-circle { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: var(--green-soft); color: var(--green-med); flex-shrink: 0; }
     .check-circle.pending { background: #f3f4f6; color: #6b7280; }
@@ -527,7 +478,6 @@
     .container-card { background: white; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 24px; overflow: hidden; }
     .container-title { background: var(--green-soft); padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 600; color: var(--green-dark); }
     
-    /* Patient Timeline Search Styles */
     .timeline-search-container { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow-sm); }
     .timeline-search-row { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
     .timeline-search-row select { flex: 0 0 160px; }
@@ -543,17 +493,6 @@
     .timeline-detail-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
     .timeline-badge { background: var(--green-soft); color: var(--green-dark); font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 6px; }
     .timeline-steps-list { display: flex; flex-direction: column; gap: 12px; }
-    .timeline-step-item { display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; transition: var(--transition-smooth); }
-    .timeline-step-item:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
-    .timeline-step-circle { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; flex-shrink: 0; }
-    .timeline-step-circle.pending { background: #f3f4f6; color: #6b7280; }
-    .timeline-step-circle.active { background: #fef9c3; color: #a16207; }
-    .timeline-step-circle.completed { background: #dcfce7; color: #15803d; }
-    .timeline-step-text { flex: 1; font-size: 15px; font-weight: 700; color: #1f2937; }
-    .timeline-step-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 10px; border-radius: 12px; }
-    .timeline-step-badge.pending { background: #f3f4f6; color: #374151; }
-    .timeline-step-badge.active { background: #fef9c3; color: #92400e; }
-    .timeline-step-badge.completed { background: #dcfce7; color: #166534; }
   </style>
 </head>
 <body>
@@ -603,16 +542,15 @@
 <div id="modal-root"></div>
 
 <script>
-  // Safe Fallback for API
   if (typeof window.api === 'undefined') {
     window.api = {
       get: async () => null,
       post: async () => null,
-      patch: async () => null
+      patch: async () => null,
+      delete: async () => null
     };
   }
 
-  // Removed Next Appointment tab from sidebar navigation list
   const PAGES = [
     { id: 'dashboard', label: 'Reception Dashboard' },
     { id: 'patient_reg', label: 'Patient Registration' },
@@ -625,8 +563,6 @@
   let patientLogs = [];
   let doctorAllocations = [];
   let doctorDirectory = [];
-  let cachedTimelineMRs = [];
-  let cachedSelectedTimelineMR = null;
   let cachedTimelineSteps = {};
 
   function allocationRoomFor(doctorName) {
@@ -669,14 +605,14 @@
     const timeInStr = checkIn ? checkIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
     const timeOutStr = checkOut ? checkOut.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
     const duration = (checkIn && checkOut) ? `${Math.max(0, Math.round((checkOut - checkIn) / 60000))} min` : '—';
-      const roomNum = (p.room || '').replace(/Room\s*/i, '').trim() || '—';
-      return {
-        id: p.id,
-        mr: p.mr_number,
-        file: p.file_number,
-        name: p.full_name,
-        cnic: p.cnic || '—',
-        location: roomNum,
+    const roomNum = (p.room || '').replace(/Room\s*/i, '').trim() || '—';
+    return {
+      id: p.id,
+      mr: p.mr_number,
+      file: p.file_number,
+      name: p.full_name,
+      cnic: p.cnic || '—',
+      location: roomNum,
       rotation: p.procedure_category || '—',
       assignedDoctor: p.assigned_doctor || '—',
       time: p.registered_at ? new Date(p.registered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00 AM',
@@ -729,15 +665,6 @@
       if (patients) patientLogs = patients.map(normalizePatient);
     } catch (e) {
       console.warn('Timeline load failed:', e);
-    }
-  }
-
-  async function fetchTimelineSteps(mr) {
-    try {
-      const steps = await api.get(`/hod/timeline/${encodeURIComponent(mr)}`);
-      cachedTimelineSteps[mr] = steps || [];
-    } catch (e) {
-      cachedTimelineSteps[mr] = [];
     }
   }
 
@@ -887,12 +814,12 @@
     const unassigned = patientLogs.filter(p => !p.assignedDoctor || p.assignedDoctor === '—').length;
     const allocated = doctorDirectory.filter(d => allocationRoomFor(d.full_name)).length;
 
-    const card = (value, label, tone) => `
-      <div style="background:#fff; border:1px solid var(--border); border-left:6px solid ${tone};
-                  border-radius:12px; padding:20px 22px; box-shadow:var(--shadow-sm);">
-        <div style="font-size:34px; font-weight:800; color:var(--green-dark); line-height:1;">${value}</div>
-        <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-top:8px;
-                    text-transform:uppercase; letter-spacing:.5px;">${label}</div>
+    const card = (value, label) => `
+      <div style="flex: 1 1 0; min-width: 140px; background: #ffffff; border: 1px solid var(--border);
+                  border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow-sm); text-align: left;">
+        <div style="font-size: 32px; font-weight: 800; color: var(--green-dark); line-height: 1.1;">${value}</div>
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-top: 8px;
+                    text-transform: uppercase; letter-spacing: .5px;">${label}</div>
       </div>`;
 
     const queueByDoctor = doctorDirectory.map(d => {
@@ -911,12 +838,12 @@
       <p>Live front-desk overview for ${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}.</p>
     </div>
 
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-bottom:24px;">
-      ${card(registeredToday, 'Registered Today', 'var(--green-med)')}
-      ${card(waiting, 'Waiting', 'var(--amber)')}
-      ${card(active, 'In Procedure', 'var(--green-accent)')}
-      ${card(completed, 'Completed', '#0369a1')}
-      ${card(`${allocated}/${doctorDirectory.length}`, 'Doctors Allocated', 'var(--green-dark)')}
+    <div style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 16px; margin-bottom: 24px; width: 100%; overflow-x: auto;">
+      ${card(registeredToday, 'Registered Today')}
+      ${card(waiting, 'Waiting')}
+      ${card(active, 'In Procedure')}
+      ${card(completed, 'Completed')}
+      ${card(`${allocated}/${doctorDirectory.length}`, 'Doctors Allocated')}
     </div>
 
     ${unassigned ? `
@@ -930,7 +857,6 @@
         <div class="panel-header">Quick Actions</div>
         <div class="panel-body" style="overflow:visible; display:flex; flex-direction:column; gap:10px;">
           <button class="btn-primary" onclick="userNavigate('patient_reg')">＋ Register New Patient</button>
-          <button class="btn-primary" onclick="userNavigate('doctor_mgmt')" style="background:var(--green-med);">＋ Register / Allocate Doctor</button>
           <button class="btn-secondary" onclick="userNavigate('patient_mgmt')">Open Patient Queue</button>
           <button class="btn-secondary" onclick="userNavigate('patient_timeline')">Look Up Patient Timeline</button>
           <div style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--border); font-size:12px; color:var(--text-muted);">
@@ -953,7 +879,7 @@
                     <td><span class="badge badge-waiting">${d.waiting} Waiting</span></td>
                     <td><span class="badge badge-active">${d.active} Active</span></td>
                   </tr>`).join('')
-                : '<tr><td colspan="4" style="text-align:center; color:#9ca3af;">No doctor accounts registered yet.</td></tr>'}
+                : '<tr><td colspan="4" style="text-align:center; color:#9ca3af;">No doctors registered yet.</td></tr>'}
               </tbody>
             </table>
           </div>
@@ -969,7 +895,7 @@
           const room = allocationRoomFor(d.full_name);
           return `<option value="${d.full_name}">${d.full_name}${room ? ` (${room})` : ''}</option>`;
         }).join('')
-      : '<option value="" disabled>No doctor accounts found — register one under Doctor Management</option>';
+      : '<option value="" disabled>No doctors available</option>';
 
     const roomOptions = Array.from({ length: 10 }, (_, i) => 10 + i)
             .map(r => `<option value="Room ${r}">Room ${r}</option>`).join('');
@@ -1168,14 +1094,14 @@
           : '<span style="color:#9ca3af; font-size:11px;">—</span>'}</td>
       </tr>
       `;
-    }).join('') : '<tr><td colspan="7" style="text-align:center; color:#9ca3af;">No doctor accounts registered yet.</td></tr>';
+    }).join('') : '<tr><td colspan="7" style="text-align:center; color:#9ca3af;">No doctor accounts found.</td></tr>';
 
     const doctorPicker = doctorDirectory.length
       ? doctorDirectory.map(d => {
           const room = allocationRoomFor(d.full_name);
           return `<option value="${d.full_name}">${d.full_name}${room ? ` — currently ${room}` : ' — unallocated'}</option>`;
         }).join('')
-      : '<option value="" disabled selected>Register a doctor account first</option>';
+      : '<option value="" disabled selected>No doctors available</option>';
 
     const roomOptions = Array.from({ length: 10 }, (_, i) => 10 + i)
       .map(r => {
@@ -1186,46 +1112,14 @@
     return `
     <div class="header-group">
       <h1>Doctor Management & Queue Allocations</h1>
-      <p>Register dental officers, assign operatory rooms, and monitor live appointment queues.</p>
+      <p>Assign operatory rooms to doctors and monitor live appointment queues.</p>
     </div>
 
     <div class="grid-split">
-      <div style="display:flex; flex-direction:column; gap:20px; min-height:0; overflow-y:auto;">
-        <div class="panel" style="height:auto; flex:0 0 auto;">
-          <div class="panel-header">Register New Doctor (Creates Login Account)</div>
-          <div class="panel-body" style="overflow:visible; flex:0 0 auto;">
-            <form id="doctor-register-form" onsubmit="registerDoctorAccount(event)">
-              <div class="form-row">
-                <label>Full Name (incl. title)</label>
-                <input type="text" id="dr-name" placeholder="e.g. Dr. Hira Zaman" required />
-              </div>
-              <div class="form-row">
-                <label>Work Email (login ID)</label>
-                <input type="email" id="dr-email" placeholder="e.g. hira@afid.mil" required />
-              </div>
-              <div class="form-row">
-                <label>Staff ID (optional)</label>
-                <input type="text" id="dr-staffid" placeholder="e.g. HMS-0011" />
-              </div>
-              <div class="form-row">
-                <label>Temporary Password (min 8 characters)</label>
-                <input type="text" id="dr-password" placeholder="Share with the doctor to sign in" minlength="8" required />
-              </div>
-              <div class="form-row">
-                <label>Assign Room Now (optional)</label>
-                <select id="dr-room">
-                  <option value="">— Do not allocate yet —</option>
-                  ${roomOptions}
-                </select>
-              </div>
-              <button type="submit" class="btn-primary" style="margin-top:12px;">Create Doctor Account</button>
-            </form>
-          </div>
-        </div>
-
-        <div class="panel" style="height:auto; flex:0 0 auto;">
+      <div style="display:flex; flex-direction:column; gap:20px; min-height:0;">
+        <div class="panel" style="height:auto;">
           <div class="panel-header">Room Allocation & Chair Setup</div>
-          <div class="panel-body" style="overflow:visible; flex:0 0 auto;">
+          <div class="panel-body" style="overflow:visible;">
             <form id="doctor-form" onsubmit="addDoctorAllocation(event)">
               <div class="form-row">
                 <label>Doctor</label>
@@ -1269,7 +1163,7 @@
   `;
   }
 
-  /* --- APPOINTMENT MODAL LOGIC (INLINE IN PATIENT MANAGEMENT) --- */
+  /* --- APPOINTMENT MODAL LOGIC --- */
   function openNextAppointmentModal(mr, name, doctor) {
     const today = new Date().toISOString().split('T')[0];
     const modalHTML = `
@@ -1388,7 +1282,7 @@
     const doctor = val('p-doctor');
 
     if (!doctor) {
-      await uiError('No dentist selected. Register a doctor account under Doctor Management first.');
+      alert('No dentist selected.');
       return;
     }
 
@@ -1412,7 +1306,7 @@
       switchView('patient_mgmt');
       showToast(`Registered & Queued ${name} under ${doctor}`);
     } catch (error) {
-      await uiError(error.message || 'Unable to register patient');
+      alert(error.message || 'Unable to register patient');
     }
   }
 
@@ -1444,61 +1338,13 @@
     }
   }
 
-  async function registerDoctorAccount(e) {
-    e.preventDefault();
-    const val = (id) => (document.getElementById(id)?.value || '').trim();
-
-    const fullName = val('dr-name');
-    const email = val('dr-email');
-    const staffId = val('dr-staffid');
-    const password = val('dr-password');
-    const room = val('dr-room');
-
-    if (password.length < 8) {
-      await uiError('Password must be at least 8 characters.');
-      return;
-    }
-
-    try {
-      await api.post('/auth/register', {
-        full_name: fullName,
-        email,
-        password,
-        role: 'doctor',
-        staff_id: staffId || null
-      });
-
-      if (room) {
-        try {
-          await api.post('/allocations', {
-            doctor_name: fullName,
-            room,
-            department: 'Orthodontics',
-            chair: 'Chair 1'
-          });
-        } catch (allocError) {
-          await uiAlert(
-            `Account created for ${fullName}, but the room could not be allocated:\n\n${allocError.message}`,
-            { title: 'Doctor Registered', tone: 'warn' }
-          );
-        }
-      }
-
-      await refreshDoctorData();
-      switchView('doctor_mgmt');
-      showToast(`${fullName} can now log in with ${email}`);
-    } catch (error) {
-      await uiError(error.message || 'Unable to register doctor');
-    }
-  }
-
   async function addDoctorAllocation(e) {
     e.preventDefault();
     const name = document.getElementById('d-name').value;
     const room = document.getElementById('d-room').value;
 
     if (!name) {
-      await uiError('Select a doctor to allocate.');
+      alert('Select a doctor to allocate.');
       return;
     }
 
@@ -1513,16 +1359,12 @@
       switchView('doctor_mgmt');
       showToast(`${name} allocated to ${room}`);
     } catch (error) {
-      await uiError(error.message || 'Unable to create allocation');
+      alert(error.message || 'Unable to create allocation');
     }
   }
 
   async function releaseAllocation(allocId, doctorName, room) {
-    const ok = await uiConfirm(
-      `Release ${room} from ${doctorName}? The room becomes available for another doctor.`,
-      { title: 'Release Room', confirmLabel: 'Release' }
-    );
-    if (!ok) return;
+    if (!confirm(`Release ${room} from ${doctorName}?`)) return;
 
     try {
       await api.delete(`/allocations/${allocId}`);
@@ -1530,7 +1372,7 @@
       switchView('doctor_mgmt');
       showToast(`${room} released`);
     } catch (error) {
-      await uiError(error.message || 'Unable to release allocation');
+      alert(error.message || 'Unable to release allocation');
     }
   }
 
@@ -1567,7 +1409,7 @@
       refreshedForPage = pageId;
       refreshDoctorData().finally(() => {
         const stillHere = document.querySelector('.nav-btn.active')?.dataset.page === pageId;
-        const typed = ['dr-name', 'dr-email', 'dr-staffid', 'dr-password', 'p-mr', 'p-file', 'p-name', 'p-cnic']
+        const typed = ['p-mr', 'p-file', 'p-name', 'p-cnic']
           .some(id => (document.getElementById(id)?.value || '').trim() !== '');
         if (stillHere && !typed) switchView(pageId);
       });
