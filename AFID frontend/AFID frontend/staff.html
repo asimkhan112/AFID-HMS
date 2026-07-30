@@ -18,14 +18,14 @@
       --bg: #f3f7f5;
       --border: #cbd5e1;
       --text-dark: #1f2937;
-      --text-muted: #4b5563;
+      --text-muted: #6b7280;
       --card-bg: #ffffff;
       --mint-container: #e6f0eb;
 
       /* Premium Depth & Hover Transitions */
-      --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.06);
-      --shadow-md: 0 8px 20px rgba(15, 98, 68, 0.12);
-      --shadow-lg: 0 12px 28px rgba(3, 37, 26, 0.18);
+      --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 8px 20px rgba(15, 98, 68, 0.08);
+      --shadow-lg: 0 12px 28px rgba(3, 37, 26, 0.15);
       --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
@@ -156,6 +156,7 @@
       padding: 12px;
       font-size: 12px;
       font-weight: 700;
+      font-family: inherit;
       border-radius: 8px;
       cursor: pointer;
       text-transform: uppercase;
@@ -190,14 +191,14 @@
       box-shadow: var(--shadow-sm);
     }
     .search-wrapper { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 14px; }
-    .search-input { border: none; outline: none; width: 280px; color: var(--text-dark); font-size: 14px; background: transparent; }
+    .search-input { border: none; outline: none; width: 280px; color: var(--text-dark); font-size: 14px; background: transparent; font-family: inherit; }
     .meta-status-group { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #4b5563; font-weight: 600; }
     .live-indicator { background-color: var(--green-dark); color: #ffffff; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.5px; }
 
     /* Workspace */
     .workspace {
       flex: 1;
-      padding: 20px 32px;
+      padding: 24px 32px;
       display: flex;
       flex-direction: column;
       height: calc(100vh - 60px);
@@ -206,12 +207,12 @@
 
     .header-group {
       border-bottom: 2px dashed var(--border);
-      padding-bottom: 8px;
-      margin-bottom: 16px;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
       flex-shrink: 0;
     }
-    .header-group h1 { font-size: 24px; font-weight: 800; color: var(--green-dark); letter-spacing: -0.5px; }
-    .header-group p { font-size: 12px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
+    .header-group h1 { font-size: 28px; font-weight: 800; color: var(--green-dark); letter-spacing: -0.5px; }
+    .header-group p { font-size: 13px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
 
     .grid-split {
       display: grid;
@@ -222,17 +223,35 @@
     }
     .grid-split > * { min-width: 0; }
 
+    .dashboard-huge-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      padding: 10px;
+    }
+
     .panel {
       background: var(--mint-container);
       border: 1px solid var(--border);
       border-radius: 14px;
-      padding: 14px 16px;
+      padding: 16px;
       box-shadow: var(--shadow-sm);
       display: flex;
       flex-direction: column;
       height: 100%;
       min-height: 0;
       transition: var(--transition-smooth);
+    }
+
+    .panel-dashboard-huge {
+      width: 100%;
+      height: 100%;
+      max-width: 1000px;
+      padding: 32px;
+      justify-content: center;
     }
 
     .panel:hover {
@@ -245,10 +264,17 @@
       color: var(--green-dark);
       text-transform: uppercase;
       letter-spacing: 0.75px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
       border-bottom: 2px solid rgba(15, 98, 68, 0.15);
-      padding-bottom: 6px;
+      padding-bottom: 8px;
       flex-shrink: 0;
+    }
+
+    .panel-header-huge {
+      font-size: 18px;
+      letter-spacing: 1px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
     }
 
     .panel-body {
@@ -256,31 +282,43 @@
       border: 1px solid #e2e8f0;
       border-radius: 10px;
       box-shadow: var(--shadow-sm);
-      padding: 14px;
+      padding: 16px;
       flex: 1;
       overflow-y: auto;
       min-height: 0;
     }
 
-    /* COMPACT FORM LAYOUT STYLES */
-    .form-grid-compact {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px 14px;
+    .panel-body-huge {
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 24px;
     }
 
-    .form-row { margin-bottom: 0px; }
-    .form-row label { display: block; font-size: 10.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 3px; text-transform: uppercase; }
+    .form-row { margin-bottom: 12px; }
+    .form-row label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; }
+
+    .form-row-huge { margin-bottom: 24px; }
+    .form-row-huge label { font-size: 14px; margin-bottom: 8px; letter-spacing: 0.5px; }
 
     input, select, textarea {
       width: 100%;
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 7px 10px;
-      font-size: 12.5px;
+      padding: 10px 14px;
+      font-size: 13px;
       color: var(--text-dark);
       background-color: #ffffff;
+      font-family: inherit;
       transition: var(--transition-smooth);
+    }
+
+    .input-huge {
+      padding: 16px 20px;
+      font-size: 16px;
+      border-radius: 8px;
+      font-weight: 600;
     }
 
     input:focus, select:focus, textarea:focus {
@@ -316,7 +354,6 @@
     .table-wide { width: max-content; min-width: 100%; }
     .table-wide th, .table-wide td { white-space: nowrap; }
     .table-wide td.cell-wrap { white-space: normal; min-width: 190px; max-width: 260px; }
-    
     .table-wide th:first-child, .table-wide td:first-child {
       position: sticky;
       left: 0;
@@ -362,7 +399,7 @@
       color: #ffffff;
       border: none;
       border-radius: 6px;
-      padding: 10px 16px;
+      padding: 11px 18px;
       font-size: 12px;
       font-weight: 700;
       font-family: inherit;
@@ -381,9 +418,10 @@
       color: #ffffff;
       border: none;
       border-radius: 6px;
-      padding: 9px 16px;
+      padding: 11px 18px;
       font-size: 12px;
       font-weight: 700;
+      font-family: inherit;
       cursor: pointer;
       width: 100%;
       text-transform: uppercase;
@@ -402,9 +440,10 @@
       border: 1px solid var(--border);
       color: #4b5563;
       border-radius: 6px;
-      padding: 9px 16px;
+      padding: 11px 18px;
       font-size: 12px;
       font-weight: 700;
+      font-family: inherit;
       cursor: pointer;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -420,6 +459,7 @@
       border-radius: 4px;
       font-size: 11px;
       font-weight: 700;
+      font-family: inherit;
       cursor: pointer;
       transition: var(--transition-smooth);
     }
@@ -469,11 +509,16 @@
     .toast.show { opacity: 1; transform: translateY(0); }
 
     /* Patient Timeline Styles */
+    .pt-pill { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-right: 8px; margin-bottom: 8px; cursor: pointer; border: 1px solid transparent; }
+    .pt-pill.active { background: var(--green-med); color: #fff; }
+    .pt-pill.inactive { background: #fff; color: var(--text-dark); border-color: var(--border); }
+    .pill-container { margin-bottom: 16px; }
+    .checklist-v { display: flex; flex-direction: column; gap: 10px; }
     .check-item { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; }
     .check-circle { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: var(--green-soft); color: var(--green-med); flex-shrink: 0; }
     .check-circle.pending { background: #f3f4f6; color: #6b7280; }
     .check-circle.active { background: #fef9c3; color: #a16207; }
-    .check-circle.completed { background: #dcfce7; color: #166534; }
+    .check-circle.completed { background: #dcfce7; color: #15803d; }
     .check-text { flex: 1; }
     .check-status-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; }
     .cs-pending { background: #f3f4f6; color: #374151; }
@@ -498,6 +543,17 @@
     .timeline-detail-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
     .timeline-badge { background: var(--green-soft); color: var(--green-dark); font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 6px; }
     .timeline-steps-list { display: flex; flex-direction: column; gap: 12px; }
+    .timeline-step-item { display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; transition: var(--transition-smooth); }
+    .timeline-step-item:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    .timeline-step-circle { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; flex-shrink: 0; }
+    .timeline-step-circle.pending { background: #f3f4f6; color: #6b7280; }
+    .timeline-step-circle.active { background: #fef9c3; color: #a16207; }
+    .timeline-step-circle.completed { background: #dcfce7; color: #15803d; }
+    .timeline-step-text { flex: 1; font-size: 15px; font-weight: 700; color: #1f2937; }
+    .timeline-step-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 10px; border-radius: 12px; }
+    .timeline-step-badge.pending { background: #f3f4f6; color: #374151; }
+    .timeline-step-badge.active { background: #fef9c3; color: #92400e; }
+    .timeline-step-badge.completed { background: #dcfce7; color: #166534; }
   </style>
 </head>
 <body>
@@ -556,6 +612,7 @@
     };
   }
 
+  // Removed Next Appointment tab from sidebar navigation list
   const PAGES = [
     { id: 'dashboard', label: 'Reception Dashboard' },
     { id: 'patient_reg', label: 'Patient Registration' },
@@ -612,14 +669,14 @@
     const timeInStr = checkIn ? checkIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
     const timeOutStr = checkOut ? checkOut.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
     const duration = (checkIn && checkOut) ? `${Math.max(0, Math.round((checkOut - checkIn) / 60000))} min` : '—';
-    const roomNum = (p.room || '').replace(/Room\s*/i, '').trim() || '—';
-    return {
-      id: p.id,
-      mr: p.mr_number,
-      file: p.file_number,
-      name: p.full_name,
-      cnic: p.cnic || '—',
-      location: roomNum,
+      const roomNum = (p.room || '').replace(/Room\s*/i, '').trim() || '—';
+      return {
+        id: p.id,
+        mr: p.mr_number,
+        file: p.file_number,
+        name: p.full_name,
+        cnic: p.cnic || '—',
+        location: roomNum,
       rotation: p.procedure_category || '—',
       assignedDoctor: p.assigned_doctor || '—',
       time: p.registered_at ? new Date(p.registered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00 AM',
@@ -672,6 +729,15 @@
       if (patients) patientLogs = patients.map(normalizePatient);
     } catch (e) {
       console.warn('Timeline load failed:', e);
+    }
+  }
+
+  async function fetchTimelineSteps(mr) {
+    try {
+      const steps = await api.get(`/hod/timeline/${encodeURIComponent(mr)}`);
+      cachedTimelineSteps[mr] = steps || [];
+    } catch (e) {
+      cachedTimelineSteps[mr] = [];
     }
   }
 
@@ -821,14 +887,12 @@
     const unassigned = patientLogs.filter(p => !p.assignedDoctor || p.assignedDoctor === '—').length;
     const allocated = doctorDirectory.filter(d => allocationRoomFor(d.full_name)).length;
 
-    const card = (value, label, color) => `
-      <div style="background:#e6f0eb; border:2px solid ${color}; border-left:6px solid ${color};
-                  border-radius:12px; padding:14px 16px; min-height:95px;
-                  box-shadow: 0 4px 12px rgba(0,0,0,0.06); display:flex; flex-direction:column; 
-                  justify-content:center; transition: var(--transition-smooth);">
-        <div style="font-size:28px; font-weight:800; color:${color}; line-height:1.1;">${value}</div>
-        <div style="font-size:11px; font-weight:800; color:#053c2a; margin-top:6px;
-                    text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</div>
+    const card = (value, label, tone) => `
+      <div style="background:#fff; border:1px solid var(--border); border-left:6px solid ${tone};
+                  border-radius:12px; padding:20px 22px; box-shadow:var(--shadow-sm);">
+        <div style="font-size:34px; font-weight:800; color:var(--green-dark); line-height:1;">${value}</div>
+        <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-top:8px;
+                    text-transform:uppercase; letter-spacing:.5px;">${label}</div>
       </div>`;
 
     const queueByDoctor = doctorDirectory.map(d => {
@@ -847,12 +911,12 @@
       <p>Live front-desk overview for ${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}.</p>
     </div>
 
-    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:14px; margin-bottom:24px; width:100%;">
-      ${card(registeredToday, 'Registered Today', '#0f6244')}
-      ${card(waiting, 'Waiting', '#b45309')}
-      ${card(active, 'In Procedure', '#10b981')}
-      ${card(completed, 'Completed', '#047857')}
-      ${card(`${allocated}/${doctorDirectory.length}`, 'Doctors Allocated', '#053c2a')}
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-bottom:24px;">
+      ${card(registeredToday, 'Registered Today', 'var(--green-med)')}
+      ${card(waiting, 'Waiting', 'var(--amber)')}
+      ${card(active, 'In Procedure', 'var(--green-accent)')}
+      ${card(completed, 'Completed', '#0369a1')}
+      ${card(`${allocated}/${doctorDirectory.length}`, 'Doctors Allocated', 'var(--green-dark)')}
     </div>
 
     ${unassigned ? `
@@ -866,7 +930,7 @@
         <div class="panel-header">Quick Actions</div>
         <div class="panel-body" style="overflow:visible; display:flex; flex-direction:column; gap:10px;">
           <button class="btn-primary" onclick="userNavigate('patient_reg')">＋ Register New Patient</button>
-          <button class="btn-primary" onclick="userNavigate('doctor_mgmt')" style="background:var(--green-med);">＋ Allocate Doctor Room</button>
+          <button class="btn-primary" onclick="userNavigate('doctor_mgmt')" style="background:var(--green-med);">＋ Register / Allocate Doctor</button>
           <button class="btn-secondary" onclick="userNavigate('patient_mgmt')">Open Patient Queue</button>
           <button class="btn-secondary" onclick="userNavigate('patient_timeline')">Look Up Patient Timeline</button>
           <div style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--border); font-size:12px; color:var(--text-muted);">
@@ -899,14 +963,13 @@
   `;
   }
 
-  /* --- HIGHLY COMPACT PATIENT REGISTRATION FORM (NO SCROLL) --- */
   function renderPatientRegistration() {
     const docOptions = doctorDirectory.length
       ? doctorDirectory.map(d => {
           const room = allocationRoomFor(d.full_name);
           return `<option value="${d.full_name}">${d.full_name}${room ? ` (${room})` : ''}</option>`;
         }).join('')
-      : '<option value="" disabled>No doctor accounts found — register one in the main portal</option>';
+      : '<option value="" disabled>No doctor accounts found — register one under Doctor Management</option>';
 
     const roomOptions = Array.from({ length: 10 }, (_, i) => 10 + i)
             .map(r => `<option value="Room ${r}">Room ${r}</option>`).join('');
@@ -917,34 +980,30 @@
       <p>Register new incoming patients into the clinical queue.</p>
     </div>
 
-    <div style="max-width: 900px; margin: 0 auto; width: 100%;">
-      <div class="panel" style="height:auto;">
+    <div style="max-width: 700px; margin: 0 auto; width: 100%;">
+      <div class="panel">
         <div class="panel-header">Dental Registration Form</div>
-        <div class="panel-body" style="overflow:visible;">
+        <div class="panel-body">
           <form id="patient-form" onsubmit="addPatient(event)">
-            
-            <div class="form-grid-compact">
-              <div class="form-row">
-                <label>MR Number</label>
-                <input type="text" id="p-mr" value="" placeholder="e.g. MR-2026-0848" required />
-              </div>
-              
-              <div class="form-row">
-                <label>File Number</label>
-                <input type="text" id="p-file" value="" placeholder="e.g. F-10299" required />
-              </div>
+            <div class="form-row">
+              <label>MR Number</label>
+              <input type="text" id="p-mr" value="" placeholder="e.g. MR-2026-0848" required />
+            </div>
+            <div class="form-row">
+              <label>File Number</label>
+              <input type="text" id="p-file" value="" placeholder="e.g. F-10299" required />
+            </div>
+            <div class="form-row">
+              <label>Full Name / Rank</label>
+              <input type="text" id="p-name" value="" placeholder="e.g. Lt. Col. Sara Khan" required />
+            </div>
+            <div class="form-row">
+              <label>CNIC</label>
+              <input type="text" id="p-cnic" value="" placeholder="35202-1234567-9" required />
+            </div>
 
-              <div class="form-row">
-                <label>Full Name / Rank</label>
-                <input type="text" id="p-name" value="" placeholder="e.g. Lt. Col. Sara Khan" required />
-              </div>
-
-              <div class="form-row">
-                <label>CNIC</label>
-                <input type="text" id="p-cnic" value="" placeholder="35202-1234567-9" required />
-              </div>
-
-              <div class="form-row">
+            <div style="display:flex; gap:12px;">
+              <div class="form-row" style="flex:1;">
                 <label>Gender</label>
                 <select id="p-gender" required>
                   <option value="" disabled selected>Select gender</option>
@@ -953,8 +1012,7 @@
                   <option value="Other">Other</option>
                 </select>
               </div>
-
-              <div class="form-row">
+              <div class="form-row" style="flex:1;">
                 <label>Blood Group</label>
                 <select id="p-blood" required>
                   <option value="" disabled selected>Select group</option>
@@ -969,43 +1027,41 @@
                   <option value="Unknown">Unknown</option>
                 </select>
               </div>
-
-              <div class="form-row">
-                <label>Service Profile</label>
-                <select id="p-service-profile" required>
-                  <option value="" disabled selected>Select service profile</option>
-                  <option value="Serving Officer">Serving Officer</option>
-                  <option value="Serving Soldier / JCO">Serving Soldier / JCO</option>
-                  <option value="Retired Officer">Retired Officer</option>
-                  <option value="Retired Soldier / JCO">Retired Soldier / JCO</option>
-                  <option value="Family / Dependent">Family / Dependent</option>
-                  <option value="Civilian (Paying)">Civilian (Paying)</option>
-                  <option value="Civilian (Entitled)">Civilian (Entitled)</option>
-                </select>
-              </div>
-
-              <div class="form-row">
-                <label>Known Allergies (optional)</label>
-                <input type="text" id="p-allergies" value="" placeholder="e.g. Penicillin, Latex — blank if none" />
-              </div>
-
-              <div class="form-row">
-                <label>Target Room (Rooms 10-19)</label>
-                <select id="p-room" required>${roomOptions}</select>
-              </div>
-
-              <div class="form-row">
-                <label>Procedure Category</label>
-                <select id="p-procedure" required>${procedureCategoryOptions('Consultation')}</select>
-              </div>
             </div>
 
-            <div class="form-row" style="margin-top:10px;">
+            <div class="form-row">
+              <label>Service Profile</label>
+              <select id="p-service-profile" required>
+                <option value="" disabled selected>Select service profile</option>
+                <option value="Serving Officer">Serving Officer</option>
+                <option value="Serving Soldier / JCO">Serving Soldier / JCO</option>
+                <option value="Retired Officer">Retired Officer</option>
+                <option value="Retired Soldier / JCO">Retired Soldier / JCO</option>
+                <option value="Family / Dependent">Family / Dependent</option>
+                <option value="Civilian (Paying)">Civilian (Paying)</option>
+                <option value="Civilian (Entitled)">Civilian (Entitled)</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <label>Known Allergies (optional)</label>
+              <input type="text" id="p-allergies" value="" placeholder="e.g. Penicillin, Latex — leave blank if none" />
+            </div>
+
+            <div class="form-row">
+              <label>Target Room (Rooms 10-19)</label>
+              <select id="p-room" required>${roomOptions}</select>
+            </div>
+            <div class="form-row">
+              <label>Procedure Category</label>
+              <select id="p-procedure" required>${procedureCategoryOptions('Consultation')}</select>
+            </div>
+            <div class="form-row">
               <label>Assigned Dentist</label>
               <select id="p-doctor" required>${docOptions}</select>
             </div>
 
-            <div style="display:flex; gap:10px; margin-top:16px;">
+            <div style="display:flex; gap:8px; margin-top:20px;">
               <button type="submit" class="btn-primary" style="flex:2;">Register Patient</button>
               <button type="button" class="btn-secondary" style="flex:1;" onclick="document.getElementById('patient-form').reset()">Clear Form</button>
             </div>
@@ -1119,7 +1175,7 @@
           const room = allocationRoomFor(d.full_name);
           return `<option value="${d.full_name}">${d.full_name}${room ? ` — currently ${room}` : ' — unallocated'}</option>`;
         }).join('')
-      : '<option value="" disabled selected>Register a doctor account in main portal first</option>';
+      : '<option value="" disabled selected>Register a doctor account first</option>';
 
     const roomOptions = Array.from({ length: 10 }, (_, i) => 10 + i)
       .map(r => {
@@ -1130,20 +1186,52 @@
     return `
     <div class="header-group">
       <h1>Doctor Management & Queue Allocations</h1>
-      <p>Assign operatory rooms to doctors and monitor live appointment queues.</p>
+      <p>Register dental officers, assign operatory rooms, and monitor live appointment queues.</p>
     </div>
 
     <div class="grid-split">
       <div style="display:flex; flex-direction:column; gap:20px; min-height:0; overflow-y:auto;">
         <div class="panel" style="height:auto; flex:0 0 auto;">
+          <div class="panel-header">Register New Doctor (Creates Login Account)</div>
+          <div class="panel-body" style="overflow:visible; flex:0 0 auto;">
+            <form id="doctor-register-form" onsubmit="registerDoctorAccount(event)">
+              <div class="form-row">
+                <label>Full Name (incl. title)</label>
+                <input type="text" id="dr-name" placeholder="e.g. Dr. Hira Zaman" required />
+              </div>
+              <div class="form-row">
+                <label>Work Email (login ID)</label>
+                <input type="email" id="dr-email" placeholder="e.g. hira@afid.mil" required />
+              </div>
+              <div class="form-row">
+                <label>Staff ID (optional)</label>
+                <input type="text" id="dr-staffid" placeholder="e.g. HMS-0011" />
+              </div>
+              <div class="form-row">
+                <label>Temporary Password (min 8 characters)</label>
+                <input type="text" id="dr-password" placeholder="Share with the doctor to sign in" minlength="8" required />
+              </div>
+              <div class="form-row">
+                <label>Assign Room Now (optional)</label>
+                <select id="dr-room">
+                  <option value="">— Do not allocate yet —</option>
+                  ${roomOptions}
+                </select>
+              </div>
+              <button type="submit" class="btn-primary" style="margin-top:12px;">Create Doctor Account</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="panel" style="height:auto; flex:0 0 auto;">
           <div class="panel-header">Room Allocation & Chair Setup</div>
           <div class="panel-body" style="overflow:visible; flex:0 0 auto;">
             <form id="doctor-form" onsubmit="addDoctorAllocation(event)">
-              <div class="form-row" style="margin-bottom:10px;">
+              <div class="form-row">
                 <label>Doctor</label>
                 <select id="d-name" required>${doctorPicker}</select>
               </div>
-              <div class="form-row" style="margin-bottom:10px;">
+              <div class="form-row">
                 <label>Assigned Room (Rooms 10-19)</label>
                 <select id="d-room" required>${roomOptions}</select>
               </div>
@@ -1181,7 +1269,7 @@
   `;
   }
 
-  /* --- APPOINTMENT MODAL LOGIC --- */
+  /* --- APPOINTMENT MODAL LOGIC (INLINE IN PATIENT MANAGEMENT) --- */
   function openNextAppointmentModal(mr, name, doctor) {
     const today = new Date().toISOString().split('T')[0];
     const modalHTML = `
@@ -1191,22 +1279,22 @@
           <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Scheduling follow-up for <strong>${name} (${mr})</strong></p>
 
           <form onsubmit="saveNextAppointment(event, '${mr}', '${name}', '${doctor}')">
-            <div class="form-row" style="margin-bottom:10px;">
+            <div class="form-row">
               <label>Assigned Doctor (Doctor Continuity Enforced)</label>
               <input type="text" value="${doctor}" readonly style="background:#f1f5f9; cursor:not-allowed; font-weight:700;" />
             </div>
 
-            <div class="form-row" style="margin-bottom:10px;">
+            <div class="form-row">
               <label>Procedure Category</label>
               <select id="appt-procedure" required>${procedureCategoryOptions('Follow-up Treatment')}</select>
             </div>
 
-            <div class="form-row" style="margin-bottom:10px;">
+            <div class="form-row">
               <label>Appointment Date</label>
               <input type="date" id="appt-date" value="${today}" min="${today}" required />
             </div>
 
-            <div class="form-row" style="margin-bottom:10px;">
+            <div class="form-row">
               <label>Appointment Time</label>
               <input type="time" id="appt-time" value="10:30" required />
             </div>
@@ -1300,7 +1388,7 @@
     const doctor = val('p-doctor');
 
     if (!doctor) {
-      await uiError('No dentist selected. Register a doctor account in the main portal first.');
+      await uiError('No dentist selected. Register a doctor account under Doctor Management first.');
       return;
     }
 
@@ -1353,6 +1441,54 @@
       showToast(`Time Out recorded`);
     } catch (error) {
       showToast(error.message || 'Unable to complete procedure');
+    }
+  }
+
+  async function registerDoctorAccount(e) {
+    e.preventDefault();
+    const val = (id) => (document.getElementById(id)?.value || '').trim();
+
+    const fullName = val('dr-name');
+    const email = val('dr-email');
+    const staffId = val('dr-staffid');
+    const password = val('dr-password');
+    const room = val('dr-room');
+
+    if (password.length < 8) {
+      await uiError('Password must be at least 8 characters.');
+      return;
+    }
+
+    try {
+      await api.post('/auth/register', {
+        full_name: fullName,
+        email,
+        password,
+        role: 'doctor',
+        staff_id: staffId || null
+      });
+
+      if (room) {
+        try {
+          await api.post('/allocations', {
+            doctor_name: fullName,
+            room,
+            department: 'Orthodontics',
+            chair: 'Chair 1'
+          });
+        } catch (allocError) {
+          await uiAlert(
+            `Account created for ${fullName}, but the room could not be allocated:\n\n${allocError.message}`,
+            { title: 'Doctor Registered', tone: 'warn' }
+          );
+        }
+      }
+
+      await refreshDoctorData();
+      switchView('doctor_mgmt');
+      showToast(`${fullName} can now log in with ${email}`);
+    } catch (error) {
+      await uiError(error.message || 'Unable to register doctor');
     }
   }
 
@@ -1431,7 +1567,7 @@
       refreshedForPage = pageId;
       refreshDoctorData().finally(() => {
         const stillHere = document.querySelector('.nav-btn.active')?.dataset.page === pageId;
-        const typed = ['p-mr', 'p-file', 'p-name', 'p-cnic']
+        const typed = ['dr-name', 'dr-email', 'dr-staffid', 'dr-password', 'p-mr', 'p-file', 'p-name', 'p-cnic']
           .some(id => (document.getElementById(id)?.value || '').trim() !== '');
         if (stillHere && !typed) switchView(pageId);
       });
