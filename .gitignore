@@ -8,8 +8,10 @@ __pycache__/
 
 # generated / runtime artifacts
 AFID backend/.venv/
+AFID backend/venv/
 AFID backend/app.log
 AFID backend/exports/
+*.log
 
 # IDE project settings (personal, not shared config)
 .idea/

@@ -9,10 +9,15 @@ Usage:
 from database import engine, Base, SessionLocal
 import models
 from auth import hash_password
+from migrations import sync_schema
 
 def seed():
-    # Create all tables
+    # Create all tables, then add any model columns missing from tables that
+    # already existed (create_all never alters an existing table).
     Base.metadata.create_all(bind=engine)
+    added = sync_schema()
+    if added:
+        print(f"Schema sync added {len(added)} column(s): {', '.join(added)}")
     db = SessionLocal()
 
     try:

@@ -34,10 +34,19 @@ import models  # noqa: F401
 from routers import auth, patients, doctors, procedures, leaves, staff, hod, presets, procedure_analytics
 
 # ── Create tables ─────────────────────────────────────────────────────────────
-# Table creation is fully handled by SQLAlchemy models against PostgreSQL.
-# For schema changes to an existing database, use Alembic migrations
-# instead of ad-hoc ALTER TABLE hacks.
+# create_all() builds any table that does not exist yet, but deliberately leaves
+# existing tables alone -- so a newly added model column would be missing from
+# every database that predates it. sync_schema() adds those columns.
+#
+# Additive changes only. Renames, type changes and drops still need a real
+# migration tool (Alembic).
 Base.metadata.create_all(bind=engine)
+
+from migrations import sync_schema  # noqa: E402  -- must follow create_all
+
+_added_columns = sync_schema()
+if _added_columns:
+    logger.info("Schema sync added: %s", ", ".join(_added_columns))
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(

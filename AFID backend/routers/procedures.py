@@ -16,6 +16,24 @@ import models, schemas
 router = APIRouter(prefix="/procedures", tags=["Procedures"])
 
 
+def _resolve_doctor_id(db: Session, patient_id) -> int | None:
+    """Map a patient's assigned_doctor name onto a doctor user id, if we can."""
+    if not patient_id:
+        return None
+    patient = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
+    if not patient or not patient.assigned_doctor:
+        return None
+    doctor = (
+        db.query(models.User)
+        .filter(
+            models.User.full_name == patient.assigned_doctor,
+            models.User.role == models.UserRole.doctor,
+        )
+        .first()
+    )
+    return doctor.id if doctor else None
+
+
 # ── Procedure sessions ────────────────────────────────────────────────────────
 @router.get("/", response_model=List[schemas.ProcedureOut])
 def list_procedures(db: Session = Depends(get_db), _=Depends(get_current_user)):
@@ -35,7 +53,14 @@ def create_procedure(
     # summary sheet fell back to a hard-coded name that was frequently not the
     # doctor who performed it.
     if not data.get("doctor_id"):
-        data["doctor_id"] = current_user.id if current_user.role == models.UserRole.doctor else None
+        if current_user.role == models.UserRole.doctor:
+            data["doctor_id"] = current_user.id
+        else:
+            # A receptionist or the HOD can start a session too. Leaving
+            # doctor_id NULL there drops the row out of every doctor-joined
+            # report (/hod/procedure-analytics/*), so fall back to the doctor
+            # the patient is already assigned to.
+            data["doctor_id"] = _resolve_doctor_id(db, data.get("patient_id"))
     # Record the start time when a procedure is created
     data["start_time"] = datetime.utcnow()
     proc = models.Procedure(**data)
@@ -60,10 +85,16 @@ def complete_procedure(proc_id: int, db: Session = Depends(get_db), _=Depends(ge
         raise HTTPException(404, "Procedure not found")
     proc.is_completed = True
     proc.end_time = datetime.utcnow()
-    # Calculate duration in minutes from start_time to end_time
-    if proc.start_time and proc.end_time:
-        delta = proc.end_time - proc.start_time
-        proc.duration_minutes = int(delta.total_seconds() // 60)
+    # Calculate duration in minutes from start_time to end_time. Sessions
+    # created before start_time existed have none, so fall back to the session
+    # date -- otherwise duration_minutes stays NULL and the row is invisible to
+    # the procedure analytics reports.
+    started = proc.start_time or proc.session_date
+    if started:
+        if proc.start_time is None:
+            proc.start_time = started
+        delta = proc.end_time - started
+        proc.duration_minutes = max(0, int(delta.total_seconds() // 60))
     if proc.patient and not proc.patient.check_out_time:
         proc.patient.check_out_time = datetime.now()
     db.commit()

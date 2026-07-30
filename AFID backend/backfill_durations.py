@@ -36,9 +36,43 @@ DEFAULT_DURATIONS = {
     "ORAL EXAM": 10,
 }
 
+def backfill_doctor_ids(db: Session) -> int:
+    """Attach a doctor to procedures saved with doctor_id NULL.
+
+    The analytics endpoints inner-join procedures to users on doctor_id, so a
+    NULL there makes the row invisible. The patient's assigned_doctor already
+    records who was responsible; map that name back onto the doctor's user row.
+    """
+    doctors = {
+        u.full_name: u.id
+        for u in db.query(models.User).filter(models.User.role == models.UserRole.doctor).all()
+    }
+
+    orphans = (
+        db.query(models.Procedure)
+        .filter(models.Procedure.doctor_id == None)  # noqa: E711 -- SQL NULL test
+        .all()
+    )
+
+    updated = 0
+    for p in orphans:
+        patient = p.patient
+        if not patient or not patient.assigned_doctor:
+            continue
+        doctor_id = doctors.get(patient.assigned_doctor)
+        if doctor_id:
+            p.doctor_id = doctor_id  # type: ignore
+            updated += 1
+    return updated
+
+
 def backfill():
     db = SessionLocal()
     try:
+        # Attribute orphaned procedures before computing durations, so the
+        # analytics reports have both halves of the data they need.
+        attributed = backfill_doctor_ids(db)
+
         # Use the same DB configured for the app from .env via database.py
         procedures = db.query(models.Procedure).filter(
             models.Procedure.is_completed == True,
@@ -70,6 +104,7 @@ def backfill():
             updated += 1
 
         db.commit()
+        print(f"Attached a doctor to {attributed} previously unattributed procedures.")
         print(f"Backfilled duration_minutes for {updated} completed procedures.")
     except Exception as e:
         print(f"Error during backfill: {e}")
