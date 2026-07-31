@@ -6,7 +6,7 @@ Three managed services, one per tier:
 |------|---------|---------------|
 | Database | **Neon** | Managed PostgreSQL |
 | Backend | **Railway** | FastAPI app (`AFID backend/`) |
-| Frontend | **Vercel** | Static portals (`AFID frontend/AFID frontend/`) |
+| Frontend | **Vercel** | Static portals (`AFID frontend/`) |
 
 **How they connect:** the browser only ever talks to Vercel. Vercel serves the
 static HTML and *rewrites* API paths (`/auth`, `/patients`, `/hod`, …) to the
@@ -73,12 +73,12 @@ Do the steps in order: **Neon → Railway → Vercel** (each needs the previous 
 
 ## 3 · Vercel — deploy the frontend
 
-1. **Edit `AFID frontend/AFID frontend/vercel.json`** and replace every
+1. **Edit `AFID frontend/vercel.json`** and replace every
    `REPLACE_WITH_RAILWAY_URL` with your Railway host (no `https://`, no trailing slash),
    e.g. `afid-backend-production.up.railway.app`. Commit & push.
 2. Sign in at **vercel.com** → **Add New → Project** → import `AFID-HMS`.
 3. Configure:
-   - **Root Directory:** `AFID frontend/AFID frontend`
+   - **Root Directory:** `AFID frontend`
    - **Framework Preset:** **Other**
    - **Build Command:** *(leave empty)* — these are plain static files, no build step
    - **Output Directory:** *(leave empty / `.`)*
@@ -110,7 +110,5 @@ Do the steps in order: **Neon → Railway → Vercel** (each needs the previous 
 - **Local dev is unchanged:** run the backend on `:8000` and the frontend with
   `npm run dev` (Vite on `:5173`). `api.js` now uses same-origin paths, which the
   Vite proxy (`vite.config.js`) forwards to `:8000` — mirroring the Vercel rewrites.
-- **File names with spaces** (`doctor (1).html`): these are served fine by Vercel,
-  but if you ever see a 404 on the doctor portal, that's the first thing to check.
 - **Free-tier sleep:** Railway/Neon free tiers may cold-start; the first request
   after idle can take a few seconds.
