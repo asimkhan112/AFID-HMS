@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from config import settings
 from database import engine, Base
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 import models  # noqa: F401
 
 from routers import auth, patients, doctors, procedures, leaves, staff, hod, presets, procedure_analytics
+from routers import upload as upload_router  # noqa: E402
 
 # ── Create tables ─────────────────────────────────────────────────────────────
 # create_all() builds any table that does not exist yet, but deliberately leaves
@@ -114,6 +116,13 @@ app.include_router(staff.router)
 app.include_router(hod.router)
 app.include_router(presets.router)
 app.include_router(procedure_analytics.router)
+app.include_router(upload_router.router)
+
+
+# ── Static uploads ─────────────────────────────────────────────────────────────
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
 @app.get("/", tags=["Health"])

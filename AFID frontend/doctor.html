@@ -533,6 +533,7 @@
         document.getElementById('step-3-container').style.display = 'none';
         document.getElementById('procedure-select').value = "";
         document.getElementById('master-summary-injection-point').innerHTML = '';
+        try { patientRecordFiles = await loadPatientDocuments(currentPatient.id); renderPatientRecords(); } catch (e) { console.warn('Failed to load saved documents:', e); }
       } catch (err) { await uiError("Error executing record search: " + err.message); }
     }
 
@@ -726,6 +727,7 @@
         const checkIn = currentPatient.check_in_time ? new Date(currentPatient.check_in_time) : null;
         const now = new Date();
         const duration_minutes = checkIn && !isNaN(checkIn) ? Math.max(0, Math.round((now - checkIn) / 60000)) : 0;
+        if (Object.keys(patientRecordFiles).length) { await uploadRecordFiles(currentPatient.id); }
         const proc = await api.post('/procedures/', { patient_id: currentPatient.id, name: procedureTitle, is_completed: true, duration_minutes: duration_minutes });
         const failures = [];
         for (const m of activeMaterials) { try { await api.post(`/procedures/${proc.id}/materials`, { material_name: m.name, quantity: m.qty || 1 }); } catch (e) { failures.push(`Material "${m.name}": ${e.message}`); } }
@@ -799,26 +801,63 @@
     const ARCHWIRE_PROCEDURE = 'Archwire insertion / change';
     let patientRecordFiles = {};
 
+    async function uploadRecordFiles(patientId) {
+      const results = [];
+      for (const [recordId, fileData] of Object.entries(patientRecordFiles)) {
+        if (fileData._uploaded || !fileData.file) continue;
+        try {
+          const fd = new FormData();
+          fd.append('patient_id', String(patientId));
+          fd.append('record_type', recordId);
+          fd.append('file_date', fileData.date || '');
+          fd.append('procedure_id', String(currentPatient?.id || ''));
+          fd.append('file', fileData.file);
+          const token = getToken();
+          const res = await fetch('/upload/', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          fileData._uploaded = true;
+          fileData._docId = data.id;
+          fileData._url = `/uploads/${data.file_path.split('/').pop()}`;
+          results.push(data);
+        } catch (e) {
+          console.warn(`Failed to upload ${recordId}:`, e);
+        }
+      }
+      return results;
+    }
+
+    async function loadPatientDocuments(patientId) {
+      try {
+        const docs = await api.get(`/upload/${patientId}`);
+        const map = {};
+        docs.forEach(d => { map[d.record_type] = { name: d.file_name, size: d.file_size, date: String(d.file_date || '').split('T')[0], _uploaded: true, _docId: d.id, _url: `/uploads/${d.file_path.split('/').pop()}`, file: null }; });
+        return map;
+      } catch (e) {
+        return {};
+      }
+    }
+
     function renderPatientRecords() {
       const container = document.getElementById('patient-records-container');
       if (!container) return;
       container.innerHTML = Object.entries(PATIENT_RECORDS_DATA).map(([category, records]) => {
         const attached = records.filter(r => patientRecordFiles[r.id]).length;
-        return `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed')">${category}</div><div class="diag-category-content is-block collapsed">${records.map(record => { const att = patientRecordFiles[record.id]; return `<div class="record-item"><div class="record-head"><div class="record-title">${record.icon} ${record.name}</div><div class="record-actions"><input type="date" id="date-${record.id}" value="${att?.date || ''}" onchange="updateRecordDate('${record.id}', this.value)"><button class="btn-view ${att ? '' : 'is-empty'}" onclick="viewRecord('${record.id}')">👁 View</button>${att ? `<button class="btn btn-sm btn-danger" onclick="removeRecordFile('${record.id}')">Remove</button>` : ''}</div></div><div class="upload-area ${att ? 'has-file' : ''}" id="drop-${record.id}" onclick="document.getElementById('file-${record.id}').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${record.id}')">${att ? `<div class="file-name">📎 ${att.name}</div><div class="upload-hint">${formatFileSize(att.size)} · attached for this session — click or drop to replace</div>` : `<div>📁 Click or drag a file to attach</div><div class="upload-hint">Supports: JPG, PNG, PDF</div>`}<input type="file" id="file-${record.id}" style="display:none;" accept="image/*,.pdf" onchange="handleFileSelect(event, '${record.id}')"></div></div>`; }).join('')}</div></div>`;
+        return `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed')">${category}</div><div class="diag-category-content is-block collapsed">${records.map(record => { const att = patientRecordFiles[record.id]; return `<div class="record-item"><div class="record-head"><div class="record-title">${record.icon} ${record.name}</div><div class="record-actions"><input type="date" id="date-${record.id}" value="${att?.date || ''}" onchange="updateRecordDate('${record.id}', this.value)"><button class="btn-view ${att ? '' : 'is-empty'}" onclick="viewRecord('${record.id}')">👁 View</button>${att ? `<button class="btn btn-sm btn-danger" onclick="removeRecordFile('${record.id}')">Remove</button>` : ''}</div></div><div class="upload-area ${att ? 'has-file' : ''}" id="drop-${record.id}" onclick="document.getElementById('file-${record.id}').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${record.id}')">${att ? `<div class="file-name">📎 ${att.name}</div><div class="upload-hint">${formatFileSize(att.size)} · ${att._uploaded ? 'Saved to server' : 'Attached — will upload on session completion'}</div>` : `<div>📁 Click or drag a file to attach</div><div class="upload-hint">Supports: JPG, PNG, PDF</div>`}<input type="file" id="file-${record.id}" style="display:none;" accept="image/*,.pdf" onchange="handleFileSelect(event, '${record.id}')"></div></div>`; }).join('')}</div></div>`;
       }).join('');
       const count = document.getElementById('records-count');
       if (count) { const n = Object.keys(patientRecordFiles).length; count.textContent = `${n} attached`; }
     }
     function formatFileSize(bytes) { if (!bytes && bytes !== 0) return ''; if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`; return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
-    function attachRecordFile(file, recordId) { if (!file) return; const dateEl = document.getElementById(`date-${recordId}`); if (patientRecordFiles[recordId]?.url) URL.revokeObjectURL(patientRecordFiles[recordId].url); patientRecordFiles[recordId] = { name: file.name, size: file.size, type: file.type, url: URL.createObjectURL(file), date: dateEl ? dateEl.value : '' }; renderPatientRecords(); showDoctorToast(`${file.name} attached (held for this session only).`); }
+    function attachRecordFile(file, recordId) { if (!file) return; const dateEl = document.getElementById(`date-${recordId}`); if (patientRecordFiles[recordId]?.url && String(patientRecordFiles[recordId].url).startsWith('blob:')) URL.revokeObjectURL(patientRecordFiles[recordId].url); patientRecordFiles[recordId] = { name: file.name, size: file.size, type: file.type, url: URL.createObjectURL(file), date: dateEl ? dateEl.value : '', file: file, _uploaded: false }; renderPatientRecords(); showDoctorToast(`${file.name} attached.`); }
     function handleFileSelect(event, recordId) { attachRecordFile(event.target.files[0], recordId); }
     function handleDragOver(event) { event.preventDefault(); event.currentTarget.style.borderColor = 'var(--green-med)'; event.currentTarget.style.background = 'var(--green-light)'; }
     function handleDragLeave(event) { event.currentTarget.style.borderColor = ''; event.currentTarget.style.background = ''; }
     function handleDrop(event, recordId) { event.preventDefault(); handleDragLeave(event); attachRecordFile(event.dataTransfer.files?.[0], recordId); }
     function updateRecordDate(recordId, value) { if (patientRecordFiles[recordId]) patientRecordFiles[recordId].date = value; }
-    function removeRecordFile(recordId) { if (patientRecordFiles[recordId]?.url) URL.revokeObjectURL(patientRecordFiles[recordId].url); delete patientRecordFiles[recordId]; renderPatientRecords(); }
-    async function viewRecord(recordId) { const att = patientRecordFiles[recordId]; if (!att) { await uiAlert('No file is attached to this record yet. Click the upload area below it to attach one.', { title: 'Nothing To View', tone: 'warn' }); return; } if (att.type === 'application/pdf') { window.open(att.url, '_blank', 'noopener'); return; } const backdrop = document.createElement('div'); backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(3,37,26,.82);z-index:100000;display:flex;align-items:center;justify-content:center;padding:32px;cursor:zoom-out;'; backdrop.innerHTML = `<div style="max-width:100%; max-height:100%; display:flex; flex-direction:column; gap:10px; align-items:center;"><img src="${att.url}" alt="${att.name}" style="max-width:100%; max-height:80vh; border-radius:8px; box-shadow:0 20px 50px rgba(0,0,0,.45); background:#fff;"><div style="color:#fff; font-size:13px; font-weight:700;">${att.name}${att.date ? ` · ${att.date}` : ''} <span style="font-weight:400; opacity:.75;">— click anywhere to close</span></div></div>`; const close = () => { backdrop.remove(); document.removeEventListener('keydown', onKey, true); }; const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } }; backdrop.addEventListener('click', close); document.addEventListener('keydown', onKey, true); document.body.appendChild(backdrop); }
-    function buildRecordsBlock() { const rows = Object.entries(PATIENT_RECORDS_DATA).flatMap(([, records]) => records.filter(r => patientRecordFiles[r.id]).map(r => { const a = patientRecordFiles[r.id]; return `  - ${r.name}: ${a.name}${a.date ? ` (${a.date})` : ''}`; })); return rows.length ? ['RECORDS ATTACHED THIS SESSION:', ...rows].join('\n') : ''; }
+    async function removeRecordFile(recordId) { const att = patientRecordFiles[recordId]; if (att?._docId) { try { await api.delete(`/upload/${att._docId}`); } catch (e) { console.warn('Delete failed:', e); } } if (att?.url && String(att.url).startsWith('blob:')) URL.revokeObjectURL(att.url); delete patientRecordFiles[recordId]; renderPatientRecords(); }
+    async function viewRecord(recordId) { const att = patientRecordFiles[recordId]; if (!att) { await uiAlert('No file is attached to this record yet. Click the upload area below it to attach one.', { title: 'Nothing To View', tone: 'warn' }); return; } let viewUrl = att._url || att.url; if (att.url && String(att.url).startsWith('blob:')) { window.open(att.url, '_blank', 'noopener'); return; } if (att.type === 'application/pdf' || (att.name && att.name.toLowerCase().endsWith('.pdf'))) { window.open(viewUrl, '_blank', 'noopener'); return; } const backdrop = document.createElement('div'); backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(3,37,26,.82);z-index:100000;display:flex;align-items:center;justify-content:center;padding:32px;cursor:zoom-out;'; backdrop.innerHTML = `<div style="max-width:100%; max-height:100%; display:flex; flex-direction:column; gap:10px; align-items:center;"><img src="${viewUrl}" alt="${att.name}" style="max-width:100%; max-height:80vh; border-radius:8px; box-shadow:0 20px 50px rgba(0,0,0,.45); background:#fff;"><div style="color:#fff; font-size:13px; font-weight:700;">${att.name}${att.date ? ` · ${att.date}` : ''} <span style="font-weight:400; opacity:.75;">— click anywhere to close</span></div></div>`; const close = () => { backdrop.remove(); document.removeEventListener('keydown', onKey, true); }; const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } }; backdrop.addEventListener('click', close); document.addEventListener('keydown', onKey, true); document.body.appendChild(backdrop); }
+    function buildRecordsBlock() { const rows = Object.entries(PATIENT_RECORDS_DATA).flatMap(([, records]) => records.filter(r => patientRecordFiles[r.id]).map(r => { const a = patientRecordFiles[r.id]; return `  - ${r.name}: ${a.name}${a.date ? ` (${a.date})` : ''}`; })); return rows.length ? ['RECORDS ATTACHED / UPLOADED:', ...rows].join('\n') : ''; }
 
     function renderProcCheckboxes(filter) {
       const f = (filter || '').toLowerCase();
