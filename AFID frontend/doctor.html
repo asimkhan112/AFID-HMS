@@ -94,6 +94,9 @@
     .qty-val { background: var(--green-light); color: var(--green-dark); padding: 2px 8px; font-weight: 700; border-radius: 4px; font-size: 12px; }
 
     .reveal-section { display: none; }
+    /* The procedure checklist IS the session's procedure selector -- there is no separate
+       dropdown. Ticking a procedure opens the record tabs below. */
+    .proc-empty-hint { margin-top: 12px; padding: 12px 16px; background: #fff8e6; border: 1px solid #f0d89a; border-radius: 8px; font-size: 12px; color: #7a5a10; }
     .view-screen { display: none; }
     .view-screen.active { display: block; }
 
@@ -531,13 +534,12 @@
         activeMaterials = []; activePharmacy = []; activeDiagnostics = [];
         resetSelectionPickers();
         document.getElementById('step-3-container').style.display = 'none';
-        document.getElementById('procedure-select').value = "";
         document.getElementById('master-summary-injection-point').innerHTML = '';
+        try { patientRecordFiles = await loadPatientDocuments(currentPatient.id); renderPatientRecords(); } catch (e) { console.warn('Failed to load saved documents:', e); }
       } catch (err) { await uiError("Error executing record search: " + err.message); }
     }
 
     function renderOperations() {
-      const proceduralOptions = Object.keys(ensurePresets()).map(key => `<option value="${key}">${key}</option>`).join('');
       return `
         <div id="view-search-screen" class="view-screen active">
           <div class="dashboard-title-row" style="margin-bottom: 24px;"><h1>Patient Operations</h1><div class="meta-tag">Record Lookup</div></div>
@@ -546,24 +548,32 @@
         <div id="view-workspace-screen" class="view-screen">
           <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;"><button class="btn btn-sm" onclick="returnToSearchScreen()" style="background: var(--text-muted);">&larr; Back to Search Lookup</button><span id="active-patient-badge" class="meta-tag" style="font-size: 13px;">Active Patient: None</span><button class="btn btn-sm" onclick="confirmTimeOut()" style="background: #0f6244;">Confirm Time & Complete Session</button></div>
           <div class="panel"><div class="panel-header">Extracted Patient Profile Breakdown & Medical Indicators</div><div class="panel-body"><div class="patient-details-grid"><div><span class="label">Full Name:</span><span class="value">—</span></div><div><span class="label">File ID / MR:</span><span class="value">—</span></div><div><span class="label">Service Profile:</span><span class="value">—</span></div><div><span class="label">Gender/Blood:</span><span class="value">—</span></div><div><span class="label">System Location:</span><span class="value">—</span></div><div><span class="label">Case Status:</span><span class="value">—</span></div></div><div class="alert-box" id="allergy-alert-box" style="margin-bottom:12px; display:none;"></div><div class="alert-box" id="complications-alert-box" style="margin-bottom:12px; display:none;"></div><div class="flex-row-inputs" style="border-top: 1px dashed var(--border); padding-top: 12px; margin-bottom: 0;"><div><label class="label" style="font-weight: 700; color: var(--green-med); font-size: 11px;">⏰ Patient Time In</label><input type="text" id="patient-time-in" readonly style="background:#f3f4f6; color:#374151;" /></div><div><label class="label" style="font-weight: 700; color: var(--green-med); font-size: 11px;">⏰ Patient Time Out</label><input type="text" id="patient-time-out" readonly style="background:#f3f4f6; color:#374151;" /></div></div></div></div>
-          <div class="panel"><div class="panel-header">Procedures Management (Choose One)</div><div class="panel-body"><div class="flex-row-inputs" style="margin-bottom:0;"><div style="flex: 1.5;"><select id="procedure-select" onchange="applyProcedure()"><option value="" disabled selected>-- Select One Procedure --</option>${proceduralOptions}</select></div><div><button class="btn btn-sm" onclick="openAddProcedureModal()" style="background: var(--green-dark); height: 38px;">+ Add Procedure</button></div></div></div></div>
+          <div class="panel"><div class="panel-header">Procedures Management — Select All Performed</div><div class="panel-body">
+            <input class="diag-search-box" id="proc-search" placeholder="🔍 Search procedures..." onkeyup="renderProcCheckboxes(this.value)">
+            <div class="proc-legend"><span class="tooth-flag">🦷 teeth</span> marks a tooth-specific procedure — ticking one opens its own tooth chart once, and each procedure's teeth are saved separately. Reopen any chart from the Procedure Charts list below.</div>
+            <div id="proc-checkbox-container"></div>
+            <div id="chart-summary-host"></div>
+            <div id="chart-modal-host"></div>
+            <div class="diag-action-row"><span class="diag-selected-count" id="proc-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearProcSelections()">Clear All</button><button class="btn btn-sm" onclick="saveProcSelections()">💾 Save Procedures</button></div></div>
+            <div id="proc-empty-hint" class="proc-empty-hint">Tick one or more procedures above to open the record tabs for this session.</div>
+          </div></div>
           <div id="step-3-container" class="reveal-section">
             <div class="tab-bar">
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-diagnosis')">Diagnosis</button>
               <button class="tab-button active" onclick="switchSubTab(event, 'subtab-investigations')">Investigations</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-patient-records')">Patient Records</button>
-              <button class="tab-button" onclick="switchSubTab(event, 'subtab-procedures')">Procedures</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-materials')">Materials Used</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-pharmacy')">Pharmacy Dispensing</button>
+              <button class="tab-button" onclick="switchSubTab(event, 'subtab-lab')">Lab</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-notes')">Clinical Notes</button>
               <button class="tab-button" onclick="switchSubTab(event, 'subtab-records')">Medical Record</button>
             </div>
             <div id="subtab-diagnosis" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Orthodontic Diagnosis — Select all applicable findings</div><div class="panel-body"><input class="diag-search-box" id="diag-search" placeholder="🔍 Search diagnosis items..." onkeyup="renderDiagCheckboxes(this.value)"><div id="diag-checkbox-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="diag-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearDiagSelections()">Clear All</button><button class="btn btn-sm" onclick="saveDiagSelections()">💾 Save Diagnosis</button></div></div></div></div></div>
             <div id="subtab-investigations" class="tab-content active"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Investigations — Select all that apply</div><div class="panel-body"><input class="diag-search-box" id="inv-search" placeholder="🔍 Search investigations..." onkeyup="renderInvCheckboxes(this.value)"><div id="inv-checkbox-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="inv-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearInvSelections()">Clear All</button><button class="btn btn-sm" onclick="saveInvSelections()">💾 Save Investigations</button></div></div></div></div></div>
             <div id="subtab-patient-records" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Patient Records — Upload and view patient files</div><div class="panel-body"><div id="patient-records-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="records-count">0 attached</span><div class="action-group"><span style="font-size:12px; color:var(--text-muted);">Files are held for this session; the filename and date are saved with the record.</span></div></div></div></div></div>
-            <div id="subtab-procedures" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Orthodontic Procedures — Select procedures performed</div><div class="panel-body"><input class="diag-search-box" id="proc-search" placeholder="🔍 Search procedures..." onkeyup="renderProcCheckboxes(this.value)"><div class="proc-legend"><span class="tooth-flag">🦷 teeth</span> marks a tooth-specific procedure — ticking one opens its own tooth chart once, and each procedure's teeth are saved separately. Reopen any chart from the Procedure Charts list below.</div><div id="proc-checkbox-container"></div><div id="chart-summary-host"></div><div id="chart-modal-host"></div><div class="diag-action-row"><span class="diag-selected-count" id="proc-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearProcSelections()">Clear All</button><button class="btn btn-sm" onclick="saveProcSelections()">💾 Save Procedures</button></div></div></div></div></div>
             <div id="subtab-materials" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Materials Used — Auto-populated from selected procedures</div><div class="panel-body"><div class="alert-box" style="background: var(--green-soft); border-color: var(--green-med); margin-bottom: 16px; color: var(--green-dark);"><strong>ℹ️ AUTO-UPDATE:</strong> Selecting procedures in the Procedures tab automatically flags the materials those procedures consume (marked <span class="mat-badge">auto</span>). Every row's quantity and unit can be edited, any row can be removed, and you can add your own materials below.</div><div class="mat-add-row"><div class="mat-add-field grow"><label for="mat-add-name">Add material</label><input type="text" id="mat-add-name" placeholder="e.g. Bracket removal plier tips" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomMaterial();}"></div><div class="mat-add-field"><label for="mat-add-category">Category</label><select id="mat-add-category"></select></div><div class="mat-add-field"><label for="mat-add-qty">Qty</label><input type="text" inputmode="numeric" id="mat-add-qty" value="1" style="width:70px; text-align:center;"></div><div class="mat-add-field"><label for="mat-add-unit">Unit</label><input type="text" id="mat-add-unit" placeholder="pcs" style="width:80px; text-align:center;"></div><button class="btn btn-sm" onclick="addCustomMaterial()">＋ Add</button></div><div id="materials-restore-host"></div><div id="materials-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="materials-count">0 items</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="resetMaterialsTable()">Reset Table</button><button class="btn btn-sm" onclick="saveMaterials()">💾 Save Materials</button></div></div></div></div></div>
             <div id="subtab-pharmacy" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Pharmacy Dispensing Log</div><div class="panel-body"><div class="flex-row-inputs"><input type="text" id="pharmacy-input" placeholder="Medication..." style="flex:1;" /><input type="text" id="pharmacy-dose" placeholder="Dose (e.g. 500mg)" style="width:120px;" /><input type="text" id="pharmacy-freq" placeholder="Frequency" style="width:150px;" /><button class="btn btn-sm" style="height: 45px;" onclick="addPharmacyItem()">+ Add</button></div><table><thead><tr><th>Medication</th><th>Dose</th><th>Frequency</th><th style="width:80px; text-align:right;">Action</th></tr></thead><tbody id="pharmacy-log-list"></tbody></table></div></div></div>
+            <div id="subtab-lab" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Lab — Appliance Order</div><div class="panel-body"><div class="flex-row-inputs" style="margin-bottom:0;"><div class="form-group" style="flex:2; margin-bottom:0;"><label class="label" for="lab-appliance-ordered">Appliance Ordered</label><input type="text" id="lab-appliance-ordered" placeholder="e.g. Upper Hawley retainer" /></div><div class="form-group" style="flex:1; margin-bottom:0;"><label class="label" for="lab-insertion-date">Date of Insertion</label><input type="date" id="lab-insertion-date" /></div></div></div></div></div>
             <div id="subtab-notes" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Ongoing Clinical Notes</div><div class="panel-body"><div class="form-group"><label style="font-weight: 700; color: var(--text-dark);">Clinical Notes & Observations</label><textarea id="clinical-notes-textarea" rows="4" placeholder="Document case observations..."></textarea><div style="text-align:right; margin-top:8px;"><button class="btn btn-sm" onclick="saveClinicalNotes()">💾 Save Notes</button></div></div><div class="form-group" style="margin-top: 16px;"><label style="font-weight: 700; color: var(--red);">⚠️ COMPLICATIONS / ADVERSE EVENTS</label><input type="text" id="complications-input" placeholder="Enter any complications or adverse events..." oninput="updateComplicationsAlert()" /><div style="text-align:right; margin-top:8px;"><button class="btn btn-sm" onclick="saveComplications()">💾 Save Complications</button></div></div><div class="alert-box" id="complications-alert-box" style="margin-bottom:12px; display:none;"></div><div style="text-align: center; margin-bottom: 12px;"><button id="transcribe-btn" style="background: var(--green-light); color: var(--green-dark); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">🎤 Transcribe</button></div><div style="text-align: center;"><button class="btn" onclick="compileMasterSummary()">📋 Use Template & Compile Master Summary Report</button></div></div></div></div>
             <div id="subtab-records" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Comprehensive Medical History & Allergies Sheet</div><div class="panel-body"><div class="form-group"><label style="color:var(--red); font-weight:700;">🚨 SYSTEM LEVEL DETECTED ALLERGIES</label><input type="text" id="record-allergy-input" placeholder="e.g. Penicillin, Latex, None..." onchange="updatePatientMedicalRecord()" /></div><div class="form-group" style="margin-top:16px;"><label>Structural Baseline Diagnostic History</label><textarea id="record-diagnostic-history" rows="4" placeholder="Enter diagnostic history..." onchange="updatePatientMedicalRecord()"></textarea></div><div class="form-group"><label>Systemic Status Records</label><textarea id="record-systemic-status" rows="4" placeholder="Enter systemic status..." onchange="updatePatientMedicalRecord()"></textarea></div><div style="text-align: right; margin-top: 12px;"><button class="btn btn-sm" onclick="saveMedicalRecordChanges()">💾 Save Changes</button></div></div></div></div>
             <div id="master-summary-injection-point"></div>
@@ -602,31 +612,69 @@
     async function saveMedicalRecordChanges() { if (!currentPatient) { await uiAlert('No patient record is open.', { title: 'Nothing To Save', tone: 'warn' }); return; } updatePatientMedicalRecord(); try { const updated = await api.put(`/patients/${currentPatient.id}`, { mr_number: currentPatient.mr_number, file_number: currentPatient.file_number, full_name: currentPatient.full_name, rank: currentPatient.rank, cnic: currentPatient.cnic, gender: currentPatient.gender, blood_group: currentPatient.blood_group, service_profile: currentPatient.service_profile, allergies: currentPatient.allergies || null, room: currentPatient.room, assigned_doctor: currentPatient.assigned_doctor, procedure_category: currentPatient.procedure_category }); currentPatient = { ...updated, ...{ diagnostic_history: currentPatient.diagnostic_history, systemic_status: currentPatient.systemic_status } }; const cachedIdx = (cachedPatients || []).findIndex(p => p.id === updated.id); if (cachedIdx !== -1) cachedPatients[cachedIdx] = updated; showDoctorToast('Medical record saved.'); } catch (err) { await uiError(err.message || 'Unable to save medical record'); } }
     function returnToSearchScreen() { document.getElementById('view-workspace-screen').classList.remove('active'); document.getElementById('view-search-screen').classList.add('active'); const searchInput = document.getElementById('patient-search-input'); if (searchInput) searchInput.focus(); }
 
-    function applyProcedure() {
-      const procSelect = document.getElementById('procedure-select');
-      const selectedProcedure = procSelect.value;
-      if (!selectedProcedure || !ensurePresets()[selectedProcedure]) return;
-      const data = ensurePresets()[selectedProcedure];
-      activeMaterials = [...GLOBAL_MATERIALS, ...data.materials].sort(sortByProp('name'));
-      renderMaterialsList();
-      activePharmacy = [...data.pharmacy].sort(sortByProp('med'));
-      renderPharmacyList();
-      activeDiagnostics = [...data.diagnostics].sort(sortByProp('name'));
-      document.getElementById('clinical-notes-textarea').value = data.notes;
+    // ---------------------------------------------------------------------
+    // Procedure selection drives the whole session
+    // ---------------------------------------------------------------------
+    // The ticked procedures ARE the session's procedure list -- there is no dropdown.
+    // Everything a preset used to supply on selection (material kit, pharmacy,
+    // diagnostics, note template) is now derived from whatever is ticked, and the
+    // record tabs open as soon as at least one procedure is on.
+    function selectedProcedures() { return Array.from(procSelected).sort(); }
+
+    // Preset names are spelt slightly differently from the checklist ("Quad Helix" vs
+    // "Quad helix"), so match case-insensitively. A procedure with no preset still gets
+    // materials via PROCEDURE_MATERIAL_MAP.
+    function presetFor(procName) {
+      const all = ensurePresets();
+      const key = Object.keys(all).find(k => k.toLowerCase() === String(procName).toLowerCase());
+      return key ? all[key] : null;
+    }
+
+    function applySelectedProcedures() {
+      const chosen = selectedProcedures();
+      const presets = chosen.map(presetFor).filter(Boolean);
+      seedMaterialsFromPresets(presets);
+      applyPresetPharmacy(presets);
+      applyPresetDiagnostics(presets);
+      applyPresetNotes(chosen, presets);
       const step3Container = document.getElementById('step-3-container');
-      if (step3Container) { step3Container.style.display = 'block'; }
-      document.getElementById('master-summary-injection-point').innerHTML = '';
-      const targetSubTabName = 'subtab-investigations';
-      const tabButton = document.querySelector(`[onclick*="${targetSubTabName}"]`);
-      if(tabButton) { const mockEvent = { currentTarget: tabButton, preventDefault: () => {} }; switchSubTab(mockEvent, targetSubTabName); }
+      if (step3Container) step3Container.style.display = chosen.length ? 'block' : 'none';
+      const hint = document.getElementById('proc-empty-hint');
+      if (hint) hint.style.display = chosen.length ? 'none' : 'block';
+    }
+
+    function applyPresetPharmacy(presets) {
+      activePharmacy = activePharmacy.filter(p => !p.fromPreset);
+      presets.forEach(p => (p.pharmacy || []).forEach(rx => {
+        if (!activePharmacy.some(x => x.med.toLowerCase() === rx.med.toLowerCase())) activePharmacy.push({ ...rx, fromPreset: true });
+      }));
+      activePharmacy.sort(sortByProp('med'));
+      renderPharmacyList();
+    }
+
+    function applyPresetDiagnostics(presets) {
+      activeDiagnostics = activeDiagnostics.filter(d => d.source !== 'preset');
+      presets.forEach(p => (p.diagnostics || []).forEach(d => {
+        if (!activeDiagnostics.some(x => x.name.toLowerCase() === d.name.toLowerCase())) activeDiagnostics.push({ ...d, source: 'preset' });
+      }));
+      activeDiagnostics.sort(sortByProp('name'));
+      renderDiagnosticsList();
+    }
+
+    function applyPresetNotes(chosen, presets) {
+      const notesEl = document.getElementById('clinical-notes-textarea');
+      if (!notesEl) return;
+      const next = presets.map(p => p.notes).filter(Boolean).join('\n\n')
+        || (chosen.length ? chosen.map(n => `Procedure performed: ${n}.`).join('\n') : '');
+      // Never overwrite what the doctor typed -- only refresh the template while the box
+      // still holds the text this function last put there.
+      if (notesEl.value.trim() && notesEl.value !== autoNotesText) return;
+      notesEl.value = next;
+      autoNotesText = next;
     }
 
     function handleDiagnosticSelectChange(selectElem) { const val = selectElem.value; if (val === "Advise new treatment file" || val === "Advise new treatment") { const urgencySelect = document.getElementById('diagnostic-urgency-select'); const currentUrgency = urgencySelect ? urgencySelect.value : "Routine"; if (!activeDiagnostics.some(d => d.name === "Advise new treatment file")) { activeDiagnostics.push({ name: "Advise new treatment file", urgency: currentUrgency }); } ADVANCED_TREATMENT_ITEMS.forEach(itemName => { if (!activeDiagnostics.some(d => d.name.toLowerCase() === itemName.toLowerCase())) { activeDiagnostics.push({ name: itemName, urgency: currentUrgency }); } }); activeDiagnostics.sort(sortByProp('name')); renderDiagnosticsList(); selectElem.value = ""; } }
 
-    function renderMaterialsList() { const container = document.getElementById('materials-log-list'); if (!container) return; if (activeMaterials.length === 0) { container.innerHTML = '<div style="color: var(--text-muted); font-size:13px;">No clinical items logged.</div>'; return; } container.innerHTML = activeMaterials.map((m, idx) => `<div class="qty-row"><span>${m.name}</span><div style="display: flex; align-items: center; gap: 8px;"><label style="font-size:11px; font-weight:700; color:var(--text-muted);">QTY</label><input type="number" min="1" value="${m.qty}" style="width:70px; padding:4px 8px; font-size:13px; text-align:center;" onchange="setMaterialQty(${idx}, this.value)" /><button class="btn btn-sm btn-danger" style="padding: 2px 6px; font-size: 11px;" onclick="removeMaterialItem(${idx})">Remove</button></div></div>`).join(''); }
-    function addMaterialItem() { const input = document.getElementById('material-input'); const qtyInput = document.getElementById('material-qty-input'); const name = input.value.trim(); const qty = Math.max(1, parseInt(qtyInput.value, 10) || 1); if (!name) return; const existing = activeMaterials.find(m => m.name.toLowerCase() === name.toLowerCase()); if (existing) { existing.qty = qty; showDoctorToast(`Updated ${existing.name} quantity to ${qty}`); } else { activeMaterials.push({ name, qty }); } activeMaterials.sort(sortByProp('name')); input.value = ''; qtyInput.value = '1'; renderMaterialsList(); }
-    function setMaterialQty(idx, value) { const item = activeMaterials[idx]; if (!item) return; const qty = Math.max(1, parseInt(value, 10) || 1); item.qty = qty; renderMaterialsList(); }
-    function removeMaterialItem(idx) { activeMaterials.splice(idx, 1); renderMaterialsList(); }
     function renderPharmacyList() { const container = document.getElementById('pharmacy-log-list'); if (!container) return; if (activePharmacy.length === 0) { container.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No medications logged.</td></tr>'; return; } container.innerHTML = activePharmacy.map((p, idx) => `<tr><td><strong>${p.med}</strong></td><td>${p.dose}</td><td>${p.freq}</td><td style="text-align:right;"><button class="btn btn-sm btn-danger" style="padding:2px 6px; font-size:11px;" onclick="removePharmacyItem(${idx})">Remove</button></td></tr>`).join(''); }
     function addPharmacyItem() { const medIn = document.getElementById('pharmacy-input'); const doseIn = document.getElementById('pharmacy-dose'); const freqIn = document.getElementById('pharmacy-freq'); const med = medIn.value.trim(); if (!med) return; const dose = doseIn.value.trim() || '—'; const freq = freqIn.value.trim() || '—'; const existing = activePharmacy.find(p => p.med.toLowerCase() === med.toLowerCase()); if (existing) { existing.dose = dose; existing.freq = freq; showDoctorToast(`Updated prescription for ${existing.med}`); } else { activePharmacy.push({ med, dose, freq }); } activePharmacy.sort(sortByProp('med')); medIn.value = ''; doseIn.value = ''; freqIn.value = ''; renderPharmacyList(); }
     function removePharmacyItem(idx) { activePharmacy.splice(idx, 1); renderPharmacyList(); }
@@ -636,7 +684,8 @@
 
     function compileMasterSummary() {
       if (!currentPatient) return;
-      const procedureTitle = document.getElementById('procedure-select').value || "Routine Clinical Assessment";
+      syncActiveMaterials();
+      const procedureTitle = selectedProcedures().join(', ') || "Routine Clinical Assessment";
       const notesValue = document.getElementById('clinical-notes-textarea').value || "No detailed observation metrics added.";
       const timeIn = document.getElementById('patient-time-in').value;
       const timeOut = document.getElementById('patient-time-out').value;
@@ -655,8 +704,10 @@
       const archwireHtml = activeArchwireEntries().map(([p, d]) => `<div style="margin-bottom:6px;"><strong>${escapeHtml(p)}</strong><div style="padding-left:12px;">${[d.arch ? `<strong>Arch:</strong> ${escapeHtml(d.arch)}` : '', d.material ? `<strong>Material:</strong> ${escapeHtml(d.material)}` : '', d.size ? `<strong>Size / gauge:</strong> ${escapeHtml(d.size)}` : '', d.date ? `<strong>Date placed:</strong> ${escapeHtml(d.date)}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ')}</div></div>`).join('');
       const recordRows = Object.entries(PATIENT_RECORDS_DATA).flatMap(([, records]) => records.filter(r => patientRecordFiles[r.id]).map(r => { const a = patientRecordFiles[r.id]; return `<tr><td>${r.name}</td><td>${a.name}</td><td>${a.date || '—'}</td></tr>`; }));
       const complicationsText = getComplicationsText();
+      const lab = getLabDetails();
+      const labHtml = lab ? [lab.appliance ? `<strong>Appliance ordered:</strong> ${escapeHtml(lab.appliance)}` : '', lab.insertionDate ? `<strong>Date of insertion:</strong> ${escapeHtml(lab.insertionDate)}` : ''].filter(Boolean).join('<br>') : '';
       const targetReportBox = document.getElementById('master-summary-injection-point');
-      targetReportBox.innerHTML = `<div class="summary-sheet"><div class="summary-header"><h2>ARMED FORCES INSTITUTE OF DENTISTRY</h2><p style="font-size:12px; font-weight:600; text-transform:uppercase; color:var(--text-muted); margin-top:4px;">Official Compiled Patient Treatment & Discharge Order</p></div><div class="summary-grid"><div><p><strong>Patient Name:</strong> ${currentPatient.full_name}</p><p><strong>MR Number:</strong> ${currentPatient.mr_number}</p><p><strong>File Number:</strong> ${currentPatient.file_number || '—'}</p><p><strong>Rank / Service Profile:</strong> ${currentPatient.service_profile || currentPatient.rank || 'Not recorded'}</p><p><strong>Gender / Blood Group:</strong> ${currentPatient.gender || '—'} / ${currentPatient.blood_group || '—'}</p></div><div style="text-align:right;"><p><strong>Session Timeline:</strong> ${timeIn} - ${timeOut}</p><p><strong>Duration:</strong> ${duration}</p><p><strong>Allergy Profile:</strong> <span style="color:var(--red); font-weight:700;">${currentPatient.allergies || 'NKA'}</span></p><p><strong>Attending Specialist:</strong> ${currentDoctorName() || 'Unknown'}</p><p><strong>Report Generated:</strong> ${new Date().toLocaleString()}</p></div></div><div class="summary-field"><label>Target Clinical Operation performed</label><div><strong>${procedureTitle}</strong></div></div><div class="summary-field"><label>Materials Used Log</label><div>${materialsHtml}</div></div><div class="summary-field"><label>Prescribed Pharmacy Logs</label><div style="background:#fff; padding:0;"><table style="width:100%;"><thead><tr><th>Medication</th><th>Dose</th><th>Frequency</th></tr></thead><tbody>${pharmacyRows}</tbody></table></div></div><div class="summary-field"><label>Diagnostics Actions Ordered</label><div style="background:#fff; padding:0;"><table style="width:100%;"><thead><tr><th>Diagnostic Screening Target</th><th>Urgency Threshold</th></tr></thead><tbody>${diagnosticsRows}</tbody></table></div></div><div class="summary-field"><label>Procedures Performed</label><div>${proceduresHtml}</div></div>${teethHtml ? `<div class="summary-field"><label>Teeth Treated (FDI Notation)</label><div>${teethHtml}</div></div>` : ''}${archwireHtml ? `<div class="summary-field"><label>Archwire Detail</label><div>${archwireHtml}</div></div>` : ''}${recordRows.length ? `<div class="summary-field"><label>Records Attached This Session</label><div style="background:#fff; padding:0;"><table style="width:100%;"><thead><tr><th>Record</th><th>File</th><th>Date</th></tr></thead><tbody>${recordRows.join('')}</tbody></table></div></div>` : ''}${complicationsText ? `<div class="summary-field"><label style="color:var(--red);">⚠️ Complications / Adverse Events</label><div style="color:var(--red); font-weight:700;">${complicationsText}</div></div>` : ''}<div class="summary-field"><label>Specialist Progress Summary & Care Directives</label><div>${notesValue}</div></div><div style="text-align:center; margin-top:30px;" class="print-action-row"><button class="btn btn-danger" style="background:var(--green-dark);" onclick="window.print()">🖨️ Dispatch & Print Structural Record</button></div></div>`;
+      targetReportBox.innerHTML = `<div class="summary-sheet"><div class="summary-header"><h2>ARMED FORCES INSTITUTE OF DENTISTRY</h2><p style="font-size:12px; font-weight:600; text-transform:uppercase; color:var(--text-muted); margin-top:4px;">Official Compiled Patient Treatment & Discharge Order</p></div><div class="summary-grid"><div><p><strong>Patient Name:</strong> ${currentPatient.full_name}</p><p><strong>MR Number:</strong> ${currentPatient.mr_number}</p><p><strong>File Number:</strong> ${currentPatient.file_number || '—'}</p><p><strong>Rank / Service Profile:</strong> ${currentPatient.service_profile || currentPatient.rank || 'Not recorded'}</p><p><strong>Gender / Blood Group:</strong> ${currentPatient.gender || '—'} / ${currentPatient.blood_group || '—'}</p></div><div style="text-align:right;"><p><strong>Session Timeline:</strong> ${timeIn} - ${timeOut}</p><p><strong>Duration:</strong> ${duration}</p><p><strong>Allergy Profile:</strong> <span style="color:var(--red); font-weight:700;">${currentPatient.allergies || 'NKA'}</span></p><p><strong>Attending Specialist:</strong> ${currentDoctorName() || 'Unknown'}</p><p><strong>Report Generated:</strong> ${new Date().toLocaleString()}</p></div></div><div class="summary-field"><label>Target Clinical Operation performed</label><div><strong>${procedureTitle}</strong></div></div><div class="summary-field"><label>Materials Used Log</label><div>${materialsHtml}</div></div><div class="summary-field"><label>Prescribed Pharmacy Logs</label><div style="background:#fff; padding:0;"><table style="width:100%;"><thead><tr><th>Medication</th><th>Dose</th><th>Frequency</th></tr></thead><tbody>${pharmacyRows}</tbody></table></div></div><div class="summary-field"><label>Diagnostics Actions Ordered</label><div style="background:#fff; padding:0;"><table style="width:100%;"><thead><tr><th>Diagnostic Screening Target</th><th>Urgency Threshold</th></tr></thead><tbody>${diagnosticsRows}</tbody></table></div></div><div class="summary-field"><label>Procedures Performed</label><div>${proceduresHtml}</div></div>${teethHtml ? `<div class="summary-field"><label>Teeth Treated (FDI Notation)</label><div>${teethHtml}</div></div>` : ''}${archwireHtml ? `<div class="summary-field"><label>Archwire Detail</label><div>${archwireHtml}</div></div>` : ''}${labHtml ? `<div class="summary-field"><label>Lab — Appliance Order</label><div>${labHtml}</div></div>` : ''}${recordRows.length ? `<div class="summary-field"><label>Records Attached This Session</label><div style="background:#fff; padding:0;"><table style="width:100%;"><thead><tr><th>Record</th><th>File</th><th>Date</th></tr></thead><tbody>${recordRows.join('')}</tbody></table></div></div>` : ''}${complicationsText ? `<div class="summary-field"><label style="color:var(--red);">⚠️ Complications / Adverse Events</label><div style="color:var(--red); font-weight:700;">${complicationsText}</div></div>` : ''}<div class="summary-field"><label>Specialist Progress Summary & Care Directives</label><div>${notesValue}</div></div><div style="text-align:center; margin-top:30px;" class="print-action-row"><button class="btn btn-danger" style="background:var(--green-dark);" onclick="window.print()">🖨️ Dispatch & Print Structural Record</button></div></div>`;
       targetReportBox.scrollIntoView({ behavior: 'smooth' });
     }
 
@@ -714,26 +765,39 @@
 
     async function confirmTimeOut() {
       if (!currentPatient) { await uiAlert("No active patient selected. Search for a patient record first.", { title: 'No Patient', tone: 'warn' }); return; }
-      const procedureSelect = document.getElementById('procedure-select');
-      const procedureTitle = procedureSelect.value;
-      if (!procedureTitle) { await uiAlert("Select the procedure that was performed before completing the session.", { title: 'Procedure Required', tone: 'warn' }); return; }
+      const chosenProcedures = selectedProcedures();
+      if (!chosenProcedures.length) { await uiAlert("Tick the procedure(s) that were performed before completing the session.", { title: 'Procedure Required', tone: 'warn' }); return; }
+      const [primaryProcedure, ...alsoPerformed] = chosenProcedures;
       const timeOutInput = document.getElementById('patient-time-out');
       const timeOut = timeOutInput.value || '—';
-      const proceed = await uiConfirm(`Complete the session for ${currentPatient.full_name} (${currentPatient.mr_number})?\n\nProcedure: ${procedureTitle}\nMaterials: ${activeMaterials.length}   Medications: ${activePharmacy.length}   Diagnostics: ${activeDiagnostics.length}\nTime Out: ${timeOut}`, { title: 'Complete Session', confirmLabel: 'Save & Complete' });
+      syncActiveMaterials();
+      const proceed = await uiConfirm(`Complete the session for ${currentPatient.full_name} (${currentPatient.mr_number})?\n\nProcedures (${chosenProcedures.length}):\n${chosenProcedures.map(p => `  • ${p}`).join('\n')}\n\nMaterials: ${activeMaterials.length}   Medications: ${activePharmacy.length}   Diagnostics: ${activeDiagnostics.length}\nTime Out: ${timeOut}`, { title: 'Complete Session', confirmLabel: 'Save & Complete' });
       if (!proceed) return;
       const notesValue = document.getElementById('clinical-notes-textarea').value;
       try {
         const checkIn = currentPatient.check_in_time ? new Date(currentPatient.check_in_time) : null;
         const now = new Date();
         const duration_minutes = checkIn && !isNaN(checkIn) ? Math.max(0, Math.round((now - checkIn) / 60000)) : 0;
-        const proc = await api.post('/procedures/', { patient_id: currentPatient.id, name: procedureTitle, is_completed: true, duration_minutes: duration_minutes });
+        if (Object.keys(patientRecordFiles).length) { await uploadRecordFiles(currentPatient.id); }
+        const proc = await api.post('/procedures/', { patient_id: currentPatient.id, name: primaryProcedure, is_completed: true, duration_minutes: duration_minutes });
         const failures = [];
+        // Every ticked procedure gets its own record so the patient's history shows all of
+        // them. Only the first carries the measured duration -- the HOD timing reports
+        // average duration_minutes, and repeating one session's clock on each procedure
+        // would inflate them. The session's materials/pharmacy/notes hang off this primary
+        // record; the full list is also written into the note below.
+        for (const name of alsoPerformed) {
+          try { await api.post('/procedures/', { patient_id: currentPatient.id, name, is_completed: true }); }
+          catch (e) { failures.push(`Procedure "${name}": ${e.message}`); }
+        }
         for (const m of activeMaterials) { try { await api.post(`/procedures/${proc.id}/materials`, { material_name: m.name, quantity: m.qty || 1 }); } catch (e) { failures.push(`Material "${m.name}": ${e.message}`); } }
         for (const p of activePharmacy) { try { await api.post(`/procedures/${proc.id}/pharmacy`, { medication: p.med, dose: p.dose === '—' ? null : p.dose, frequency: p.freq === '—' ? null : p.freq }); } catch (e) { failures.push(`Medication "${p.med}": ${e.message}`); } }
         for (const d of activeDiagnostics) { try { await api.post(`/procedures/${proc.id}/diagnostics`, { test_name: d.name, urgency: d.urgency || 'Routine' }); } catch (e) { failures.push(`Diagnostic "${d.name}": ${e.message}`); } }
-        const noteSections = [notesValue && notesValue.trim() ? notesValue.trim() : '', buildProcedureDetailBlock(), buildRecordsBlock(), getComplicationsText() ? `COMPLICATIONS / ADVERSE EVENTS:\n  ${getComplicationsText()}` : ''].filter(Boolean);
+        const noteSections = [notesValue && notesValue.trim() ? notesValue.trim() : '', buildProcedureDetailBlock(), buildLabBlock(), buildRecordsBlock(), getComplicationsText() ? `COMPLICATIONS / ADVERSE EVENTS:\n  ${getComplicationsText()}` : ''].filter(Boolean);
         if (noteSections.length) { try { await api.post(`/procedures/${proc.id}/notes`, { note_text: noteSections.join('\n\n') }); } catch (e) { failures.push(`Clinical notes: ${e.message}`); } }
-        try { await api.post(`/hod/timeline/${encodeURIComponent(currentPatient.mr_number)}/steps`, { step_name: procedureTitle, status: 'Completed' }); } catch (e) { failures.push(`Timeline entry: ${e.message}`); }
+        for (const name of chosenProcedures) {
+          try { await api.post(`/hod/timeline/${encodeURIComponent(currentPatient.mr_number)}/steps`, { step_name: name, status: 'Completed' }); } catch (e) { failures.push(`Timeline entry "${name}": ${e.message}`); }
+        }
         const updated = await api.patch(`/patients/${currentPatient.id}/status`, { status: 'COMPLETED' });
         currentPatient = updated;
         const updatedTimeOut = updated.check_out_time ? new Date(updated.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
@@ -750,11 +814,10 @@
       } catch (err) { await uiError(err.message || "Unable to complete session"); }
     }
 
-    async function openAddProcedureModal() { const procName = await uiPrompt("Name of the procedure to add:", { title: 'Add Procedure', confirmLabel: 'Next' }); if (!procName || procName.trim() === "") return; const durationInput = await uiPrompt("Approximate duration in minutes:", { title: 'Add Procedure', defaultValue: '30', confirmLabel: 'Add' }); if (durationInput === null) return; const select = document.getElementById('procedure-select'); const existingOptions = Array.from(select.options).map(opt => opt.value); if (!existingOptions.includes(procName)) { const newOption = document.createElement('option'); newOption.value = procName; newOption.text = procName; select.appendChild(newOption); } select.value = procName; applyProcedure(); }
     let userHasNavigated = false;
     let initialDataReady = null;
     function userNavigate(pageId) { userHasNavigated = true; const DATA_BACKED = ['dashboard', 'operations', 'doctor-analytics', 'timeline', 'leave']; if (initialDataReady && DATA_BACKED.includes(pageId)) { initialDataReady.then(() => switchView(pageId)); } else { switchView(pageId); } }
-    function refreshStaleViewData() { const procedureSelect = document.getElementById('procedure-select'); if (procedureSelect) { const existingOptions = new Set(Array.from(procedureSelect.options).map(opt => opt.value)); Object.keys(ensurePresets()).forEach(key => { if (!existingOptions.has(key)) { const newOption = document.createElement('option'); newOption.value = key; newOption.text = key; procedureSelect.appendChild(newOption); } }); } if (document.getElementById('docAnalyticsTableBody')) { const query = document.getElementById('docAnalyticsSearch')?.value || ''; if (query.trim()) filterDoctorAnalytics(); else processAndRenderDoctorAnalytics(); } }
+    function refreshStaleViewData() { if (document.getElementById('docAnalyticsTableBody')) { const query = document.getElementById('docAnalyticsSearch')?.value || ''; if (query.trim()) filterDoctorAnalytics(); else processAndRenderDoctorAnalytics(); } }
 
     const PATIENT_RECORDS_DATA = { "Radiographic Records": [{ id: 'opg', name: 'OPG (Panoramic Radiograph)', icon: '📷' }, { id: 'lateral-cephalogram', name: 'Lateral Cephalogram', icon: '📷' }, { id: 'pa-cephalogram', name: 'PA Cephalogram', icon: '📷' }, { id: 'cbct', name: 'CBCT Scan', icon: '📷' }], "Photographic Records": [{ id: 'extraoral-photos', name: 'Extraoral Photographs', icon: '📸' }, { id: 'intraoral-photos', name: 'Intraoral Photographs', icon: '📸' }], "Digital Records": [{ id: 'study-models', name: 'Study Models / Digital Scan', icon: '💾' }] };
     const PROCEDURES_DATA = {
@@ -793,32 +856,88 @@
     let removedMaterials = new Set(); // catalog rows the doctor removed from Materials Used
     let customMaterials = [];         // { name, spec, category } rows the doctor added
     let autoMaterials = new Set();    // rows auto-added by the current procedure selection
+    let presetMaterials = new Set();  // rows seeded by the ticked procedures' preset kits
+    let presetSeededQty = {};         // { matId: qty we seeded } -- lets us spot doctor edits
+    let autoNotesText = '';           // the note template we last wrote, to avoid clobbering edits
     const UPPER_TEETH = ['18', '17', '16', '15', '14', '13', '12', '11', '21', '22', '23', '24', '25', '26', '27', '28'];
     const LOWER_TEETH = ['48', '47', '46', '45', '44', '43', '42', '41', '31', '32', '33', '34', '35', '36', '37', '38'];
     const TOOTH_SPECIFIC_PROCEDURES = new Set(["Bonding of brackets", "Banding of molars", "Interproximal reduction (IPR)", "Serial extraction", "TAD / miniscrew placement", "TAD-assisted space closure", "TAD-assisted intrusion / extrusion", "TAD-assisted molar distalization", "Surgical exposure of impacted tooth", "Debonding", "Power chain application", "Coil spring placement"]);
     const ARCHWIRE_PROCEDURE = 'Archwire insertion / change';
     let patientRecordFiles = {};
 
+    async function uploadRecordFiles(patientId) {
+      const results = [];
+      for (const [recordId, fileData] of Object.entries(patientRecordFiles)) {
+        if (fileData._uploaded || !fileData.file) continue;
+        try {
+          const fd = new FormData();
+          fd.append('patient_id', String(patientId));
+          fd.append('record_type', recordId);
+          fd.append('file_date', fileData.date || '');
+          fd.append('procedure_id', String(currentPatient?.id || ''));
+          fd.append('file', fileData.file);
+          const token = getToken();
+          const res = await fetch('/upload/', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          fileData._uploaded = true;
+          fileData._docId = data.id;
+          fileData._url = `/uploads/${data.file_path.split('/').pop()}`;
+          results.push(data);
+        } catch (e) {
+          console.warn(`Failed to upload ${recordId}:`, e);
+        }
+      }
+      return results;
+    }
+
+    async function loadPatientDocuments(patientId) {
+      try {
+        const docs = await api.get(`/upload/${patientId}`);
+        const map = {};
+        docs.forEach(d => { map[d.record_type] = { name: d.file_name, size: d.file_size, date: String(d.file_date || '').split('T')[0], _uploaded: true, _docId: d.id, _url: `/uploads/${d.file_path.split('/').pop()}`, file: null }; });
+        return map;
+      } catch (e) {
+        return {};
+      }
+    }
+
     function renderPatientRecords() {
       const container = document.getElementById('patient-records-container');
       if (!container) return;
       container.innerHTML = Object.entries(PATIENT_RECORDS_DATA).map(([category, records]) => {
         const attached = records.filter(r => patientRecordFiles[r.id]).length;
-        return `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed')">${category}</div><div class="diag-category-content is-block collapsed">${records.map(record => { const att = patientRecordFiles[record.id]; return `<div class="record-item"><div class="record-head"><div class="record-title">${record.icon} ${record.name}</div><div class="record-actions"><input type="date" id="date-${record.id}" value="${att?.date || ''}" onchange="updateRecordDate('${record.id}', this.value)"><button class="btn-view ${att ? '' : 'is-empty'}" onclick="viewRecord('${record.id}')">👁 View</button>${att ? `<button class="btn btn-sm btn-danger" onclick="removeRecordFile('${record.id}')">Remove</button>` : ''}</div></div><div class="upload-area ${att ? 'has-file' : ''}" id="drop-${record.id}" onclick="document.getElementById('file-${record.id}').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${record.id}')">${att ? `<div class="file-name">📎 ${att.name}</div><div class="upload-hint">${formatFileSize(att.size)} · attached for this session — click or drop to replace</div>` : `<div>📁 Click or drag a file to attach</div><div class="upload-hint">Supports: JPG, PNG, PDF</div>`}<input type="file" id="file-${record.id}" style="display:none;" accept="image/*,.pdf" onchange="handleFileSelect(event, '${record.id}')"></div></div>`; }).join('')}</div></div>`;
+        return `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed')">${category}</div><div class="diag-category-content is-block collapsed">${records.map(record => { const att = patientRecordFiles[record.id]; return `<div class="record-item"><div class="record-head"><div class="record-title">${record.icon} ${record.name}</div><div class="record-actions"><input type="date" id="date-${record.id}" value="${att?.date || ''}" onchange="updateRecordDate('${record.id}', this.value)"><button class="btn-view ${att ? '' : 'is-empty'}" onclick="viewRecord('${record.id}')">👁 View</button>${att ? `<button class="btn btn-sm btn-danger" onclick="removeRecordFile('${record.id}')">Remove</button>` : ''}</div></div><div class="upload-area ${att ? 'has-file' : ''}" id="drop-${record.id}" onclick="document.getElementById('file-${record.id}').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${record.id}')">${att ? `<div class="file-name">📎 ${att.name}</div><div class="upload-hint">${formatFileSize(att.size)} · ${att._uploaded ? 'Saved to server' : 'Attached — will upload on session completion'}</div>` : `<div>📁 Click or drag a file to attach</div><div class="upload-hint">Supports: JPG, PNG, PDF</div>`}<input type="file" id="file-${record.id}" style="display:none;" accept="image/*,.pdf" onchange="handleFileSelect(event, '${record.id}')"></div></div>`; }).join('')}</div></div>`;
       }).join('');
       const count = document.getElementById('records-count');
       if (count) { const n = Object.keys(patientRecordFiles).length; count.textContent = `${n} attached`; }
     }
     function formatFileSize(bytes) { if (!bytes && bytes !== 0) return ''; if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`; return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
-    function attachRecordFile(file, recordId) { if (!file) return; const dateEl = document.getElementById(`date-${recordId}`); if (patientRecordFiles[recordId]?.url) URL.revokeObjectURL(patientRecordFiles[recordId].url); patientRecordFiles[recordId] = { name: file.name, size: file.size, type: file.type, url: URL.createObjectURL(file), date: dateEl ? dateEl.value : '' }; renderPatientRecords(); showDoctorToast(`${file.name} attached (held for this session only).`); }
+    function attachRecordFile(file, recordId) { if (!file) return; const dateEl = document.getElementById(`date-${recordId}`); if (patientRecordFiles[recordId]?.url && String(patientRecordFiles[recordId].url).startsWith('blob:')) URL.revokeObjectURL(patientRecordFiles[recordId].url); patientRecordFiles[recordId] = { name: file.name, size: file.size, type: file.type, url: URL.createObjectURL(file), date: dateEl ? dateEl.value : '', file: file, _uploaded: false }; renderPatientRecords(); showDoctorToast(`${file.name} attached.`); }
     function handleFileSelect(event, recordId) { attachRecordFile(event.target.files[0], recordId); }
     function handleDragOver(event) { event.preventDefault(); event.currentTarget.style.borderColor = 'var(--green-med)'; event.currentTarget.style.background = 'var(--green-light)'; }
     function handleDragLeave(event) { event.currentTarget.style.borderColor = ''; event.currentTarget.style.background = ''; }
     function handleDrop(event, recordId) { event.preventDefault(); handleDragLeave(event); attachRecordFile(event.dataTransfer.files?.[0], recordId); }
     function updateRecordDate(recordId, value) { if (patientRecordFiles[recordId]) patientRecordFiles[recordId].date = value; }
-    function removeRecordFile(recordId) { if (patientRecordFiles[recordId]?.url) URL.revokeObjectURL(patientRecordFiles[recordId].url); delete patientRecordFiles[recordId]; renderPatientRecords(); }
-    async function viewRecord(recordId) { const att = patientRecordFiles[recordId]; if (!att) { await uiAlert('No file is attached to this record yet. Click the upload area below it to attach one.', { title: 'Nothing To View', tone: 'warn' }); return; } if (att.type === 'application/pdf') { window.open(att.url, '_blank', 'noopener'); return; } const backdrop = document.createElement('div'); backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(3,37,26,.82);z-index:100000;display:flex;align-items:center;justify-content:center;padding:32px;cursor:zoom-out;'; backdrop.innerHTML = `<div style="max-width:100%; max-height:100%; display:flex; flex-direction:column; gap:10px; align-items:center;"><img src="${att.url}" alt="${att.name}" style="max-width:100%; max-height:80vh; border-radius:8px; box-shadow:0 20px 50px rgba(0,0,0,.45); background:#fff;"><div style="color:#fff; font-size:13px; font-weight:700;">${att.name}${att.date ? ` · ${att.date}` : ''} <span style="font-weight:400; opacity:.75;">— click anywhere to close</span></div></div>`; const close = () => { backdrop.remove(); document.removeEventListener('keydown', onKey, true); }; const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } }; backdrop.addEventListener('click', close); document.addEventListener('keydown', onKey, true); document.body.appendChild(backdrop); }
-    function buildRecordsBlock() { const rows = Object.entries(PATIENT_RECORDS_DATA).flatMap(([, records]) => records.filter(r => patientRecordFiles[r.id]).map(r => { const a = patientRecordFiles[r.id]; return `  - ${r.name}: ${a.name}${a.date ? ` (${a.date})` : ''}`; })); return rows.length ? ['RECORDS ATTACHED THIS SESSION:', ...rows].join('\n') : ''; }
+    async function removeRecordFile(recordId) { const att = patientRecordFiles[recordId]; if (att?._docId) { try { await api.delete(`/upload/${att._docId}`); } catch (e) { console.warn('Delete failed:', e); } } if (att?.url && String(att.url).startsWith('blob:')) URL.revokeObjectURL(att.url); delete patientRecordFiles[recordId]; renderPatientRecords(); }
+    async function viewRecord(recordId) { const att = patientRecordFiles[recordId]; if (!att) { await uiAlert('No file is attached to this record yet. Click the upload area below it to attach one.', { title: 'Nothing To View', tone: 'warn' }); return; } let viewUrl = att._url || att.url; if (att.url && String(att.url).startsWith('blob:')) { window.open(att.url, '_blank', 'noopener'); return; } if (att.type === 'application/pdf' || (att.name && att.name.toLowerCase().endsWith('.pdf'))) { window.open(viewUrl, '_blank', 'noopener'); return; } const backdrop = document.createElement('div'); backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(3,37,26,.82);z-index:100000;display:flex;align-items:center;justify-content:center;padding:32px;cursor:zoom-out;'; backdrop.innerHTML = `<div style="max-width:100%; max-height:100%; display:flex; flex-direction:column; gap:10px; align-items:center;"><img src="${viewUrl}" alt="${att.name}" style="max-width:100%; max-height:80vh; border-radius:8px; box-shadow:0 20px 50px rgba(0,0,0,.45); background:#fff;"><div style="color:#fff; font-size:13px; font-weight:700;">${att.name}${att.date ? ` · ${att.date}` : ''} <span style="font-weight:400; opacity:.75;">— click anywhere to close</span></div></div>`; const close = () => { backdrop.remove(); document.removeEventListener('keydown', onKey, true); }; const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } }; backdrop.addEventListener('click', close); document.addEventListener('keydown', onKey, true); document.body.appendChild(backdrop); }
+    // Lab tab: appliance ordered + date of insertion. Filed with the session note and
+    // the summary sheet so the entry is not lost when the workspace is cleared.
+    function getLabDetails() {
+      const appliance = (document.getElementById('lab-appliance-ordered')?.value || '').trim();
+      const insertionDate = (document.getElementById('lab-insertion-date')?.value || '').trim();
+      return (appliance || insertionDate) ? { appliance, insertionDate } : null;
+    }
+    function buildLabBlock() {
+      const lab = getLabDetails();
+      if (!lab) return '';
+      const lines = ['LAB — APPLIANCE ORDER:'];
+      if (lab.appliance) lines.push(`  Appliance ordered: ${lab.appliance}`);
+      if (lab.insertionDate) lines.push(`  Date of insertion: ${lab.insertionDate}`);
+      return lines.join('\n');
+    }
+
+    function buildRecordsBlock() { const rows = Object.entries(PATIENT_RECORDS_DATA).flatMap(([, records]) => records.filter(r => patientRecordFiles[r.id]).map(r => { const a = patientRecordFiles[r.id]; return `  - ${r.name}: ${a.name}${a.date ? ` (${a.date})` : ''}`; })); return rows.length ? ['RECORDS ATTACHED / UPLOADED:', ...rows].join('\n') : ''; }
 
     function renderProcCheckboxes(filter) {
       const f = (filter || '').toLowerCase();
@@ -877,14 +996,15 @@
       }
       const search = document.getElementById('proc-search');
       renderProcCheckboxes(search ? search.value : '');
-      updateMaterialsFromProcedures();
+      applySelectedProcedures();
       openNextChart();
     }
 
     function clearProcSelections() {
       procSelected.clear(); toothSelections = {}; archwireEntries = {};
-      chartQueue = []; chartsAutoOpened.clear(); activeChart = null; autoMaterials = new Set();
-      renderChartHost(); renderProcCheckboxes(''); renderMaterials();
+      chartQueue = []; chartsAutoOpened.clear(); activeChart = null;
+      // Recompute from the (now empty) selection: withdraws the kits and closes the tabs.
+      renderChartHost(); renderProcCheckboxes(''); applySelectedProcedures();
     }
 
     // Called at the end of renderProcCheckboxes — refreshes the chart list, never reopens a modal.
@@ -1151,10 +1271,50 @@
       "Retention review": ['retention', 'misc']
     };
 
+    // Preset kits name materials loosely ("composite", "Napkin") next to the catalog's
+    // clinical names ("Composite bonding adhesive"). Anything that matches a catalog row
+    // by name lands on that row; the rest becomes a visible custom row rather than being
+    // dropped, so a preset never loses an item.
+    const PRESET_MATERIAL_CATEGORY = "Procedure Kit & Consumables";
+
+    // Seeds the kit for every ticked procedure (plus the always-used consumables), and
+    // withdraws the kit of any procedure that has just been unticked. A quantity the
+    // doctor typed over is never overwritten and never withdrawn.
+    function seedMaterialsFromPresets(presets) {
+      const seeded = [...GLOBAL_MATERIALS];
+      presets.forEach(p => seeded.push(...(p.materials || [])));
+      const nextIds = new Set();
+      seeded.forEach(({ name, qty }) => {
+        const id = materialId(name);
+        nextIds.add(id);
+        if (removedMaterials.has(id)) return;
+        if (!MATERIAL_ID_TO_NAME[id] && !customMaterials.some(m => materialId(m.name) === id)) {
+          customMaterials.push({ name, spec: '', category: PRESET_MATERIAL_CATEGORY });
+        }
+        const current = materialsQuantities[id];
+        const untouched = !current || !String(current.qty ?? '').trim() || presetSeededQty[id] === String(current.qty);
+        if (untouched) {
+          presetSeededQty[id] = String(qty || 1);
+          materialsQuantities[id] = { qty: presetSeededQty[id], unit: current?.unit || '' };
+        }
+      });
+      Object.keys(presetSeededQty).forEach(id => {
+        if (nextIds.has(id)) return;
+        if (String(materialsQuantities[id]?.qty ?? '') === presetSeededQty[id]) delete materialsQuantities[id];
+        delete presetSeededQty[id];
+      });
+      // Kit rows the doctor never filled in disappear with their procedure; edited ones stay.
+      customMaterials = customMaterials.filter(m => m.category !== PRESET_MATERIAL_CATEGORY
+        || nextIds.has(materialId(m.name))
+        || String(materialsQuantities[materialId(m.name)]?.qty ?? '').trim());
+      presetMaterials = nextIds;
+      updateMaterialsFromProcedures();
+    }
+
     function updateMaterialsFromProcedures() {
       const groups = new Set();
       procSelected.forEach(p => (PROCEDURE_MATERIAL_MAP[p] || []).forEach(g => groups.add(g)));
-      autoMaterials = new Set();
+      autoMaterials = new Set(presetMaterials);
       groups.forEach(key => {
         (MATERIALS_DATA[MATERIAL_GROUPS[key]] || []).forEach(mat => {
           const id = materialId(mat.name);
@@ -1197,7 +1357,11 @@
           const id = materialId(mat.name);
           const entry = materialsQuantities[id] || {};
           const qty = entry.qty || '', unit = entry.unit || '';
-          const badge = mat.custom ? '<span class="mat-badge is-custom">added</span>' : (autoMaterials.has(id) ? '<span class="mat-badge">auto</span>' : '');
+          // A preset-kit row is auto-populated even though it is carried as a custom row,
+          // so it must not be badged "added" as if the doctor had typed it in.
+          const badge = presetMaterials.has(id) || (!mat.custom && autoMaterials.has(id))
+            ? '<span class="mat-badge">auto</span>'
+            : (mat.custom ? '<span class="mat-badge is-custom">added</span>' : '');
           const spec = mat.spec ? `<span class="mat-spec">${escapeHtml(mat.spec)}</span>` : '';
           return `<tr class="${qty ? 'has-qty' : ''}" data-mat="${escapeAttr(id)}"><td class="col-material">${escapeHtml(mat.name)}${badge}${spec}</td><td class="col-qty"><input type="text" inputmode="numeric" value="${escapeAttr(qty)}" placeholder="0" oninput="updateMaterial('${escapeAttr(id)}', 'qty', this.value)"></td><td class="col-unit"><input type="text" value="${escapeAttr(unit)}" placeholder="pcs" oninput="updateMaterial('${escapeAttr(id)}', 'unit', this.value)"></td><td class="col-act"><button class="btn btn-sm btn-danger" onclick="removeMaterialRow('${escapeAttr(id)}')" title="Remove this material from the list">✕</button></td></tr>`;
         }).join('');
@@ -1288,30 +1452,41 @@
 
     function resetMaterialsTable() {
       materialsQuantities = {}; removedMaterials.clear(); customMaterials = [];
-      updateMaterialsFromProcedures();
+      presetMaterials = new Set(); presetSeededQty = {};
+      seedMaterialsFromPresets(selectedProcedures().map(presetFor).filter(Boolean));
       showDoctorToast('Materials table reset to the current procedure selection.');
     }
 
-    async function saveMaterials() {
-      const rows = []; const invalid = [];
+    function materialNameFor(matId) {
+      return MATERIAL_ID_TO_NAME[matId] || customMaterials.find(m => materialId(m.name) === matId)?.name || null;
+    }
+
+    // The Materials Used table is the single source of truth for the session. Reading it
+    // on demand means a doctor who fills in quantities but never presses "Save Materials"
+    // still has those materials filed with the procedure.
+    function collectMaterialRows() {
+      const rows = [], invalid = [];
       for (const [matId, entry] of visibleMaterialEntries()) {
-        const name = MATERIAL_ID_TO_NAME[matId] || customMaterials.find(m => materialId(m.name) === matId)?.name;
+        const name = materialNameFor(matId);
         if (!name) continue;
         const raw = String(entry.qty).trim();
         const qty = Number.parseInt(raw, 10);
         if (!Number.isFinite(qty) || qty <= 0 || !/^\d+$/.test(raw)) { invalid.push(`${name} ("${raw}")`); continue; }
-        rows.push({ name, qty, unit: String(entry.unit || '').trim(), source: 'materials-tab' });
+        rows.push({ name, qty, unit: String(entry.unit || '').trim() });
       }
+      return { rows, invalid };
+    }
+
+    function syncActiveMaterials() {
+      activeMaterials = collectMaterialRows().rows.sort(sortByProp('name'));
+      return activeMaterials;
+    }
+
+    async function saveMaterials() {
+      const { rows, invalid } = collectMaterialRows();
       if (invalid.length) { await uiAlert('These quantities are not whole numbers, so they cannot be saved:\n\n' + invalid.join('\n') + '\n\nEnter a whole number (e.g. 2) and save again.', { title: 'Check Quantities', tone: 'warn' }); return; }
       if (!rows.length) { await uiAlert('Enter a quantity against at least one material before saving.', { title: 'Materials', tone: 'warn' }); return; }
-      activeMaterials = activeMaterials.filter(m => m.source !== 'materials-tab');
-      rows.forEach(r => {
-        const existing = activeMaterials.find(m => m.name.toLowerCase() === r.name.toLowerCase());
-        if (existing) { existing.qty = r.qty; existing.unit = r.unit; existing.source = 'materials-tab'; }
-        else activeMaterials.push(r);
-      });
-      activeMaterials.sort(sortByProp('name'));
-      renderMaterialsList();
+      syncActiveMaterials();
       showDoctorToast(`${rows.length} material${rows.length === 1 ? '' : 's'} recorded for this session.`);
     }
 
@@ -1323,10 +1498,14 @@
     function resetSelectionPickers() {
       diagSelected.clear(); invSelected.clear(); procSelected.clear(); materialsQuantities = {};
       toothSelections = {}; archwireEntries = {}; chartQueue = []; chartsAutoOpened.clear(); activeChart = null;
-      autoMaterials = new Set(); removedMaterials.clear(); customMaterials = [];
-      renderChartHost();
+      autoMaterials = new Set(); presetMaterials = new Set(); presetSeededQty = {};
+      removedMaterials.clear(); customMaterials = []; activePharmacy = []; autoNotesText = '';
+      const notesEl = document.getElementById('clinical-notes-textarea'); if (notesEl) notesEl.value = '';
+      const procHint = document.getElementById('proc-empty-hint'); if (procHint) procHint.style.display = 'block';
+      renderChartHost(); renderPharmacyList();
       Object.values(patientRecordFiles).forEach(f => { if (f.url) URL.revokeObjectURL(f.url); }); patientRecordFiles = {};
       const complications = document.getElementById('complications-input'); if (complications) complications.value = ''; updateComplicationsAlert();
+      ['lab-appliance-ordered', 'lab-insertion-date'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
       const searches = ['diag-search', 'inv-search', 'proc-search']; searches.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
       if (document.getElementById('diag-checkbox-container')) renderDiagCheckboxes('');
       if (document.getElementById('inv-checkbox-container')) renderInvCheckboxes('');

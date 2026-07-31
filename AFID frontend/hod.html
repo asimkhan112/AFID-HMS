@@ -1367,41 +1367,6 @@
         return;
       }
 
-      // Build department summary HTML
-      const deptSummaryHtml = cachedDepartmentSummary ? `
-        <div style="margin-top: 30px; padding-top: 24px; border-top: 3px solid var(--primary-green);">
-          <div class="container-title" style="margin-bottom: 16px;">🤖 Department AI-Generated Summary <span style="font-size:11px; font-weight:400; text-transform:none; color:#6b7280;">— What the orthodontics dept has accomplished</span></div>
-          <div style="font-size: 14px; line-height: 1.7; color: #374151; padding: 12px; background: #f3f7f5; border-radius: 8px; margin-bottom: 16px;">
-            ${cachedDepartmentSummary.summary || 'Summary not available.'}
-          </div>
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px;">
-            <div style="text-align: center; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-              <div style="font-size: 24px; font-weight: 800; color: var(--primary-green);">${cachedDepartmentSummary.stats?.procedures_last_week || 0}</div>
-              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #6b7280;">Procedures (Week)</div>
-            </div>
-            <div style="text-align: center; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-              <div style="font-size: 24px; font-weight: 800; color: var(--primary-green);">${cachedDepartmentSummary.stats?.procedures_last_month || 0}</div>
-              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #6b7280;">Procedures (Month)</div>
-            </div>
-            <div style="text-align: center; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-              <div style="font-size: 24px; font-weight: 800; color: var(--primary-green);">${cachedDepartmentSummary.stats?.completed_all_time || 0}</div>
-              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #6b7280;">Completed (All)</div>
-            </div>
-          </div>
-          ${(cachedDepartmentSummary.stats?.top_procedures || []).length > 0 ? `
-          <div style="margin-top: 8px;">
-            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--primary-green); margin-bottom: 8px;">Top Procedures This Month</div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              ${cachedDepartmentSummary.stats.top_procedures.map(p => `<span class="meta-tag" style="background: #def7ec;">${p.name} (${p.count})</span>`).join('')}
-            </div>
-          </div>
-          ` : ''}
-          <div style="margin-top: 10px; font-size: 11px; color: #9ca3af; text-align: right;">
-            Generated: ${new Date(cachedDepartmentSummary.generated_at).toLocaleString()}
-          </div>
-        </div>
-      ` : '';
-
       bodyEl.innerHTML = `
         <div style="margin-bottom: 20px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -1472,8 +1437,6 @@
             </div>
           </div>
         </div>
-
-        ${deptSummaryHtml}
 
         <div style="text-align: center; margin-top: 20px;">
           <button class="btn btn-sm" onclick="closeDoctorStatsModal()" style="background: #6b7280;">Close</button>

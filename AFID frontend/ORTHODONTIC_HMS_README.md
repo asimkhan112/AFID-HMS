@@ -227,9 +227,16 @@ This document provides a comprehensive record of all features implemented in the
 ### File Structure:
 ```
 AFID frontend/
-├── AFID frontend/
-│   └── doctor (1).html          # Main doctor portal with all tabs
-├── ORTHODONTIC_HMS_README.md    # This file
+├── doctor.html                 # Main doctor portal with all tabs
+├── hod.html                    # HOD dashboard
+├── staff.html                  # Receptionist / staff portal
+├── Login.html                  # Authentication page
+├── api.js                      # Shared HTTP + auth helpers
+├── orthodontic-diagnosis.html  # Diagnosis / investigations
+├── index.html                  # Entry point
+├── vercel.json                 # Vercel deployment config
+├── clinic-bg.jpg               # Login page background
+├── ORTHODONTIC_HMS_README.md   # This file
 ├── package.json
 ├── package-lock.json
 └── vite.config.js

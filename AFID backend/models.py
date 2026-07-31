@@ -168,6 +168,7 @@ class Patient(Base):
 
     procedures       = relationship("Procedure", back_populates="patient")
     timeline_steps   = relationship("PatientTimelineStep", back_populates="patient")
+    documents        = relationship("PatientDocument", back_populates="patient", cascade="all, delete-orphan")
 
 
 # ── Procedure Presets ────────────────────────────────────────────────────────
@@ -245,6 +246,7 @@ class Procedure(Base):
     pharmacy     = relationship("ProcedurePharmacy", back_populates="procedure", cascade="all, delete-orphan")
     diagnostics  = relationship("ProcedureDiagnostic", back_populates="procedure", cascade="all, delete-orphan")
     notes        = relationship("ClinicalNote", back_populates="procedure", cascade="all, delete-orphan")
+    documents    = relationship("PatientDocument", back_populates="procedure")
 
 
 class ProcedureChecklist(Base):
@@ -302,6 +304,25 @@ class ClinicalNote(Base):
     created_at   = Column(DateTime, default=datetime.utcnow)
 
     procedure    = relationship("Procedure", back_populates="notes")
+
+
+# ── Patient Documents / Uploads ────────────────────────────────────────────────
+
+class PatientDocument(Base):
+    __tablename__ = "patient_documents"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    patient_id    = Column(Integer, ForeignKey("patients.id", ondelete="CASCADE"), nullable=False)
+    procedure_id  = Column(Integer, ForeignKey("procedures.id", ondelete="SET NULL"), nullable=True)
+    record_type   = Column(String(60), nullable=False)
+    file_name     = Column(String(255), nullable=False)
+    file_path     = Column(String(500), nullable=False)
+    file_size     = Column(Integer, default=0)
+    file_date     = Column(Date, default=date.today)
+    uploaded_at   = Column(DateTime, default=datetime.utcnow)
+
+    patient   = relationship("Patient", back_populates="documents")
+    procedure = relationship("Procedure", back_populates="documents")
 
 
 # ── Leave Requests ────────────────────────────────────────────────────────────
