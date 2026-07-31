@@ -1,5 +1,8 @@
 import { defineConfig } from "vite";
 
+// DEV SERVER ONLY. The production build is `node build.mjs` (see package.json), not
+// `vite build` -- Vite builds a single entry (index.html) and would ship only the
+// redirect stub, dropping every portal page. See build.mjs for the full reasoning.
 export default defineConfig({
   root: ".",
   server: {
