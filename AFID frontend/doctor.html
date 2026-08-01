@@ -609,7 +609,7 @@
     async function saveComplications() { if (!getComplicationsText()) { await uiAlert('Enter the complication or adverse event before saving.', { title: 'Complications', tone: 'warn' }); return; } updateComplicationsAlert(); showDoctorToast('Complication recorded — it is filed when you complete the session.'); }
     function updateComplicationsAlert() { const complicationsInput = document.getElementById('complications-input'); const complicationsBox = document.getElementById('complications-alert-box'); if (complicationsBox && complicationsInput) { const complicationsText = complicationsInput.value.trim(); if (complicationsText !== "") { complicationsBox.innerHTML = `<strong>⚠️ COMPLICATIONS / ADVERSE EVENTS:</strong> ${complicationsText}`; complicationsBox.style.display = 'block'; } else { complicationsBox.style.display = 'none'; } } }
     function updatePatientMedicalRecord() { if (!currentPatient) return; const newAllergies = document.getElementById('record-allergy-input')?.value.trim() || ""; const newDiagHistory = document.getElementById('record-diagnostic-history')?.value.trim() || ""; const newSystemic = document.getElementById('record-systemic-status')?.value.trim() || ""; currentPatient.allergies = newAllergies; currentPatient.diagnostic_history = newDiagHistory; currentPatient.systemic_status = newSystemic; updateAllergyAlertBox(newAllergies); }
-    async function saveMedicalRecordChanges() { if (!currentPatient) { await uiAlert('No patient record is open.', { title: 'Nothing To Save', tone: 'warn' }); return; } updatePatientMedicalRecord(); try { const updated = await api.put(`/patients/${currentPatient.id}`, { mr_number: currentPatient.mr_number, file_number: currentPatient.file_number, full_name: currentPatient.full_name, rank: currentPatient.rank, cnic: currentPatient.cnic, gender: currentPatient.gender, blood_group: currentPatient.blood_group, service_profile: currentPatient.service_profile, allergies: currentPatient.allergies || null, room: currentPatient.room, assigned_doctor: currentPatient.assigned_doctor, procedure_category: currentPatient.procedure_category }); currentPatient = { ...updated, ...{ diagnostic_history: currentPatient.diagnostic_history, systemic_status: currentPatient.systemic_status } }; const cachedIdx = (cachedPatients || []).findIndex(p => p.id === updated.id); if (cachedIdx !== -1) cachedPatients[cachedIdx] = updated; showDoctorToast('Medical record saved.'); } catch (err) { await uiError(err.message || 'Unable to save medical record'); } }
+    async function saveMedicalRecordChanges() { if (!currentPatient) { await uiAlert('No patient record is open.', { title: 'Nothing To Save', tone: 'warn' }); return; } updatePatientMedicalRecord(); try { const updated = await api.put(`/patients/${currentPatient.id}`, { mr_number: currentPatient.mr_number, file_number: currentPatient.file_number, full_name: currentPatient.full_name, rank: currentPatient.rank, cnic: currentPatient.cnic, gender: currentPatient.gender, blood_group: currentPatient.blood_group, service_profile: currentPatient.service_profile, allergies: currentPatient.allergies || null, diagnostic_history: currentPatient.diagnostic_history || null, systemic_status: currentPatient.systemic_status || null, room: currentPatient.room, assigned_doctor: currentPatient.assigned_doctor, procedure_category: currentPatient.procedure_category }); currentPatient = updated; const cachedIdx = (cachedPatients || []).findIndex(p => p.id === updated.id); if (cachedIdx !== -1) cachedPatients[cachedIdx] = updated; showDoctorToast('Medical record saved.'); } catch (err) { await uiError(err.message || 'Unable to save medical record'); } }
     function returnToSearchScreen() { document.getElementById('view-workspace-screen').classList.remove('active'); document.getElementById('view-search-screen').classList.add('active'); const searchInput = document.getElementById('patient-search-input'); if (searchInput) searchInput.focus(); }
 
     // ---------------------------------------------------------------------
@@ -619,7 +619,15 @@
     // Everything a preset used to supply on selection (material kit, pharmacy,
     // diagnostics, note template) is now derived from whatever is ticked, and the
     // record tabs open as soon as at least one procedure is on.
+    // Sorted, for display and for the summary sheet.
     function selectedProcedures() { return Array.from(procSelected).sort(); }
+
+    // The session's own data -- duration, complications, materials, pharmacy, diagnosis,
+    // investigations, notes -- hangs off ONE procedure record. That is the one the doctor
+    // ticked first, not the alphabetically first: a Set preserves insertion order, and
+    // "the first thing I selected is the main procedure" is the only ordering a clinician
+    // would predict.
+    function primaryProcedureName() { return Array.from(procSelected)[0] || null; }
 
     // Preset names are spelt slightly differently from the checklist ("Quad Helix" vs
     // "Quad helix"), so match case-insensitively. A procedure with no preset still gets
@@ -767,7 +775,8 @@
       if (!currentPatient) { await uiAlert("No active patient selected. Search for a patient record first.", { title: 'No Patient', tone: 'warn' }); return; }
       const chosenProcedures = selectedProcedures();
       if (!chosenProcedures.length) { await uiAlert("Tick the procedure(s) that were performed before completing the session.", { title: 'Procedure Required', tone: 'warn' }); return; }
-      const [primaryProcedure, ...alsoPerformed] = chosenProcedures;
+      const primaryProcedure = primaryProcedureName();
+      const alsoPerformed = chosenProcedures.filter(n => n !== primaryProcedure);
       const timeOutInput = document.getElementById('patient-time-out');
       const timeOut = timeOutInput.value || '—';
       syncActiveMaterials();
@@ -779,20 +788,43 @@
         const now = new Date();
         const duration_minutes = checkIn && !isNaN(checkIn) ? Math.max(0, Math.round((now - checkIn) / 60000)) : 0;
         if (Object.keys(patientRecordFiles).length) { await uploadRecordFiles(currentPatient.id); }
-        const proc = await api.post('/procedures/', { patient_id: currentPatient.id, name: primaryProcedure, is_completed: true, duration_minutes: duration_minutes });
+        const complicationsText = getComplicationsText();
+        const proc = await api.post('/procedures/', { patient_id: currentPatient.id, name: primaryProcedure, is_completed: true, duration_minutes: duration_minutes, complications: complicationsText || null });
         const failures = [];
         // Every ticked procedure gets its own record so the patient's history shows all of
         // them. Only the first carries the measured duration -- the HOD timing reports
         // average duration_minutes, and repeating one session's clock on each procedure
         // would inflate them. The session's materials/pharmacy/notes hang off this primary
         // record; the full list is also written into the note below.
+        const procedureIds = { [primaryProcedure]: proc.id };
         for (const name of alsoPerformed) {
-          try { await api.post('/procedures/', { patient_id: currentPatient.id, name, is_completed: true }); }
+          try { const extra = await api.post('/procedures/', { patient_id: currentPatient.id, name, is_completed: true }); procedureIds[name] = extra.id; }
           catch (e) { failures.push(`Procedure "${name}": ${e.message}`); }
         }
-        for (const m of activeMaterials) { try { await api.post(`/procedures/${proc.id}/materials`, { material_name: m.name, quantity: m.qty || 1 }); } catch (e) { failures.push(`Material "${m.name}": ${e.message}`); } }
+        for (const m of activeMaterials) { try { await api.post(`/procedures/${proc.id}/materials`, { material_name: m.name, quantity: m.qty || 1, unit: m.unit || null }); } catch (e) { failures.push(`Material "${m.name}": ${e.message}`); } }
         for (const p of activePharmacy) { try { await api.post(`/procedures/${proc.id}/pharmacy`, { medication: p.med, dose: p.dose === '—' ? null : p.dose, frequency: p.freq === '—' ? null : p.freq }); } catch (e) { failures.push(`Medication "${p.med}": ${e.message}`); } }
-        for (const d of activeDiagnostics) { try { await api.post(`/procedures/${proc.id}/diagnostics`, { test_name: d.name, urgency: d.urgency || 'Routine' }); } catch (e) { failures.push(`Diagnostic "${d.name}": ${e.message}`); } }
+        // Genuine ordered tests only. Diagnosis findings and investigations used to be
+        // flattened in here too, which made a finding indistinguishable from a test order;
+        // they now go to their own endpoints below.
+        for (const d of activeDiagnostics.filter(d => d.source !== 'diagnosis' && d.source !== 'investigation')) { try { await api.post(`/procedures/${proc.id}/diagnostics`, { test_name: d.name, urgency: d.urgency || 'Routine' }); } catch (e) { failures.push(`Diagnostic "${d.name}": ${e.message}`); } }
+        // Ticked is enough -- these save whether or not the doctor pressed the tab's own
+        // Save button, matching how materials behave.
+        if (diagSelected.size) { try { await api.put(`/procedures/${proc.id}/diagnosis`, Array.from(diagSelected).map(f => ({ category: categoryOf(DIAGNOSIS_DATA, f), finding: f }))); } catch (e) { failures.push(`Diagnosis findings: ${e.message}`); } }
+        if (invSelected.size) { try { await api.put(`/procedures/${proc.id}/investigations`, Array.from(invSelected).map(i => ({ category: categoryOf(INVESTIGATIONS_DATA, i), investigation: i }))); } catch (e) { failures.push(`Investigations: ${e.message}`); } }
+        // Teeth and archwire are charted per procedure, so each follows its own record
+        // rather than all being merged onto the primary one.
+        for (const [name, id] of Object.entries(procedureIds)) {
+          const teeth = toothSelections[name];
+          if (teeth && teeth.size) {
+            try { await api.put(`/procedures/${id}/teeth`, Array.from(teeth).map(t => ({ tooth_code: t, arch: UPPER_TEETH.includes(t) ? 'Upper' : 'Lower' }))); } catch (e) { failures.push(`Teeth for "${name}": ${e.message}`); }
+          }
+          const wire = archwireEntries[name];
+          if (wire && archwireFilledCount(wire)) {
+            try { await api.post(`/procedures/${id}/archwire`, { arch: wire.arch || null, material: wire.material || null, size: wire.size || null, date_placed: wire.date || null }); } catch (e) { failures.push(`Archwire for "${name}": ${e.message}`); }
+          }
+        }
+        const lab = getLabDetails();
+        if (lab?.appliance) { try { await api.post('/lab/', { patient_id: currentPatient.id, procedure_id: proc.id, appliance_ordered: lab.appliance, date_of_insertion: lab.insertionDate || null }); } catch (e) { failures.push(`Lab order: ${e.message}`); } }
         const noteSections = [notesValue && notesValue.trim() ? notesValue.trim() : '', buildProcedureDetailBlock(), buildLabBlock(), buildRecordsBlock(), getComplicationsText() ? `COMPLICATIONS / ADVERSE EVENTS:\n  ${getComplicationsText()}` : ''].filter(Boolean);
         if (noteSections.length) { try { await api.post(`/procedures/${proc.id}/notes`, { note_text: noteSections.join('\n\n') }); } catch (e) { failures.push(`Clinical notes: ${e.message}`); } }
         for (const name of chosenProcedures) {
@@ -874,15 +906,19 @@
           fd.append('patient_id', String(patientId));
           fd.append('record_type', recordId);
           fd.append('file_date', fileData.date || '');
-          fd.append('procedure_id', String(currentPatient?.id || ''));
           fd.append('file', fileData.file);
           const token = getToken();
-          const res = await fetch('/upload/', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd });
+          // Must carry the /api prefix: that is the single path the Vite proxy and the
+          // Vercel rewrite forward to the backend. A bare "/upload" hits the static host
+          // and 404s, which is why saved records never actually reached the server.
+          // No procedure_id -- uploads run before the procedure exists, and sending the
+          // PATIENT id in that field simply mislabelled the row.
+          const res = await fetch('/api/upload/', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd });
           if (!res.ok) throw new Error(await res.text());
           const data = await res.json();
           fileData._uploaded = true;
           fileData._docId = data.id;
-          fileData._url = `/uploads/${data.file_path.split('/').pop()}`;
+          fileData._url = `/api/uploads/${data.file_path.split('/').pop()}`;
           results.push(data);
         } catch (e) {
           console.warn(`Failed to upload ${recordId}:`, e);
@@ -895,7 +931,7 @@
       try {
         const docs = await api.get(`/upload/${patientId}`);
         const map = {};
-        docs.forEach(d => { map[d.record_type] = { name: d.file_name, size: d.file_size, date: String(d.file_date || '').split('T')[0], _uploaded: true, _docId: d.id, _url: `/uploads/${d.file_path.split('/').pop()}`, file: null }; });
+        docs.forEach(d => { map[d.record_type] = { name: d.file_name, size: d.file_size, date: String(d.file_date || '').split('T')[0], _uploaded: true, _docId: d.id, _url: `/api/uploads/${d.file_path.split('/').pop()}`, file: null }; });
         return map;
       } catch (e) {
         return {};
@@ -921,6 +957,15 @@
     function updateRecordDate(recordId, value) { if (patientRecordFiles[recordId]) patientRecordFiles[recordId].date = value; }
     async function removeRecordFile(recordId) { const att = patientRecordFiles[recordId]; if (att?._docId) { try { await api.delete(`/upload/${att._docId}`); } catch (e) { console.warn('Delete failed:', e); } } if (att?.url && String(att.url).startsWith('blob:')) URL.revokeObjectURL(att.url); delete patientRecordFiles[recordId]; renderPatientRecords(); }
     async function viewRecord(recordId) { const att = patientRecordFiles[recordId]; if (!att) { await uiAlert('No file is attached to this record yet. Click the upload area below it to attach one.', { title: 'Nothing To View', tone: 'warn' }); return; } let viewUrl = att._url || att.url; if (att.url && String(att.url).startsWith('blob:')) { window.open(att.url, '_blank', 'noopener'); return; } if (att.type === 'application/pdf' || (att.name && att.name.toLowerCase().endsWith('.pdf'))) { window.open(viewUrl, '_blank', 'noopener'); return; } const backdrop = document.createElement('div'); backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(3,37,26,.82);z-index:100000;display:flex;align-items:center;justify-content:center;padding:32px;cursor:zoom-out;'; backdrop.innerHTML = `<div style="max-width:100%; max-height:100%; display:flex; flex-direction:column; gap:10px; align-items:center;"><img src="${viewUrl}" alt="${att.name}" style="max-width:100%; max-height:80vh; border-radius:8px; box-shadow:0 20px 50px rgba(0,0,0,.45); background:#fff;"><div style="color:#fff; font-size:13px; font-weight:700;">${att.name}${att.date ? ` · ${att.date}` : ''} <span style="font-weight:400; opacity:.75;">— click anywhere to close</span></div></div>`; const close = () => { backdrop.remove(); document.removeEventListener('keydown', onKey, true); }; const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } }; backdrop.addEventListener('click', close); document.addEventListener('keydown', onKey, true); document.body.appendChild(backdrop); }
+    // The checklists are flat Sets of item names; the backend stores each item with the
+    // category it came from, so look it back up out of the source data on save.
+    function categoryOf(data, item) {
+      for (const [category, items] of Object.entries(data)) {
+        if (items.includes(item)) return category;
+      }
+      return null;
+    }
+
     // Lab tab: appliance ordered + date of insertion. Filed with the session note and
     // the summary sheet so the entry is not lost when the workspace is cleared.
     function getLabDetails() {
