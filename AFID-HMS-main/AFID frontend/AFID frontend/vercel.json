@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": false,
+  "rewrites": [
+    { "source": "/api/patients",   "destination": "https://afid-hms-production.up.railway.app/patients/" },
+    { "source": "/api/procedures", "destination": "https://afid-hms-production.up.railway.app/procedures/" },
+    { "source": "/api/leaves",     "destination": "https://afid-hms-production.up.railway.app/leaves/" },
+    { "source": "/api/staff",      "destination": "https://afid-hms-production.up.railway.app/staff/" },
+    { "source": "/api/presets",    "destination": "https://afid-hms-production.up.railway.app/presets/" },
+
+    { "source": "/api/:path*",     "destination": "https://afid-hms-production.up.railway.app/:path*" }
+  ]
+}
