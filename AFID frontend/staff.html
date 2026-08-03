@@ -333,6 +333,27 @@
       background-color: #fbfdfc;
     }
 
+    /* Dashboard Search Bar */
+    .dashboard-search-container {
+      margin-bottom: 12px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: #ffffff;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .dashboard-search-container input {
+      border: none;
+      padding: 6px;
+      font-size: 13px;
+    }
+    .dashboard-search-container input:focus {
+      box-shadow: none;
+      background: transparent;
+    }
+
     /* Tables */
     .table-container {
       width: 100%;
@@ -358,7 +379,7 @@
 
     .table-wide { width: max-content; min-width: 100%; }
 
-    /* Compact table for small summary tables (no horizontal scroll needed) */
+    /* Compact table for small summary tables */
     .table-compact { border-radius: 10px; overflow: hidden; }
     .table-compact th, .table-compact td { text-align: left; }
     .table-compact tbody tr:last-child td { border-bottom: none; }
@@ -534,7 +555,7 @@
     /* Patient Timeline Search Styles */
     .timeline-search-container { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow-sm); }
     .timeline-search-row { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
-    .timeline-search-row select { flex: 0 0 160px; }
+    .timeline-search-row select { flex: 0 0 180px; }
     .timeline-search-row input[type="text"] { flex: 1; }
     .timeline-search-row .btn-holder { flex: 0 0 auto; }
     .timeline-results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -601,7 +622,8 @@
     window.api = {
       get: async () => null,
       post: async () => null,
-      patch: async () => null
+      patch: async () => null,
+      delete: async () => null
     };
   }
 
@@ -620,6 +642,7 @@
   let cachedTimelineMRs = [];
   let cachedSelectedTimelineMR = null;
   let cachedTimelineSteps = {};
+  let dashboardDoctorFilter = '';
 
   function allocationRoomFor(doctorName) {
     const match = doctorAllocations.find(a => a.name === doctorName);
@@ -668,6 +691,7 @@
       file: p.file_number,
       name: p.full_name,
       cnic: p.cnic || '—',
+      pa: p.pa_number || '—',
       location: roomNum,
       rotation: p.procedure_category || '—',
       assignedDoctor: p.assigned_doctor || '—',
@@ -676,8 +700,6 @@
       apptDateShort: (p.registered_at ? new Date(p.registered_at) : new Date())
         .toLocaleDateString(undefined, { day: '2-digit', month: 'short' }),
       registeredAt: p.registered_at || null,
-      timeIn: timeInStr,
-      timeOut: timeOutStr,
       duration,
       status,
       badge: status === 'ACTIVE' ? 'badge-active' : status === 'COMPLETED' ? 'badge-completed' : 'badge-waiting'
@@ -688,9 +710,7 @@
     return {
       id: a.id,
       name: a.doctor_name || a.name,
-      room: a.room || a.room_name,
-      department: a.department || 'Oral Exam',
-      chair: a.chair || 'Chair 1'
+      room: a.room || a.room_name
     };
   }
 
@@ -746,7 +766,7 @@
       return;
     }
 
-    const fieldMap = { mr: 'mr', file: 'file', name: 'name', mr_number: 'mr', file_number: 'file' };
+    const fieldMap = { mr: 'mr', file: 'file', name: 'name', cnic: 'cnic', pa: 'pa', mr_number: 'mr', file_number: 'file', pa_number: 'pa' };
     const field = fieldMap[filterType] || 'mr';
     let results = (patientLogs || []).filter(p => (p[field] || '').toString().toLowerCase().includes(query));
 
@@ -822,6 +842,8 @@
                 <option value="mr">MR Number</option>
                 <option value="file">File Number</option>
                 <option value="name">Name</option>
+                <option value="cnic">CNIC Number</option>
+                <option value="pa">PA Number</option>
               </select>
             </div>
             <div style="flex: 2;">
@@ -857,6 +879,15 @@
   }
 
   /* ==================== VIEWS ==================== */
+
+  function applyDashboardSearch(query) {
+    dashboardDoctorFilter = (query || '').toLowerCase();
+    const rows = document.querySelectorAll('#dashboard-doctor-table tbody tr');
+    rows.forEach(tr => {
+      const text = tr.innerText.toLowerCase();
+      tr.style.display = text.includes(dashboardDoctorFilter) ? '' : 'none';
+    });
+  }
 
   // Reception Dashboard
   function renderDashboard() {
@@ -929,13 +960,17 @@
       </div>
 
       <div class="panel">
+        <div class="dashboard-search-container">
+          <span>🔍</span>
+          <input type="text" id="dashboard-doctor-search" placeholder="Search doctor or room queue..." oninput="applyDashboardSearch(this.value)" value="${dashboardDoctorFilter}" />
+        </div>
         <div class="panel-body">
           <div class="table-container">
-            <table class="table-compact">
+            <table class="table-compact" id="dashboard-doctor-table">
               <thead><tr><th>Dentist</th><th style="text-align:center;">Room</th><th style="text-align:center;">Waiting</th><th style="text-align:center;">In Procedure</th></tr></thead>
               <tbody>
                 ${queueByDoctor.length ? queueByDoctor.map(d => `
-                  <tr>
+                  <tr style="${dashboardDoctorFilter && !`${d.name} ${d.room}`.toLowerCase().includes(dashboardDoctorFilter) ? 'display:none;' : ''}">
                     <td><strong style="color:var(--green-dark);">${d.name}</strong></td>
                     <td style="text-align:center;">${d.room !== '—' ? `<span class="badge badge-info">${d.room}</span>` : '<span style="color:#9ca3af; font-size:11px;">—</span>'}</td>
                     <td style="text-align:center;"><span class="badge badge-waiting">${d.waiting} Waiting</span></td>
@@ -949,6 +984,24 @@
       </div>
     </div>
   `;
+  }
+
+  function handleServiceProfileChange(val) {
+    const paRow = document.getElementById('pa-number-row');
+    const paInput = document.getElementById('p-pa');
+    if (!paRow || !paInput) return;
+
+    // Civilian profiles do NOT require PA number; ALL army categories do.
+    const isCivilian = val.startsWith('Civilian');
+
+    if (val && !isCivilian) {
+      paRow.style.display = 'block';
+      paInput.setAttribute('required', 'required');
+    } else {
+      paRow.style.display = 'none';
+      paInput.removeAttribute('required');
+      paInput.value = '';
+    }
   }
 
   function renderPatientRegistration() {
@@ -982,13 +1035,9 @@
                 <input type="text" id="p-file" value="" placeholder="e.g. F-10299" required />
               </div>
 
-              <div class="form-row">
+              <div class="form-row form-row-full">
                 <label>Full Name / Rank</label>
                 <input type="text" id="p-name" value="" placeholder="e.g. Lt. Col. Sara Khan" required />
-              </div>
-              <div class="form-row">
-                <label>CNIC</label>
-                <input type="text" id="p-cnic" value="" placeholder="35202-1234567-9" required />
               </div>
 
               <div class="form-row">
@@ -1018,18 +1067,24 @@
 
               <div class="form-row">
                 <label>Service Profile</label>
-                <select id="p-service-profile" required>
+                <select id="p-service-profile" onchange="handleServiceProfileChange(this.value)" required>
                   <option value="" disabled selected>Select service profile</option>
-                  <option value="Serving Officer">Serving Officer</option>
-                  <option value="Serving Soldier / JCO">Serving Soldier / JCO</option>
-                  <option value="Retired Officer">Retired Officer</option>
-                  <option value="Retired Soldier / JCO">Retired Soldier / JCO</option>
-                  <option value="Family / Dependent">Family / Dependent</option>
+                  <option value="Serving Officer">Serving Officer (Army)</option>
+                  <option value="Serving Soldier / JCO">Serving Soldier / JCO (Army)</option>
+                  <option value="Retired Officer">Retired Officer (Army)</option>
+                  <option value="Retired Soldier / JCO">Retired Soldier / JCO (Army)</option>
+                  <option value="Family / Dependent">Family / Dependent (Army)</option>
+                  <option value="Army Brats">Army Brats (Army)</option>
                   <option value="Civilian (Paying)">Civilian (Paying)</option>
                   <option value="Civilian (Entitled)">Civilian (Entitled)</option>
                 </select>
               </div>
-              <div class="form-row">
+              <div class="form-row" id="pa-number-row" style="display: none;">
+                <label>PA Number</label>
+                <input type="text" id="p-pa" value="" placeholder="e.g. PA-12345" />
+              </div>
+
+              <div class="form-row form-row-full">
                 <label>Known Allergies (optional)</label>
                 <input type="text" id="p-allergies" value="" placeholder="e.g. Penicillin, Latex — leave blank if none" />
               </div>
@@ -1051,7 +1106,7 @@
 
             <div style="display:flex; gap:8px; margin-top:8px;">
               <button type="submit" class="btn-primary" style="flex:2;">Register Patient</button>
-              <button type="button" class="btn-secondary" style="flex:1;" onclick="document.getElementById('patient-form').reset()">Clear Form</button>
+              <button type="button" class="btn-secondary" style="flex:1;" onclick="document.getElementById('patient-form').reset(); handleServiceProfileChange('');">Clear Form</button>
             </div>
           </form>
         </div>
@@ -1065,36 +1120,25 @@
     const visible = q
       ? patientLogs
           .map((p, index) => ({ p, index }))
-          .filter(({ p }) => [p.mr, p.file, p.name, p.cnic, p.assignedDoctor]
+          .filter(({ p }) => [p.mr, p.file, p.name, p.pa, p.assignedDoctor]
             .some(field => (field || '').toString().toLowerCase().includes(q)))
       : patientLogs.map((p, index) => ({ p, index }));
 
-    const tableRows = visible.length ? visible.map(({ p, index }) => `
+    const tableRows = visible.length ? visible.map(({ p }) => `
     <tr>
       <td><strong>${p.mr}</strong></td>
       <td><strong>${p.file}</strong></td>
       <td><strong>${p.name}</strong></td>
-      <td>${p.cnic}</td>
       <td>${p.location}</td>
       <td class="cell-wrap">${p.rotation}</td>
       <td><strong style="color:var(--green-dark);">${p.assignedDoctor || 'Unassigned'}</strong></td>
       <td>${p.apptDateShort} · ${p.time}</td>
-      <td><strong style="color:var(--green-med);">${p.timeIn}</strong></td>
-      <td><strong style="color:var(--red);">${p.timeOut}</strong></td>
       <td>${p.duration}</td>
-      <td><span class="badge ${p.badge}">${p.status}</span></td>
       <td>
-        <button class="action-link" onclick="openNextAppointmentModal('${p.mr}', '${p.name}', '${p.assignedDoctor}')" style="background:var(--green-dark); margin-right:4px;">+ Next Appt</button>
-        ${p.status === 'WAITING' ? `
-          <button class="action-link" onclick="startProcedure(${index})" style="background:#0f6244;">Start</button>
-        ` : p.status === 'ACTIVE' ? `
-          <button class="action-link" onclick="completeProcedure(${index})" style="background:var(--amber);">Complete</button>
-        ` : `
-          <span style="color:#9ca3af; font-size:11px; font-weight:700;">Done</span>
-        `}
+        <button class="action-link" onclick="openNextAppointmentModal('${p.mr}', '${p.name}', '${p.assignedDoctor}')" style="background:var(--green-dark);">+ Next Appt</button>
       </td>
     </tr>
-  `).join('') : `<tr><td colspan="13" style="text-align:center; color:#9ca3af; padding:24px;">${
+  `).join('') : `<tr><td colspan="9" style="text-align:center; color:#9ca3af; padding:24px;">${
       q ? `No patients match “${q}”.` : 'No patients registered yet.'
     }</td></tr>`;
 
@@ -1113,15 +1157,11 @@
                 <th>MR No.</th>
                 <th>File No.</th>
                 <th>Name / Rank</th>
-                <th>CNIC</th>
                 <th>Room</th>
                 <th>Procedure</th>
                 <th>Doctor Queue</th>
                 <th>Appt Date & Time</th>
-                <th>Time In</th>
-                <th>Time Out</th>
                 <th>Duration</th>
-                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -1137,25 +1177,17 @@
     const docRows = doctorDirectory.length ? doctorDirectory.map(doc => {
       const name = doc.full_name;
       const alloc = doctorAllocations.find(a => a.name === name);
-      const doctorQueue = patientLogs.filter(p => p.assignedDoctor === name);
-      const waitingCount = doctorQueue.filter(p => p.status === 'WAITING').length;
-      const activeCount = doctorQueue.filter(p => p.status === 'ACTIVE').length;
-      const nextAppt = doctorQueue.find(p => p.status === 'WAITING');
 
       return `
       <tr>
         <td><strong>${name}</strong></td>
         <td style="text-align:center;">${alloc ? `<span class="badge badge-info">${alloc.room}</span>` : '<span style="color:#9ca3af; font-size:11px;">Unallocated</span>'}</td>
-        <td style="text-align:center;">${alloc ? alloc.department : 'Orthodontics'}</td>
-        <td style="text-align:center;"><span class="badge badge-active">${activeCount} Active</span></td>
-        <td style="text-align:center;"><span class="badge badge-waiting">${waitingCount} Waiting</span></td>
-        <td>${nextAppt ? `<strong>${nextAppt.name}</strong> (${nextAppt.time})` : '<span style="color:#9ca3af;">No upcoming appts</span>'}</td>
         <td style="text-align:center;">${alloc
           ? `<button class="action-link" style="background:var(--red);" onclick="releaseAllocation(${alloc.id}, '${name.replace(/'/g, "\\'")}', '${alloc.room}')">Release Room</button>`
           : '<span style="color:#9ca3af; font-size:11px;">—</span>'}</td>
       </tr>
       `;
-    }).join('') : '<tr><td colspan="7" style="text-align:center; color:#9ca3af;">No doctor accounts registered yet.</td></tr>';
+    }).join('') : '<tr><td colspan="3" style="text-align:center; color:#9ca3af;">No doctor accounts registered yet.</td></tr>';
 
     const doctorPicker = doctorDirectory.length
       ? doctorDirectory.map(d => {
@@ -1172,8 +1204,8 @@
 
     return `
     <div class="header-group">
-      <h1>Doctor Management & Queue Allocations</h1>
-      <p>Assign operatory rooms to doctors and monitor live appointment queues.</p>
+      <h1>Doctor Management & Room Allocations</h1>
+      <p>Assign operatory rooms to doctors and manage clinic space allocation.</p>
     </div>
 
     <div class="grid-split">
@@ -1191,7 +1223,7 @@
             <p style="font-size:11px; color:var(--text-muted); margin-top:4px;">
               Re-assigning a doctor moves them — their previous room is released automatically.
             </p>
-            <button type="submit" class="btn-primary" style="margin-top:16px;">Assign Allocation</button>
+            <button type="submit" class="btn-primary" style="margin-top:16px;">Assign Room</button>
           </form>
         </div>
       </div>
@@ -1204,11 +1236,7 @@
                 <tr>
                   <th>Doctor Name</th>
                   <th style="text-align:center;">Assigned Room</th>
-                  <th style="text-align:center;">Department</th>
-                  <th style="text-align:center;">Active Sessions</th>
-                  <th style="text-align:center;">In Queue</th>
-                  <th>Next Scheduled Appt</th>
-                  <th style="text-align:center;">Allocation</th>
+                  <th style="text-align:center;">Allocation Action</th>
                 </tr>
               </thead>
               <tbody>${docRows}</tbody>
@@ -1293,14 +1321,13 @@
         mr: mr,
         file: 'F-' + Math.floor(10000 + Math.random() * 90000),
         name: name,
-        cnic: '35202-0000000-0',
+        cnic: '—',
+        pa: '—',
         location: 'Room 12',
         rotation: procedure,
         assignedDoctor: doctor,
         time: formattedTime,
         apptDate: date,
-        timeIn: '—',
-        timeOut: '—',
         status: 'WAITING',
         badge: 'badge-waiting'
       });
@@ -1329,10 +1356,11 @@
     const mr = val('p-mr');
     const file = val('p-file');
     const name = val('p-name');
-    const cnic = val('p-cnic');
     const gender = val('p-gender');
     const bloodGroup = val('p-blood');
     const serviceProfile = val('p-service-profile');
+    const isCivilian = serviceProfile.startsWith('Civilian');
+    const paNumber = !isCivilian ? val('p-pa') : null;
     const allergies = val('p-allergies');
     const room = val('p-room');
     const rotation = val('p-procedure');
@@ -1349,7 +1377,7 @@
         file_number: file,
         full_name: name,
         rank: name,
-        cnic,
+        pa_number: paNumber,
         gender,
         blood_group: bloodGroup,
         service_profile: serviceProfile,
@@ -1367,34 +1395,6 @@
     }
   }
 
-  async function startProcedure(index) {
-    const patient = patientLogs[index];
-    if (!patient) return;
-
-    try {
-      const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'ACTIVE' });
-      patientLogs[index] = normalizePatient(updated);
-      switchView('patient_mgmt');
-      showToast(`Time In recorded`);
-    } catch (error) {
-      showToast(error.message || 'Unable to start procedure');
-    }
-  }
-
-  async function completeProcedure(index) {
-    const patient = patientLogs[index];
-    if (!patient) return;
-
-    try {
-      const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'COMPLETED' });
-      patientLogs[index] = normalizePatient(updated);
-      switchView('patient_mgmt');
-      showToast(`Time Out recorded`);
-    } catch (error) {
-      showToast(error.message || 'Unable to complete procedure');
-    }
-  }
-
   async function addDoctorAllocation(e) {
     e.preventDefault();
     const name = document.getElementById('d-name').value;
@@ -1408,9 +1408,7 @@
     try {
       await api.post('/allocations', {
         doctor_name: name,
-        room,
-        department: 'Orthodontics',
-        chair: 'Chair 1'
+        room
       });
       await refreshDoctorData();
       switchView('doctor_mgmt');
@@ -1466,7 +1464,7 @@
       refreshedForPage = pageId;
       refreshDoctorData().finally(() => {
         const stillHere = document.querySelector('.nav-btn.active')?.dataset.page === pageId;
-        const typed = ['p-mr', 'p-file', 'p-name', 'p-cnic']
+        const typed = ['p-mr', 'p-file', 'p-name', 'p-pa']
           .some(id => (document.getElementById(id)?.value || '').trim() !== '');
         if (stillHere && !typed) switchView(pageId);
       });
