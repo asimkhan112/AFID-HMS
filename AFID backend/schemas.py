@@ -74,6 +74,17 @@ class PatientCreate(PatientBase):
     pass
 
 
+class PatientAssignmentUpdate(BaseModel):
+    """Reassign a patient to a different doctor after registration.
+
+    Narrow on purpose: PUT /patients/{id} replaces the whole record and requires
+    mr_number/file_number/full_name, so reception could not use it just to fix a
+    doctor. Send an id where possible; a name is resolved to an account.
+    """
+    assigned_doctor_id: Optional[int] = None
+    assigned_doctor: Optional[str] = None
+
+
 class PatientOut(PatientBase):
     id: int
     status: str

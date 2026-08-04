@@ -203,6 +203,58 @@ def update_patient(
     return patient
 
 
+@router.patch("/{patient_id}/assignment", response_model=schemas.PatientOut)
+def update_assignment(
+    patient_id: int,
+    payload: schemas.PatientAssignmentUpdate,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Move a patient to a different doctor.
+
+    Reception registers against a doctor dropdown, but a patient still ends up
+    on the wrong list often enough -- a mistyped import, a name that matched no
+    account, or simply the wrong pick -- and until now there was no way to
+    correct it short of a full record replace.
+    """
+    patient = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(
+            status_code=422,
+            detail="Send assigned_doctor_id (preferred) or assigned_doctor",
+        )
+
+    if data.get("assigned_doctor_id") is not None:
+        doctor = db.query(models.User).filter(
+            models.User.id == data["assigned_doctor_id"],
+            models.User.role == models.UserRole.doctor,
+        ).first()
+        if not doctor:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No doctor account with id {data['assigned_doctor_id']}",
+            )
+
+    apply_doctor_assignment(db, patient, data)
+    # A name that resolves to no account would silently unassign the patient,
+    # which is how records went missing from every doctor's queue before.
+    if patient.assigned_doctor_id is None:
+        db.rollback()
+        raise HTTPException(
+            status_code=422,
+            detail=f"'{data.get('assigned_doctor')}' does not match any active doctor "
+                   "account. Pick a doctor from the list instead.",
+        )
+
+    db.commit()
+    db.refresh(patient)
+    return patient
+
+
 @router.patch("/{patient_id}/status", response_model=schemas.PatientOut)
 def update_status(
     patient_id: int,

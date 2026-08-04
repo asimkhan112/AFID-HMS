@@ -1092,7 +1092,6 @@
                   <option value="Retired Officer">Retired Officer (Army)</option>
                   <option value="Retired Soldier / JCO">Retired Soldier / JCO (Army)</option>
                   <option value="Family / Dependent">Family / Dependent (Army)</option>
-                  <option value="Army Brats">Army Brats (Army)</option>
                   <option value="Civilian (Paying)">Civilian (Paying)</option>
                   <option value="Civilian (Entitled)">Civilian (Entitled)</option>
                 </select>
@@ -1146,10 +1145,14 @@
       <td><strong>${p.name}</strong></td>
       <td>${p.location}</td>
       <td class="cell-wrap">${p.rotation}</td>
-      <td><strong style="color:var(--green-dark);">${p.assignedDoctor || 'Unassigned'}</strong></td>
+      <td>
+        <strong style="color:var(--green-dark);">${p.assignedDoctor || 'Unassigned'}</strong>
+        ${p.assignedDoctorId ? '' : '<div style="font-size:10px; color:var(--amber); font-weight:700;">⚠ not linked to an account</div>'}
+      </td>
       <td>${p.apptDateShort} · ${p.time}</td>
       <td>${p.duration}</td>
       <td>
+        <button class="action-link" onclick="openReassignModal(${p.id})">✎ Change Doctor</button>
         <button class="action-link" onclick="openNextAppointmentModal('${p.mr}', '${p.name}', '${p.assignedDoctor}')" style="background:var(--green-dark);">+ Next Appt</button>
       </td>
     </tr>
@@ -1306,6 +1309,87 @@
 
   function closeModal() {
     document.getElementById('modal-root').innerHTML = '';
+  }
+
+  // Patient names reach these templates verbatim; an apostrophe or quote in one
+  // would otherwise break out of the attribute it is interpolated into.
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* --- REASSIGN DOCTOR MODAL --- */
+  // Reception picks the doctor from a dropdown at registration, but a patient
+  // can still land on the wrong list -- wrong pick, or an imported record whose
+  // doctor name matched no account. Without this the only fix was a full record
+  // replace, so the patient stayed invisible to the doctor actually treating them.
+  function openReassignModal(patientId) {
+    const p = patientLogs.find(x => x.id === patientId);
+    if (!p) { showToast('Patient record not found in the current list.'); return; }
+
+    if (!doctorDirectory.length) {
+      showToast('No doctor accounts available — add one under Doctor Management first.');
+      return;
+    }
+
+    const options = doctorDirectory.map(d => {
+      const room = allocationRoomFor(d.full_name);
+      const selected = d.id === p.assignedDoctorId ? ' selected' : '';
+      return `<option value="${d.id}"${selected}>${escapeHtml(d.full_name)}${room ? ` (${room})` : ''}</option>`;
+    }).join('');
+
+    const currentLabel = p.assignedDoctorId
+      ? escapeHtml(p.assignedDoctor)
+      : `${escapeHtml(p.assignedDoctor || 'Unassigned')} — not linked to any doctor account, so this patient does not appear in any doctor's queue`;
+
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" id="reassign-modal">
+        <div class="modal-box">
+          <h2 style="font-size:18px; font-weight:800; color:var(--green-dark); margin-bottom:4px;">Change Assigned Doctor</h2>
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">
+            Reassigning <strong>${escapeHtml(p.name)} (${escapeHtml(p.mr)})</strong>
+          </p>
+
+          <div class="form-row">
+            <label>Currently Assigned</label>
+            <input type="text" value="${currentLabel}" readonly style="background:#f1f5f9; cursor:not-allowed;" />
+          </div>
+
+          <form onsubmit="saveReassignment(event, ${patientId})">
+            <div class="form-row">
+              <label>Assign To</label>
+              <select id="reassign-doctor" required>${options}</select>
+            </div>
+
+            <div style="display:flex; gap:8px; margin-top:20px;">
+              <button type="submit" class="btn-primary" style="flex:2;">Save Assignment</button>
+              <button type="button" class="btn-secondary" style="flex:1;" onclick="closeModal()">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>`;
+  }
+
+  async function saveReassignment(e, patientId) {
+    e.preventDefault();
+    const doctorId = Number(document.getElementById('reassign-doctor').value);
+    if (!doctorId) { showToast('Pick a doctor.'); return; }
+
+    try {
+      // Sends the account id, not the display name -- matching on names is what
+      // let "Dr Hira" and "Dr. Hira Z." drift apart in the first place.
+      const updated = await api.patch(`/patients/${patientId}/assignment`, {
+        assigned_doctor_id: doctorId,
+      });
+      const idx = patientLogs.findIndex(x => x.id === patientId);
+      if (idx !== -1) patientLogs[idx] = normalizePatient(updated);
+      closeModal();
+      switchView('patient_mgmt');
+      showToast(`${updated.full_name} reassigned to ${updated.assigned_doctor}`);
+    } catch (error) {
+      showToast(error.message || 'Unable to change the assigned doctor');
+    }
   }
 
   async function saveNextAppointment(e, mr, name, doctor) {
