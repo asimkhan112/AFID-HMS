@@ -165,7 +165,15 @@ class Patient(Base):
     diagnostic_history = Column(Text)                   # Medical Record tab -- baseline history
     systemic_status  = Column(Text)                     # Medical Record tab -- systemic findings
     room             = Column(String(30))
+    # assigned_doctor is the DISPLAY string and is no longer authoritative.
+    # Ownership is decided by assigned_doctor_id: matching on the name alone
+    # meant "Dr Hira" and "Dr. Hira Z." were different doctors, so a patient
+    # could vanish from the queue of the very doctor they were assigned to.
+    # The string is kept in sync on write, and retained for rows whose doctor
+    # predates this column or no longer has an account.
     assigned_doctor  = Column(String(120))
+    assigned_doctor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"),
+                                nullable=True, index=True)
     procedure_category = Column(String(120))
     status           = Column(SAEnum(PatientStatus), default=PatientStatus.waiting)
     registered_at    = Column(DateTime, default=datetime.utcnow)
@@ -177,6 +185,46 @@ class Patient(Base):
     timeline_steps   = relationship("PatientTimelineStep", back_populates="patient")
     documents        = relationship("PatientDocument", back_populates="patient", cascade="all, delete-orphan")
     lab_orders       = relationship("LabOrder", back_populates="patient", cascade="all, delete-orphan")
+    appointments     = relationship("Appointment", back_populates="patient",
+                                    cascade="all, delete-orphan", order_by="Appointment.scheduled_for")
+
+
+# ── Appointments ─────────────────────────────────────────────────────────────
+
+class AppointmentStatus(str, enum.Enum):
+    scheduled = "SCHEDULED"
+    attended  = "ATTENDED"
+    cancelled = "CANCELLED"
+    no_show   = "NO_SHOW"
+
+
+class Appointment(Base):
+    """A booked future visit.
+
+    The staff portal has always had a "Next Appt" button, but it only flipped
+    the patient back to WAITING and kept the date, time and procedure in a
+    browser-side array -- so the booking was announced to the user and then
+    silently lost on the next refresh. This table is where it actually lives.
+    """
+    __tablename__ = "appointments"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    patient_id    = Column(Integer, ForeignKey("patients.id", ondelete="CASCADE"),
+                           nullable=False, index=True)
+    # Same pairing as Patient.assigned_doctor(_id): the id is authoritative and
+    # the name is a display fallback for doctors without an account.
+    doctor_id     = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"),
+                           nullable=True, index=True)
+    doctor_name   = Column(String(120))
+    scheduled_for = Column(DateTime, nullable=False, index=True)
+    procedure     = Column(String(160))
+    notes         = Column(Text)
+    status        = Column(SAEnum(AppointmentStatus), default=AppointmentStatus.scheduled)
+    created_at    = Column(DateTime, default=datetime.utcnow)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    patient       = relationship("Patient", back_populates="appointments")
+    doctor        = relationship("User", foreign_keys=[doctor_id])
 
 
 # ── Procedure Presets ────────────────────────────────────────────────────────

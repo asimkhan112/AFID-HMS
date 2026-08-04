@@ -62,7 +62,11 @@ class PatientBase(BaseModel):
     diagnostic_history: Optional[str] = None
     systemic_status: Optional[str] = None
     room: Optional[str] = None
+    # assigned_doctor is the display string; assigned_doctor_id is what the
+    # portals actually filter on. Callers may send either -- create/update
+    # reconcile the two so the pair never drifts (see routers/patients.py).
     assigned_doctor: Optional[str] = None
+    assigned_doctor_id: Optional[int] = None
     procedure_category: Optional[str] = None
 
 
@@ -691,6 +695,42 @@ OperatoryRoomUpdate = RoomStatusUpdate
 # ── Timeline Steps ────────────────────────────────────────────────────────────
 
 TimelineStepOut = PatientTimelineStepOut
+
+
+# ── Appointments ──────────────────────────────────────────────────────────────
+
+class AppointmentBase(BaseModel):
+    patient_id: int
+    scheduled_for: datetime
+    procedure: Optional[str] = None
+    notes: Optional[str] = None
+    # Either may be sent; the router reconciles them the same way patients do.
+    doctor_id: Optional[int] = None
+    doctor_name: Optional[str] = None
+
+
+class AppointmentCreate(AppointmentBase):
+    pass
+
+
+class AppointmentUpdate(BaseModel):
+    scheduled_for: Optional[datetime] = None
+    procedure: Optional[str] = None
+    notes: Optional[str] = None
+    doctor_id: Optional[int] = None
+    doctor_name: Optional[str] = None
+    status: Optional[str] = None
+
+
+class AppointmentOut(AppointmentBase):
+    id: int
+    status: str
+    created_at: datetime
+    # Denormalised for the queue tables, which show these without a second call.
+    patient_name: Optional[str] = None
+    patient_mr: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ── Forward-reference resolution ──────────────────────────────────────────────

@@ -705,9 +705,13 @@
       name: p.full_name,
       cnic: p.cnic || '—',
       pa: p.pa_number || '—',
+      // rank was never carried across, so the patient-management filter had
+      // nothing to match a rank against and searching by one hid every row.
+      rank: p.rank || '—',
       location: roomNum,
       rotation: p.procedure_category || '—',
       assignedDoctor: p.assigned_doctor || '—',
+      assignedDoctorId: p.assigned_doctor_id ?? null,
       time: p.registered_at ? new Date(p.registered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00 AM',
       apptDate: p.registered_at ? new Date(p.registered_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       apptDateShort: (p.registered_at ? new Date(p.registered_at) : new Date())
@@ -1133,7 +1137,7 @@
     const visible = q
       ? patientLogs
           .map((p, index) => ({ p, index }))
-          .filter(({ p }) => [p.mr, p.file, p.name, p.pa, p.assignedDoctor]
+          .filter(({ p }) => [p.mr, p.file, p.name, p.pa, p.assignedDoctor, p.rank, p.cnic, p.rotation]
             .some(field => (field || '').toString().toLowerCase().includes(q)))
       : patientLogs.map((p, index) => ({ p, index }));
 
@@ -1315,35 +1319,38 @@
     const [h, m] = rawTime.split(':');
     const formattedTime = new Date(0, 0, 0, h, m).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+    if (!date || !rawTime) {
+      showToast('Pick both a date and a time for the appointment.');
+      return;
+    }
+
     const patientIndex = patientLogs.findIndex(p => p.mr === mr);
-    if (patientIndex !== -1) {
-      const patient = patientLogs[patientIndex];
-      try {
-        const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'WAITING' });
-        patientLogs[patientIndex] = normalizePatient(updated);
-        patientLogs[patientIndex].time = formattedTime;
-        patientLogs[patientIndex].apptDate = date;
-        patientLogs[patientIndex].rotation = procedure;
-      } catch (error) {
-        showToast(error.message || 'Unable to queue next appointment');
-        return;
-      }
-    } else {
-      patientLogs.unshift({
-        id: Date.now(),
-        mr: mr,
-        file: 'F-' + Math.floor(10000 + Math.random() * 90000),
-        name: name,
-        cnic: '—',
-        pa: '—',
-        location: 'Room 12',
-        rotation: procedure,
-        assignedDoctor: doctor,
-        time: formattedTime,
-        apptDate: date,
-        status: 'WAITING',
-        badge: 'badge-waiting'
+    if (patientIndex === -1) {
+      // Previously this branch invented a patient with a random file number and
+      // pushed it into the local array only. There is nothing to book against.
+      showToast(`No patient record found for ${mr} — cannot book an appointment.`);
+      return;
+    }
+
+    const patient = patientLogs[patientIndex];
+    try {
+      // Persist the booking. This used to live only in the browser array below,
+      // so the confirmation toast appeared and the appointment vanished on the
+      // next refresh.
+      await api.post('/appointments/', {
+        patient_id: patient.id,
+        scheduled_for: `${date}T${rawTime}`,
+        procedure: procedure || null,
+        doctor_name: doctor && doctor !== '—' ? doctor : null,
       });
+      const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'WAITING' });
+      patientLogs[patientIndex] = normalizePatient(updated);
+      patientLogs[patientIndex].time = formattedTime;
+      patientLogs[patientIndex].apptDate = date;
+      patientLogs[patientIndex].rotation = procedure;
+    } catch (error) {
+      showToast(error.message || 'Unable to queue next appointment');
+      return;
     }
 
     closeModal();

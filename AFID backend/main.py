@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # Import models so SQLAlchemy registers them before create_all
 import models  # noqa: F401
 
-from routers import auth, patients, doctors, procedures, leaves, staff, hod, presets, procedure_analytics, lab
+from routers import auth, patients, doctors, procedures, leaves, staff, hod, presets, procedure_analytics, lab, appointments
 from routers import upload as upload_router  # noqa: E402
 
 # ── Create tables ─────────────────────────────────────────────────────────────
@@ -117,6 +117,7 @@ app.include_router(hod.router)
 app.include_router(presets.router)
 app.include_router(procedure_analytics.router)
 app.include_router(lab.router)
+app.include_router(appointments.router)
 app.include_router(upload_router.router)
 
 

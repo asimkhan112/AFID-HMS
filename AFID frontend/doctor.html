@@ -397,7 +397,36 @@
       if (nameEl) nameEl.innerText = user?.full_name || 'Unknown User';
       if (roleEl) { const role = (user?.role || 'doctor').toString(); roleEl.innerText = `Role: ${role.charAt(0).toUpperCase()}${role.slice(1)}`; }
     }
-    function isMyPatient(p) { const me = currentDoctorName(); if (!me) return false; const assigned = (p?.assigned_doctor || p?.doctor || '').trim(); return assigned.toLowerCase() === me.toLowerCase(); }
+    function currentDoctorId() { const id = getUser()?.id; return Number.isFinite(Number(id)) ? Number(id) : null; }
+
+    // Ownership is decided by account id. This used to compare display names,
+    // which meant a patient stored as "Dr Hira" was invisible to the account
+    // named "Dr. Hira Z." -- they were missing from her queue and a direct
+    // search answered "Not Your Patient" about her own patient.
+    //
+    // The name comparison is kept only as a fallback for records whose
+    // assigned_doctor_id is still null (rows the backfill could not resolve, or
+    // an older backend that does not send the field yet). Once a record has an
+    // id, the id is the only thing that counts.
+    function isMyPatient(p) {
+      if (!p) return false;
+      const myId = currentDoctorId();
+      const theirId = Number(p.assigned_doctor_id);
+      if (Number.isFinite(theirId) && theirId > 0) return myId !== null && theirId === myId;
+      const me = normaliseDoctorName(currentDoctorName());
+      if (!me) return false;
+      return normaliseDoctorName(p.assigned_doctor || p.doctor || '') === me;
+    }
+
+    // Mirrors normalise_doctor_name() in the backend's doctor_matching.py:
+    // "Dr. Hira Z." -> "hira z". Used only by the fallback path above.
+    function normaliseDoctorName(name) {
+      return String(name || '').trim().toLowerCase()
+        .replace(/^(dr|doctor|prof|professor)\b\.?\s*/, '')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
     function myPatients() { return (cachedPatients || []).filter(isMyPatient); }
     function ensurePresets() { if (!cachedPresets || !Object.keys(cachedPresets).length) { cachedPresets = buildFallbackPresets(); } return cachedPresets; }
     function buildFallbackPresets() { const out = {}; Object.keys(PRESETS).forEach(name => { const p = PRESETS[name]; out[name] = { materials: [...(p.materials || [])], pharmacy: [...(p.pharmacy || [])], diagnostics: [...(p.diagnostics || [])], notes: p.notes || `Procedure performed: ${name}.`, duration: p.duration || (PROCEDURE_MASTER_BY_NAME[name] || 30) }; }); Object.values(PROCEDURE_MASTER).forEach(({ name, duration }) => { if (!out[name]) { out[name] = { materials: [], pharmacy: [], diagnostics: [], notes: `Procedure performed: ${name}.`, duration }; } }); return out; }
@@ -512,10 +541,14 @@
       const query = searchInput ? searchInput.value.trim() : '';
       if (!query) { await uiAlert("Please enter a search term (MR number, CNIC, file number or rank).", { title: 'Search' }); return; }
       try {
-        const patients = (await api.get(`/patients/?search=${encodeURIComponent(query)}`)) || [];
+        // Honour the "search by" selector. It used to be ignored entirely, so
+        // choosing "File Number" and typing an MR number still found the record.
+        const field = document.getElementById('search-filter-category')?.value || '';
+        const url = `/patients/?search=${encodeURIComponent(query)}` + (field ? `&field=${encodeURIComponent(field)}` : '');
+        const patients = (await api.get(url)) || [];
         const mine = patients.filter(isMyPatient);
         let patient = mine[0] || null;
-        if (!patient) { const foundButNotMine = patients[0]; if (foundButNotMine) { await uiAlert(`${foundButNotMine.full_name} (${foundButNotMine.mr_number}) is assigned to ${foundButNotMine.assigned_doctor || 'another doctor'}, not to you.`, { title: 'Not Your Patient', tone: 'warn' }); } else { await uiAlert(`No patient record found matching: ${query}`, { title: 'Not Found', tone: 'warn' }); } return; }
+        if (!patient) { const foundButNotMine = patients[0]; if (foundButNotMine) { const owner = foundButNotMine.assigned_doctor || 'another doctor'; const orphaned = !foundButNotMine.assigned_doctor_id; await uiAlert(orphaned ? `${foundButNotMine.full_name} (${foundButNotMine.mr_number}) is recorded against "${owner}", but that name is not linked to a doctor account, so the record cannot be opened from a doctor portal. Ask reception or the HOD to reassign the patient.` : `${foundButNotMine.full_name} (${foundButNotMine.mr_number}) is assigned to ${owner}, not to you.`, { title: orphaned ? 'Unassigned Patient' : 'Not Your Patient', tone: 'warn' }); } else { await uiAlert(`No patient record found matching: ${query}`, { title: 'Not Found', tone: 'warn' }); } return; }
         currentPatient = patient;
         if ((patient.status || '').toString().toUpperCase() === 'WAITING') { try { const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'ACTIVE' }); currentPatient = updated; patient = updated; showDoctorToast(`${patient.full_name} checked in at ${new Date(updated.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`); } catch (err) { await uiError('Auto check-in failed: ' + (err.message || 'Unknown error')); } }
         const cachedIdx = (cachedPatients || []).findIndex(p => p.id === patient.id);
@@ -554,7 +587,7 @@
       return `
         <div id="view-search-screen" class="view-screen active">
           <div class="dashboard-title-row" style="margin-bottom: 24px;"><h1>Patient Operations</h1><div class="meta-tag">Record Lookup</div></div>
-          <div class="panel"><div class="panel-header">Patient Record Lookup</div><div class="panel-body"><div class="flex-row-inputs" style="margin-bottom: 0;"><div style="flex: 0.8;"><select id="search-filter-category"><option value="MR Number" selected>MR Number</option><option value="CNIC No.">CNIC No.</option><option value="File Number">File Number</option><option value="Rank">Rank</option></select></div><div style="flex: 2;"><input type="text" id="patient-search-input" value="" placeholder="Try typing: MR-0201708" /></div><div class="btn-holder"><button class="btn" onclick="executeSearch()" style="height: 45px;">Search & Continue →</button></div></div></div></div>
+          <div class="panel"><div class="panel-header">Patient Record Lookup</div><div class="panel-body"><div class="flex-row-inputs" style="margin-bottom: 0;"><div style="flex: 0.8;"><select id="search-filter-category"><option value="" selected>Any field</option><option value="mr_number">MR Number</option><option value="cnic">CNIC No.</option><option value="file_number">File Number</option><option value="rank">Rank</option><option value="name">Name</option></select></div><div style="flex: 2;"><input type="text" id="patient-search-input" value="" placeholder="Try typing: MR-0201708" /></div><div class="btn-holder"><button class="btn" onclick="executeSearch()" style="height: 45px;">Search & Continue →</button></div></div></div></div>
         </div>
         <div id="view-workspace-screen" class="view-screen">
           <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;"><button class="btn btn-sm" onclick="returnToSearchScreen()" style="background: var(--text-muted);">&larr; Back to Search Lookup</button><span id="active-patient-badge" class="meta-tag" style="font-size: 13px;">Active Patient: None</span><button class="btn btn-sm" onclick="confirmTimeOut()" style="background: #0f6244;">Confirm Time & Complete Session</button></div>
@@ -743,8 +776,10 @@
       const mine = myPatients();
       const FIELD_MAP = { mr_number: 'mr_number', file_number: 'file_number', name: 'full_name' };
       const field = FIELD_MAP[filterType] || 'mr_number';
-      let results = mine.filter(p => p && (p[field] || '').toString().toLowerCase().includes(query));
-      if (!results.length) { results = mine.filter(p => p && ['mr_number', 'file_number', 'full_name', 'cnic', 'rank'].some(f => (p[f] || '').toString().toLowerCase().includes(query))); }
+      // Search only the selected column. The old code fell back to scanning every
+      // field when the chosen one missed, so "MR Number" would happily match a
+      // name or a rank -- which is why MR search appeared to work only sometimes.
+      const results = mine.filter(p => p && (p[field] || '').toString().toLowerCase().includes(query));
       tbody.innerHTML = results.length ? results.map(p => `<tr style="cursor:pointer;" onclick="selectTimelinePatient('${p.mr_number}')"><td><strong>${p.mr_number}</strong></td><td>${p.file_number || '—'}</td><td>${p.full_name}</td><td><span class="badge ${(p.status || '').toString().toUpperCase() === 'ACTIVE' ? 'badge-success' : (p.status || '').toString().toUpperCase() === 'COMPLETED' ? 'badge-info' : 'badge-warning'}">${(p.status || '—').toString().toUpperCase()}</span></td><td><button class="btn btn-sm" onclick="event.stopPropagation(); selectTimelinePatient('${p.mr_number}')" style="height:38px;">View Timeline</button></td></tr>`).join('') : `<tr><td colspan="5" style="text-align:center; color:#6b7280;">No patient assigned to ${currentDoctorName() || 'you'} matches "${query}".</td></tr>`;
     }
 
@@ -995,6 +1030,29 @@
 
     function buildRecordsBlock() { const rows = Object.entries(PATIENT_RECORDS_DATA).flatMap(([, records]) => records.filter(r => patientRecordFiles[r.id]).map(r => { const a = patientRecordFiles[r.id]; return `  - ${r.name}: ${a.name}${a.date ? ` (${a.date})` : ''}`; })); return rows.length ? ['RECORDS ATTACHED / UPLOADED:', ...rows].join('\n') : ''; }
 
+    // Which categories are expanded, per list. Held outside the render functions
+    // so the open/closed state survives the re-render that every tick triggers.
+    let expandedProcCategories = new Set();
+    let expandedDiagCategories = new Set();
+    let expandedInvCategories  = new Set();
+
+    function toggleCategoryIn(set, cat, rerender) {
+      if (set.has(cat)) set.delete(cat); else set.add(cat);
+      rerender();
+    }
+    function toggleProcCategory(cat) {
+      toggleCategoryIn(expandedProcCategories, cat,
+        () => renderProcCheckboxes(document.getElementById('proc-search')?.value || ''));
+    }
+    function toggleDiagCategory(cat) {
+      toggleCategoryIn(expandedDiagCategories, cat,
+        () => renderDiagCheckboxes(document.getElementById('diag-search')?.value || ''));
+    }
+    function toggleInvCategory(cat) {
+      toggleCategoryIn(expandedInvCategories, cat,
+        () => renderInvCheckboxes(document.getElementById('inv-search')?.value || ''));
+    }
+
     function renderProcCheckboxes(filter) {
       const f = (filter || '').toLowerCase();
       const c = document.getElementById('proc-checkbox-container');
@@ -1004,7 +1062,14 @@
         const fi = items.filter(i => i.toLowerCase().includes(f));
         if (!fi.length) continue;
         const catId = cat.replace(/\s+/g, '-');
-        html += `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');document.getElementById('${catId}-proc-body').classList.toggle('collapsed')">${cat} </div><div class="diag-category-content collapsed" id="${catId}-proc-body">`;
+        // Ticking a procedure re-renders this whole list. The collapsed class
+        // used to be hard-coded here, so every category slammed shut on each
+        // selection and multiple picks meant reopening the category every time.
+        // An active text filter expands everything, since the matches are the point.
+        const open = f ? true : expandedProcCategories.has(cat);
+        const bodyClass = open ? 'diag-category-content' : 'diag-category-content collapsed';
+        const headClass = open ? 'diag-category-header' : 'diag-category-header collapsed';
+        html += `<div class="diag-category"><div class="${headClass}" onclick="toggleProcCategory('${cat.replace(/'/g, "\\'")}')">${cat} </div><div class="${bodyClass}" id="${catId}-proc-body">`;
         fi.forEach(i => {
           const cleanItem = i.replace(' *', '').replace(' ⚡', '');
           const ch = procSelected.has(cleanItem);
@@ -1578,7 +1643,10 @@
         const fi = items.filter(i => i.toLowerCase().includes(f));
         if (!fi.length) continue;
         const catId = cat.replace(/\s+/g,'-');
-        html += `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');document.getElementById('${catId}-body').classList.toggle('collapsed')">${cat} </div><div class="diag-category-content collapsed" id="${catId}-body">`;
+        // Same re-render problem as the procedure list: ticking an item rebuilt
+        // this markup with `collapsed` baked in, closing every category.
+        const open = f ? true : expandedDiagCategories.has(cat);
+        html += `<div class="diag-category"><div class="diag-category-header${open ? '' : ' collapsed'}" onclick="toggleDiagCategory('${cat.replace(/'/g, "\\'")}')">${cat} </div><div class="diag-category-content${open ? '' : ' collapsed'}" id="${catId}-body">`;
         fi.forEach(i => {
           const ch = diagSelected.has(i);
           if (ch) total++;
@@ -1601,7 +1669,9 @@
         const fi = items.filter(i => i.toLowerCase().includes(f));
         if (!fi.length) continue;
         const catId = cat.replace(/\s+/g,'-');
-        html += `<div class="diag-category"><div class="diag-category-header" onclick="this.classList.toggle('collapsed');document.getElementById('${catId}-inv-body').classList.toggle('collapsed')">${cat} </div><div class="diag-category-content collapsed" id="${catId}-inv-body">`;
+        // Same re-render problem as the procedure list — see toggleProcCategory.
+        const open = f ? true : expandedInvCategories.has(cat);
+        html += `<div class="diag-category"><div class="diag-category-header${open ? '' : ' collapsed'}" onclick="toggleInvCategory('${cat.replace(/'/g, "\\'")}')">${cat} </div><div class="diag-category-content${open ? '' : ' collapsed'}" id="${catId}-inv-body">`;
         fi.forEach(i => {
           const ch = invSelected.has(i);
           if (ch) total++;
