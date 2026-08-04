@@ -101,6 +101,50 @@
     .qty-val { background: var(--green-light); color: var(--green-dark); padding: 2px 8px; font-weight: 700; border-radius: 4px; font-size: 12px; }
 
     .reveal-section { display: none; }
+
+    /* ── Patient Operations workspace ────────────────────────────────────────
+       The tab strip used to sit ~1500px down the page, underneath two
+       full-height panels, so it was below the fold on a 1080p screen -- you had
+       to scroll past the entire procedure list to discover the tabs existed.
+       Procedures is now the first tab, and identity + navigation are pinned.
+
+       Topbar and tab strip share ONE sticky wrapper on purpose: two separate
+       sticky elements would need the second one's `top` to track the first
+       one's height, which changes whenever an allergy banner appears. */
+    .ws-header {
+      position: sticky; top: 0; z-index: 30;
+      background: var(--bg-main);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 18px;
+    }
+    .ws-topbar { display: flex; align-items: center; gap: 14px; padding: 4px 0 10px; }
+    .ws-ident { flex: 1; min-width: 0; }
+    .ws-name { font-size: 17px; font-weight: 800; color: var(--green-dark); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ws-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+    .ws-dot { opacity: .4; }
+    .ws-times { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+    .ws-times label { font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+    .ws-times input { width: 86px; padding: 5px 8px; font-size: 12px; text-align: center; background: #f3f4f6; color: #374151; border: 1px solid var(--border); border-radius: 6px; }
+    .ws-expand { background: #fff; border: 1px solid var(--border); border-radius: 6px; width: 30px; height: 30px; cursor: pointer; color: var(--text-muted); font-size: 11px; flex-shrink: 0; transition: transform .18s; }
+    .ws-expand[aria-expanded="true"] { transform: rotate(180deg); }
+    .ws-details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 12px 16px; background: var(--green-soft); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; }
+    .ws-details .label { display: block; color: var(--text-muted); font-size: 11px; margin-bottom: 2px; }
+    .ws-details .value { font-size: 13px; font-weight: 600; color: var(--text-dark); }
+    .ws-header .tab-bar { margin-bottom: 0; border-bottom: none; }
+    /* Record tabs stay locked until a procedure is ticked. Previously the whole
+       container was hidden instead, which gave no hint that the tabs existed. */
+    .tab-button.is-locked { opacity: .4; cursor: not-allowed; }
+    .tab-button.is-locked:hover { color: var(--text-muted); }
+    .ws-footer {
+      position: sticky; bottom: 0; z-index: 28;
+      display: flex; justify-content: flex-end; align-items: center; gap: 12px;
+      padding: 12px 0; margin-top: 18px;
+      background: var(--bg-main); border-top: 1px solid var(--border);
+    }
+    @media (max-width: 900px) {
+      .ws-topbar { flex-wrap: wrap; }
+      .ws-details { grid-template-columns: repeat(2, 1fr); }
+    }
     /* The procedure checklist IS the session's procedure selector -- there is no separate
        dropdown. Ticking a procedure opens the record tabs below. */
     .proc-empty-hint { margin-top: 12px; padding: 12px 16px; background: #fff8e6; border: 1px solid #f0d89a; border-radius: 8px; font-size: 12px; color: #7a5a10; }
@@ -557,13 +601,10 @@
         document.getElementById('view-workspace-screen').classList.add('active');
         const badgeEl = document.getElementById('active-patient-badge');
         if (badgeEl) badgeEl.innerText = `Open Case: ${patient.full_name} (${patient.mr_number})`;
-        const values = document.querySelectorAll('#view-workspace-screen .value');
-        if (values[0]) values[0].innerText = patient.full_name;
-        if (values[1]) values[1].innerText = patient.mr_number + (patient.file_number ? ' / ' + patient.file_number : '');
-        if (values[2]) values[2].innerText = patient.service_profile || '—';
-        if (values[3]) values[3].innerText = `${patient.gender || '—'} / ${patient.blood_group || '—'}`;
-        if (values[4]) values[4].innerText = patient.room || '—';
-        if (values[5]) { const st = (patient.status || 'WAITING').toString().toUpperCase(); const colour = st === 'COMPLETED' ? '#0369a1' : st === 'ACTIVE' ? '#15803d' : '#92400e'; values[5].innerHTML = `<span style="color:${colour}; font-weight:800;">${st}</span>`; }
+        // Addressed by id rather than by position in a NodeList of .value spans:
+        // the old indexes silently pointed at the wrong fields the moment the
+        // profile markup was reordered.
+        renderWorkspaceIdentity(patient);
         updateAllergyAlertBox(patient.allergies);
         const recordAllergyInput = document.getElementById('record-allergy-input');
         if (recordAllergyInput) recordAllergyInput.value = patient.allergies || "";
@@ -577,7 +618,7 @@
         if (timeOutEl) timeOutEl.value = patient.check_out_time ? new Date(patient.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
         activeMaterials = []; activePharmacy = []; activeDiagnostics = [];
         resetSelectionPickers();
-        document.getElementById('step-3-container').style.display = 'none';
+        setRecordTabsUnlocked(false);
         document.getElementById('master-summary-injection-point').innerHTML = '';
         try { patientRecordFiles = await loadPatientDocuments(currentPatient.id); renderPatientRecords(); } catch (e) { console.warn('Failed to load saved documents:', e); }
       } catch (err) { await uiError("Error executing record search: " + err.message); }
@@ -590,30 +631,59 @@
           <div class="panel"><div class="panel-header">Patient Record Lookup</div><div class="panel-body"><div class="flex-row-inputs" style="margin-bottom: 0;"><div style="flex: 0.8;"><select id="search-filter-category"><option value="" selected>Any field</option><option value="mr_number">MR Number</option><option value="cnic">CNIC No.</option><option value="file_number">File Number</option><option value="rank">Rank</option><option value="name">Name</option></select></div><div style="flex: 2;"><input type="text" id="patient-search-input" value="" placeholder="Try typing: MR-0201708" /></div><div class="btn-holder"><button class="btn" onclick="executeSearch()" style="height: 45px;">Search & Continue →</button></div></div></div></div>
         </div>
         <div id="view-workspace-screen" class="view-screen">
-          <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;"><button class="btn btn-sm" onclick="returnToSearchScreen()" style="background: var(--text-muted);">&larr; Back to Search Lookup</button><span id="active-patient-badge" class="meta-tag" style="font-size: 13px;">Active Patient: None</span><button class="btn btn-sm" onclick="confirmTimeOut()" style="background: #0f6244;">Confirm Time & Complete Session</button></div>
-          <div class="panel"><div class="panel-header">Extracted Patient Profile Breakdown & Medical Indicators</div><div class="panel-body"><div class="patient-details-grid"><div><span class="label">Full Name:</span><span class="value">—</span></div><div><span class="label">File ID / MR:</span><span class="value">—</span></div><div><span class="label">Service Profile:</span><span class="value">—</span></div><div><span class="label">Gender/Blood:</span><span class="value">—</span></div><div><span class="label">System Location:</span><span class="value">—</span></div><div><span class="label">Case Status:</span><span class="value">—</span></div></div><div class="alert-box" id="allergy-alert-box" style="margin-bottom:12px; display:none;"></div><div class="alert-box" id="complications-alert-box" style="margin-bottom:12px; display:none;"></div><div class="flex-row-inputs" style="border-top: 1px dashed var(--border); padding-top: 12px; margin-bottom: 0;"><div><label class="label" style="font-weight: 700; color: var(--green-med); font-size: 11px;">⏰ Patient Time In</label><input type="text" id="patient-time-in" readonly style="background:#f3f4f6; color:#374151;" /></div><div><label class="label" style="font-weight: 700; color: var(--green-med); font-size: 11px;">⏰ Patient Time Out</label><input type="text" id="patient-time-out" readonly style="background:#f3f4f6; color:#374151;" /></div></div></div></div>
-          <div class="panel"><div class="panel-header">Procedures Management — Select All Performed</div><div class="panel-body">
-            <input class="diag-search-box" id="proc-search" placeholder="🔍 Search procedures..." onkeyup="renderProcCheckboxes(this.value)">
-            <div class="proc-legend"><span class="tooth-flag">🦷 teeth</span> marks a tooth-specific procedure — ticking one opens its own tooth chart once, and each procedure's teeth are saved separately. Reopen any chart from the Procedure Charts list below.</div>
-            <div id="proc-checkbox-container"></div>
-            <div id="chart-summary-host"></div>
-            <div id="chart-modal-host"></div>
-            <div class="diag-action-row"><span class="diag-selected-count" id="proc-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearProcSelections()">Clear All</button><button class="btn btn-sm" onclick="saveProcSelections()">💾 Save Procedures</button></div></div>
-            <div id="proc-empty-hint" class="proc-empty-hint">Tick one or more procedures above to open the record tabs for this session.</div>
-          </div></div>
-          <div id="step-3-container" class="reveal-section">
-            <div class="tab-bar">
-              <button class="tab-button" onclick="switchSubTab(event, 'subtab-diagnosis')">Diagnosis</button>
-              <button class="tab-button active" onclick="switchSubTab(event, 'subtab-investigations')">Investigations</button>
-              <button class="tab-button" onclick="switchSubTab(event, 'subtab-patient-records')">Patient Records</button>
-              <button class="tab-button" onclick="switchSubTab(event, 'subtab-materials')">Materials Used</button>
-              <button class="tab-button" onclick="switchSubTab(event, 'subtab-pharmacy')">Pharmacy Dispensing</button>
-              <button class="tab-button" onclick="switchSubTab(event, 'subtab-lab')">Lab</button>
-              <button class="tab-button" onclick="switchSubTab(event, 'subtab-notes')">Clinical Notes</button>
-              <button class="tab-button" onclick="switchSubTab(event, 'subtab-records')">Medical Record</button>
+          <div class="ws-header">
+            <div class="ws-topbar">
+              <button class="btn btn-sm" onclick="returnToSearchScreen()" style="background: var(--text-muted); flex-shrink:0;">&larr; Back</button>
+              <div class="ws-ident">
+                <div class="ws-name" id="ws-name">—</div>
+                <div class="ws-meta">
+                  <span id="ws-mr">—</span><span class="ws-dot">·</span>
+                  <span id="ws-room">—</span><span class="ws-dot">·</span>
+                  <span id="ws-status">—</span>
+                </div>
+              </div>
+              <div class="ws-times">
+                <label for="patient-time-in">⏰ In</label>
+                <input type="text" id="patient-time-in" readonly />
+                <label for="patient-time-out">Out</label>
+                <input type="text" id="patient-time-out" readonly />
+              </div>
+              <button class="ws-expand" id="ws-expand-btn" aria-expanded="false" title="Show more patient details" onclick="toggleWorkspaceDetails()">▾</button>
             </div>
+            <div class="ws-details" id="ws-details" hidden>
+              <div><span class="label">Service Profile</span><span class="value" id="ws-service">—</span></div>
+              <div><span class="label">Gender / Blood</span><span class="value" id="ws-genderblood">—</span></div>
+              <div><span class="label">File ID</span><span class="value" id="ws-file">—</span></div>
+            </div>
+            <!-- Allergy stays inside the pinned header on purpose: it used to sit
+                 in a panel that scrolled away the moment work began. -->
+            <div class="alert-box" id="allergy-alert-box" style="margin-bottom:10px; display:none;"></div>
+            <div class="alert-box" id="complications-alert-box" style="margin-bottom:10px; display:none;"></div>
+            <div class="tab-bar">
+              <button class="tab-button active" data-tab="subtab-procedures" onclick="switchSubTab(event, 'subtab-procedures')">Procedures</button>
+              <button class="tab-button" data-tab="subtab-diagnosis" data-gated onclick="switchSubTab(event, 'subtab-diagnosis')">Diagnosis</button>
+              <button class="tab-button" data-tab="subtab-investigations" data-gated onclick="switchSubTab(event, 'subtab-investigations')">Investigations</button>
+              <button class="tab-button" data-tab="subtab-patient-records" data-gated onclick="switchSubTab(event, 'subtab-patient-records')">Patient Records</button>
+              <button class="tab-button" data-tab="subtab-materials" data-gated onclick="switchSubTab(event, 'subtab-materials')">Materials Used</button>
+              <button class="tab-button" data-tab="subtab-pharmacy" data-gated onclick="switchSubTab(event, 'subtab-pharmacy')">Pharmacy Dispensing</button>
+              <button class="tab-button" data-tab="subtab-lab" data-gated onclick="switchSubTab(event, 'subtab-lab')">Lab</button>
+              <button class="tab-button" data-tab="subtab-notes" data-gated onclick="switchSubTab(event, 'subtab-notes')">Clinical Notes</button>
+              <button class="tab-button" data-tab="subtab-records" data-gated onclick="switchSubTab(event, 'subtab-records')">Medical Record</button>
+            </div>
+          </div>
+
+          <div id="proc-empty-hint" class="proc-empty-hint">Tick one or more procedures below to unlock the record tabs for this session.</div>
+
+          <div id="step-3-container">
+            <div id="subtab-procedures" class="tab-content active"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Procedures Management — Select All Performed</div><div class="panel-body">
+              <input class="diag-search-box" id="proc-search" placeholder="🔍 Search procedures..." onkeyup="renderProcCheckboxes(this.value)">
+              <div class="proc-legend"><span class="tooth-flag">🦷 teeth</span> marks a tooth-specific procedure — ticking one opens its own tooth chart once, and each procedure's teeth are saved separately. Reopen any chart from the Procedure Charts list below.</div>
+              <div id="proc-checkbox-container"></div>
+              <div id="chart-summary-host"></div>
+              <div class="diag-action-row"><span class="diag-selected-count" id="proc-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearProcSelections()">Clear All</button><button class="btn btn-sm" onclick="saveProcSelections()">💾 Save Procedures</button></div></div>
+            </div></div></div>
             <div id="subtab-diagnosis" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Orthodontic Diagnosis — Select all applicable findings</div><div class="panel-body"><input class="diag-search-box" id="diag-search" placeholder="🔍 Search diagnosis items..." onkeyup="renderDiagCheckboxes(this.value)"><div id="diag-checkbox-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="diag-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearDiagSelections()">Clear All</button><button class="btn btn-sm" onclick="saveDiagSelections()">💾 Save Diagnosis</button></div></div></div></div></div>
-            <div id="subtab-investigations" class="tab-content active"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Investigations — Select all that apply</div><div class="panel-body"><input class="diag-search-box" id="inv-search" placeholder="🔍 Search investigations..." onkeyup="renderInvCheckboxes(this.value)"><div id="inv-checkbox-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="inv-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearInvSelections()">Clear All</button><button class="btn btn-sm" onclick="saveInvSelections()">💾 Save Investigations</button></div></div></div></div></div>
+            <div id="subtab-investigations" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Investigations — Select all that apply</div><div class="panel-body"><input class="diag-search-box" id="inv-search" placeholder="🔍 Search investigations..." onkeyup="renderInvCheckboxes(this.value)"><div id="inv-checkbox-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="inv-count">0 selected</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="clearInvSelections()">Clear All</button><button class="btn btn-sm" onclick="saveInvSelections()">💾 Save Investigations</button></div></div></div></div></div>
             <div id="subtab-patient-records" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Patient Records — Upload and view patient files</div><div class="panel-body"><div id="patient-records-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="records-count">0 attached</span><div class="action-group"><span style="font-size:12px; color:var(--text-muted);">Files are held for this session; the filename and date are saved with the record.</span></div></div></div></div></div>
             <div id="subtab-materials" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Materials Used — Auto-populated from selected procedures</div><div class="panel-body"><div class="alert-box" style="background: var(--green-soft); border-color: var(--green-med); margin-bottom: 16px; color: var(--green-dark);"><strong>ℹ️ AUTO-UPDATE:</strong> Selecting procedures in the Procedures tab automatically flags the materials those procedures consume (marked <span class="mat-badge">auto</span>). Every row's quantity and unit can be edited, any row can be removed, and you can add your own materials below.</div><div class="mat-add-row"><div class="mat-add-field grow"><label for="mat-add-name">Add material</label><input type="text" id="mat-add-name" placeholder="e.g. Bracket removal plier tips" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomMaterial();}"></div><div class="mat-add-field"><label for="mat-add-category">Category</label><select id="mat-add-category"></select></div><div class="mat-add-field"><label for="mat-add-qty">Qty</label><input type="text" inputmode="numeric" id="mat-add-qty" value="1" style="width:70px; text-align:center;"></div><div class="mat-add-field"><label for="mat-add-unit">Unit</label><input type="text" id="mat-add-unit" placeholder="pcs" style="width:80px; text-align:center;"></div><button class="btn btn-sm" onclick="addCustomMaterial()">＋ Add</button></div><div id="materials-restore-host"></div><div id="materials-container"></div><div class="diag-action-row"><span class="diag-selected-count" id="materials-count">0 items</span><div class="action-group"><button class="btn btn-sm btn-danger" onclick="resetMaterialsTable()">Reset Table</button><button class="btn btn-sm" onclick="saveMaterials()">💾 Save Materials</button></div></div></div></div></div>
             <div id="subtab-pharmacy" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Pharmacy Dispensing Log</div><div class="panel-body"><div class="flex-row-inputs"><input type="text" id="pharmacy-input" placeholder="Medication..." style="flex:1;" /><input type="text" id="pharmacy-dose" placeholder="Dose (e.g. 500mg)" style="width:120px;" /><input type="text" id="pharmacy-freq" placeholder="Frequency" style="width:150px;" /><button class="btn btn-sm" style="height: 45px;" onclick="addPharmacyItem()">+ Add</button></div><table><thead><tr><th>Medication</th><th>Dose</th><th>Frequency</th><th style="width:80px; text-align:right;">Action</th></tr></thead><tbody id="pharmacy-log-list"></tbody></table></div></div></div>
@@ -621,6 +691,15 @@
             <div id="subtab-notes" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Ongoing Clinical Notes</div><div class="panel-body"><div class="form-group"><label style="font-weight: 700; color: var(--text-dark);">Clinical Notes & Observations</label><textarea id="clinical-notes-textarea" rows="4" placeholder="Document case observations..."></textarea><div style="text-align:right; margin-top:8px;"><button class="btn btn-sm" onclick="saveClinicalNotes()">💾 Save Notes</button></div></div><div class="form-group" style="margin-top: 16px;"><label style="font-weight: 700; color: var(--red);">⚠️ COMPLICATIONS / ADVERSE EVENTS</label><input type="text" id="complications-input" placeholder="Enter any complications or adverse events..." oninput="updateComplicationsAlert()" /><div style="text-align:right; margin-top:8px;"><button class="btn btn-sm" onclick="saveComplications()">💾 Save Complications</button></div></div><div class="alert-box" id="complications-alert-box" style="margin-bottom:12px; display:none;"></div><div style="text-align: center; margin-bottom: 12px;"><button id="transcribe-btn" style="background: var(--green-light); color: var(--green-dark); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">🎤 Transcribe</button></div><div style="text-align: center;"><button class="btn" onclick="compileMasterSummary()">📋 Use Template & Compile Master Summary Report</button></div></div></div></div>
             <div id="subtab-records" class="tab-content"><div class="panel" style="margin-bottom:0;"><div class="panel-header">Comprehensive Medical History & Allergies Sheet</div><div class="panel-body"><div class="form-group"><label style="color:var(--red); font-weight:700;">🚨 SYSTEM LEVEL DETECTED ALLERGIES</label><input type="text" id="record-allergy-input" placeholder="e.g. Penicillin, Latex, None..." onchange="updatePatientMedicalRecord()" /></div><div class="form-group" style="margin-top:16px;"><label>Structural Baseline Diagnostic History</label><textarea id="record-diagnostic-history" rows="4" placeholder="Enter diagnostic history..." onchange="updatePatientMedicalRecord()"></textarea></div><div class="form-group"><label>Systemic Status Records</label><textarea id="record-systemic-status" rows="4" placeholder="Enter systemic status..." onchange="updatePatientMedicalRecord()"></textarea></div><div style="text-align: right; margin-top: 12px;"><button class="btn btn-sm" onclick="saveMedicalRecordChanges()">💾 Save Changes</button></div></div></div></div>
             <div id="master-summary-injection-point"></div>
+          </div>
+
+          <!-- Outside the tab panels: the tooth chart must survive a tab switch,
+               and it would be clipped if it stayed inside the procedures panel. -->
+          <div id="chart-modal-host"></div>
+
+          <div class="ws-footer">
+            <span id="active-patient-badge" class="meta-tag" style="font-size:13px; margin-right:auto;">Active Patient: None</span>
+            <button class="btn btn-sm" onclick="confirmTimeOut()" style="background:#0f6244;">Confirm Time &amp; Complete Session</button>
           </div>
         </div>
       `;
@@ -630,7 +709,10 @@
     function repaintLeaveLog() { const body = document.getElementById('leave-log-body'); if (body) body.innerHTML = buildLeaveLogRows(); }
     function renderLeave() { const rows = buildLeaveLogRows(); const today = new Date(); const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`; return `<div class="dashboard-title-row"><h1>Leave Requests & Rotations</h1><div class="meta-tag">${currentDoctorName() || 'Clinical Staff'}</div></div><div class="panel"><div class="panel-header">My Leave Requests — ${currentDoctorName() || 'You'}</div><div class="panel-body" style="padding:0;"><table><thead><tr><th>Date Range</th><th>Type</th><th>Covering For Me</th><th>Reason / Log</th><th>Status</th></tr></thead><tbody id="leave-log-body">${rows}</tbody></table></div></div><div class="panel"><div class="panel-header">Submit Leave Request to HOD</div><div class="panel-body"><form onsubmit="handleLeaveSubmit(event)"><div style="display:flex; gap:16px; flex-wrap:wrap;"><div class="form-group" style="flex:1; min-width:180px;"><label class="label" for="leave-start-date">Start Date</label><input type="date" id="leave-start-date" min="${isoToday}" value="${isoToday}" required /></div><div class="form-group" style="flex:1; min-width:180px;"><label class="label" for="leave-end-date">End Date</label><input type="date" id="leave-end-date" min="${isoToday}" value="${isoToday}" required /></div><div class="form-group" style="flex:1; min-width:180px;"><label class="label" for="leave-type">Leave Type</label><select id="leave-type" required><option value="Casual Leave">Casual Leave</option><option value="Annual Leave">Annual Leave</option><option value="Medical Allocation">Medical Allocation</option></select></div></div><div class="form-group"><label class="label" for="leave-coverage-officer">Relief Officer</label><input type="text" id="leave-coverage-officer" placeholder="e.g. Maj. T. Farooq" required /></div><div class="form-group"><label class="label" for="leave-reason">Reason for Leave</label><textarea id="leave-reason" rows="3" placeholder="Specify context or justification for the HOD..." required></textarea></div><button type="submit" class="btn">Submit Request to HOD</button></form></div></div>`; }
 
-    function switchSubTab(event, targetTabId) { document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active')); document.getElementById(targetTabId).classList.add('active'); event.currentTarget.classList.add('active'); }
+    function switchSubTab(event, targetTabId) {
+      if (event?.currentTarget?.classList.contains('is-locked')) return;
+      switchSubTabById(targetTabId);
+    }
 
     window.handleLeaveSubmit = async function(event) { event.preventDefault(); const submitBtn = event.target.querySelector('button[type="submit"]'); const start = document.getElementById('leave-start-date').value; const end = document.getElementById('leave-end-date').value; const officer = document.getElementById('leave-coverage-officer').value.trim(); const reason = document.getElementById('leave-reason').value.trim(); if (!start || !end || !officer || !reason) { await uiAlert('Please complete all leave fields.', { title: 'Incomplete Request', tone: 'warn' }); return; } const today = new Date(); const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`; if (start < isoToday) { await uiAlert(`Start date ${start} has already passed. Leave must be applied for from ${isoToday} onwards.`, { title: 'Invalid Start Date', tone: 'warn' }); return; } if (end < start) { await uiAlert('End date must be on or after the start date.', { title: 'Invalid Date Range', tone: 'warn' }); return; } const leaveType = document.getElementById('leave-type')?.value || 'Casual Leave'; if (submitBtn) { submitBtn.disabled = true; submitBtn.innerText = 'Submitting…'; } try { await api.post('/leaves/', { leave_type: leaveType, coverage_officer: officer, reason, start_date: start, end_date: end }); await refreshMyLeaves(); showDoctorToast('Leave request sent to the HOD.'); switchView('leave'); } catch (err) { if (submitBtn) { submitBtn.disabled = false; submitBtn.innerText = 'Submit Request to HOD'; } await uiError(err.message || 'Error submitting leave request'); } };
 
@@ -654,6 +736,55 @@
     function updateComplicationsAlert() { const complicationsInput = document.getElementById('complications-input'); const complicationsBox = document.getElementById('complications-alert-box'); if (complicationsBox && complicationsInput) { const complicationsText = complicationsInput.value.trim(); if (complicationsText !== "") { complicationsBox.innerHTML = `<strong>⚠️ COMPLICATIONS / ADVERSE EVENTS:</strong> ${complicationsText}`; complicationsBox.style.display = 'block'; } else { complicationsBox.style.display = 'none'; } } }
     function updatePatientMedicalRecord() { if (!currentPatient) return; const newAllergies = document.getElementById('record-allergy-input')?.value.trim() || ""; const newDiagHistory = document.getElementById('record-diagnostic-history')?.value.trim() || ""; const newSystemic = document.getElementById('record-systemic-status')?.value.trim() || ""; currentPatient.allergies = newAllergies; currentPatient.diagnostic_history = newDiagHistory; currentPatient.systemic_status = newSystemic; updateAllergyAlertBox(newAllergies); }
     async function saveMedicalRecordChanges() { if (!currentPatient) { await uiAlert('No patient record is open.', { title: 'Nothing To Save', tone: 'warn' }); return; } updatePatientMedicalRecord(); try { const updated = await api.put(`/patients/${currentPatient.id}`, { mr_number: currentPatient.mr_number, file_number: currentPatient.file_number, full_name: currentPatient.full_name, rank: currentPatient.rank, cnic: currentPatient.cnic, gender: currentPatient.gender, blood_group: currentPatient.blood_group, service_profile: currentPatient.service_profile, allergies: currentPatient.allergies || null, diagnostic_history: currentPatient.diagnostic_history || null, systemic_status: currentPatient.systemic_status || null, room: currentPatient.room, assigned_doctor: currentPatient.assigned_doctor, procedure_category: currentPatient.procedure_category }); currentPatient = updated; const cachedIdx = (cachedPatients || []).findIndex(p => p.id === updated.id); if (cachedIdx !== -1) cachedPatients[cachedIdx] = updated; showDoctorToast('Medical record saved.'); } catch (err) { await uiError(err.message || 'Unable to save medical record'); } }
+    // ── Workspace header ───────────────────────────────────────────────────
+    const STATUS_COLOURS = { COMPLETED: '#0369a1', ACTIVE: '#15803d', WAITING: '#92400e' };
+
+    function setWorkspaceStatus(status) {
+      const el = document.getElementById('ws-status');
+      if (!el) return;
+      const st = (status || 'WAITING').toString().toUpperCase();
+      el.innerHTML = `<span style="color:${STATUS_COLOURS[st] || '#92400e'}; font-weight:800;">${st}</span>`;
+    }
+
+    function renderWorkspaceIdentity(patient) {
+      const set = (id, text) => { const el = document.getElementById(id); if (el) el.innerText = text; };
+      set('ws-name', patient.full_name || '—');
+      set('ws-mr', patient.mr_number || '—');
+      set('ws-room', patient.room || '—');
+      set('ws-service', patient.service_profile || '—');
+      set('ws-genderblood', `${patient.gender || '—'} / ${patient.blood_group || '—'}`);
+      set('ws-file', patient.file_number || '—');
+      setWorkspaceStatus(patient.status);
+    }
+
+    function toggleWorkspaceDetails() {
+      const panel = document.getElementById('ws-details');
+      const btn = document.getElementById('ws-expand-btn');
+      if (!panel || !btn) return;
+      const open = panel.hasAttribute('hidden');
+      if (open) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', '');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    // Record tabs are gated on having at least one procedure ticked. They used
+    // to be hidden wholesale, which left no clue they existed at all.
+    function setRecordTabsUnlocked(unlocked) {
+      document.querySelectorAll('.tab-button[data-gated]').forEach(btn => {
+        btn.classList.toggle('is-locked', !unlocked);
+        btn.title = unlocked ? '' : 'Tick a procedure first to unlock this tab';
+      });
+      if (!unlocked) switchSubTabById('subtab-procedures');
+    }
+
+    function switchSubTabById(targetTabId) {
+      const btn = document.querySelector(`.tab-button[data-tab="${targetTabId}"]`);
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+      const panel = document.getElementById(targetTabId);
+      if (panel) panel.classList.add('active');
+      if (btn) btn.classList.add('active');
+    }
+
     function returnToSearchScreen() { document.getElementById('view-workspace-screen').classList.remove('active'); document.getElementById('view-search-screen').classList.add('active'); const searchInput = document.getElementById('patient-search-input'); if (searchInput) searchInput.focus(); }
 
     // ---------------------------------------------------------------------
@@ -689,8 +820,9 @@
       applyPresetPharmacy(presets);
       applyPresetDiagnostics(presets);
       applyPresetNotes(chosen, presets);
-      const step3Container = document.getElementById('step-3-container');
-      if (step3Container) step3Container.style.display = chosen.length ? 'block' : 'none';
+      // The procedures panel is itself a tab now, so the container always shows;
+      // only the downstream record tabs are gated.
+      setRecordTabsUnlocked(chosen.length > 0);
       const hint = document.getElementById('proc-empty-hint');
       if (hint) hint.style.display = chosen.length ? 'none' : 'block';
     }
@@ -880,8 +1012,7 @@
         currentPatient = updated;
         const updatedTimeOut = updated.check_out_time ? new Date(updated.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
         timeOutInput.value = updatedTimeOut;
-        const statusCells = document.querySelectorAll('#view-workspace-screen .value');
-        if (statusCells[5]) statusCells[5].innerHTML = '<span style="color:#0369a1; font-weight:800;">COMPLETED</span>';
+        setWorkspaceStatus('COMPLETED');
         const cachedIdx = (cachedPatients || []).findIndex(p => p.id === updated.id);
         if (cachedIdx !== -1) cachedPatients[cachedIdx] = updated;
         compileMasterSummary();
@@ -1623,6 +1754,7 @@
       removedMaterials.clear(); customMaterials = []; activePharmacy = []; autoNotesText = '';
       const notesEl = document.getElementById('clinical-notes-textarea'); if (notesEl) notesEl.value = '';
       const procHint = document.getElementById('proc-empty-hint'); if (procHint) procHint.style.display = 'block';
+      setRecordTabsUnlocked(false);
       renderChartHost(); renderPharmacyList();
       Object.values(patientRecordFiles).forEach(f => { if (f.url) URL.revokeObjectURL(f.url); }); patientRecordFiles = {};
       const complications = document.getElementById('complications-input'); if (complications) complications.value = ''; updateComplicationsAlert();
