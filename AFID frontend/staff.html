@@ -1006,10 +1006,21 @@
   function handleServiceProfileChange(val) {
     const paRow = document.getElementById('pa-number-row');
     const paInput = document.getElementById('p-pa');
-    if (!paRow || !paInput) return;
 
     // Civilian profiles do NOT require PA number; ALL army categories do.
     const isCivilian = val.startsWith('Civilian');
+
+    // Rank follows the same rule -- a civilian patient has none, and leaving the
+    // box visible invited someone to retype the name into it.
+    const rankRow = document.getElementById('rank-row');
+    const rankInput = document.getElementById('p-rank');
+    if (rankRow && rankInput) {
+      const showRank = Boolean(val) && !isCivilian;
+      rankRow.style.display = showRank ? 'block' : 'none';
+      if (!showRank) rankInput.value = '';
+    }
+
+    if (!paRow || !paInput) return;
 
     if (val && !isCivilian) {
       paRow.style.display = 'block';
@@ -1050,8 +1061,35 @@
               </div>
 
               <div class="form-row form-row-full">
-                <label>Full Name / Rank</label>
-                <input type="text" id="p-name" value="" placeholder="e.g. Lt. Col. Sara Khan" required />
+                <label>Full Name</label>
+                <input type="text" id="p-name" value="" placeholder="e.g. Sara Khan" required />
+              </div>
+
+              <!-- Rank used to share the name box, and the whole "Lt. Col. Sara
+                   Khan" string was written to BOTH columns. Hidden for civilians,
+                   the same way the PA Number row is. -->
+              <div class="form-row" id="rank-row" style="display: none;">
+                <label>Rank</label>
+                <input type="text" id="p-rank" value="" placeholder="e.g. Lt. Col." list="rank-suggestions" />
+                <datalist id="rank-suggestions">
+                  <option value="Sepoy"></option>
+                  <option value="Lance Naik"></option>
+                  <option value="Naik"></option>
+                  <option value="Havildar"></option>
+                  <option value="Naib Subedar"></option>
+                  <option value="Subedar"></option>
+                  <option value="Subedar Major"></option>
+                  <option value="2nd Lt."></option>
+                  <option value="Lt."></option>
+                  <option value="Capt."></option>
+                  <option value="Maj."></option>
+                  <option value="Lt. Col."></option>
+                  <option value="Col."></option>
+                  <option value="Brig."></option>
+                  <option value="Maj. Gen."></option>
+                  <option value="Lt. Gen."></option>
+                  <option value="Gen."></option>
+                </datalist>
               </div>
 
               <div class="form-row">
@@ -1463,6 +1501,7 @@
     const serviceProfile = val('p-service-profile');
     const isCivilian = serviceProfile.startsWith('Civilian');
     const paNumber = !isCivilian ? val('p-pa') : null;
+    const rank = !isCivilian ? val('p-rank') : '';
     const allergies = val('p-allergies');
     const rotation = val('p-procedure');
     const doctor = val('p-doctor');
@@ -1478,7 +1517,10 @@
         file_number: file,
         full_name: name,
         cnic: cnic,
-        rank: name,
+        // Was `rank: name`, which stored the patient's full name in the rank
+        // column for every record -- filtering by rank only ever "worked"
+        // because names happened to start with "Maj."/"Capt.".
+        rank: rank || null,
         pa_number: paNumber,
         gender,
         blood_group: bloodGroup,
@@ -1565,7 +1607,7 @@
       refreshedForPage = pageId;
       refreshDoctorData().finally(() => {
         const stillHere = document.querySelector('.nav-btn.active')?.dataset.page === pageId;
-        const typed = ['p-mr', 'p-file', 'p-name', 'p-cnic', 'p-pa']
+        const typed = ['p-mr', 'p-file', 'p-name', 'p-rank', 'p-cnic', 'p-pa']
           .some(id => (document.getElementById(id)?.value || '').trim() !== '');
         if (stillHere && !typed) switchView(pageId);
       });
