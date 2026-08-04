@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # Import models so SQLAlchemy registers them before create_all
 import models  # noqa: F401
 
-from routers import auth, patients, doctors, procedures, leaves, staff, hod, presets, procedure_analytics
+from routers import auth, patients, doctors, procedures, leaves, staff, hod, presets, procedure_analytics, lab
 from routers import upload as upload_router  # noqa: E402
 
 # ── Create tables ─────────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ app = FastAPI(
 # Rewriting the path in the ASGI scope resolves both spellings to the same
 # endpoint with no redirect at all.
 _COLLECTION_PATHS = frozenset({
-    "/patients", "/procedures", "/leaves", "/staff", "/presets",
+    "/patients", "/procedures", "/leaves", "/staff", "/presets", "/lab", "/upload",
 })
 
 
@@ -116,6 +116,7 @@ app.include_router(staff.router)
 app.include_router(hod.router)
 app.include_router(presets.router)
 app.include_router(procedure_analytics.router)
+app.include_router(lab.router)
 app.include_router(upload_router.router)
 
 

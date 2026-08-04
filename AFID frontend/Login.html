@@ -14,20 +14,28 @@
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
   <div class="w-full max-w-5xl bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row">
-    <div class="md:w-1/2 bg-brand relative p-0 min-h-[400px]">
-      <!-- Image covering entire green area -->
-      <img src="clinic-bg.jpg" alt="AFID Dental Clinic" class="absolute inset-0 w-full h-full object-cover">
-      
-      <!-- Dark overlay for text readability -->
-      <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
-      
+    <div class="md:w-1/2 bg-[#141414] relative p-0 min-h-[400px]">
+      <!-- Lateral cephalometric film. object-contain rather than object-cover:
+           this panel stretches to match the form column, which is much taller on
+           the Registration tab, and cover would crop the patient's face out of
+           frame at that aspect. The panel colour matches the film's own backdrop
+           (sampled #101010-#2a2a2a), so the letterboxing reads as part of it. -->
+      <img src="clinic-bg.jpeg" alt="Lateral cephalometric radiograph"
+           class="absolute inset-0 w-full h-full object-contain">
+
+      <!-- Scrim behind the heading only. The previous full-panel black gradient
+           was tuned for a bright clinic photo; over a radiograph it darkened an
+           already near-black image without adding any text contrast. -->
+      <div class="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/80 to-transparent"></div>
+
       <!-- Heading positioned at bottom left -->
       <div class="absolute bottom-0 left-0 p-8 text-white">
         <h1 class="text-4xl font-bold tracking-tight drop-shadow-lg">AFID HMS</h1>
         <p class="text-green-200 text-sm mt-1 drop-shadow-md">Hospital Management System</p>
       </div>
     </div>
-    <div class="md:w-1/2">
+    <div class="md:w-1/2 relative">
+      
       <div class="flex border-b border-gray-200">
       <button id="btn-login" onclick="switchMode('login')" class="flex-1 py-4 font-bold text-brand border-b-2 border-brand transition">Log In</button>
       <button id="btn-register" onclick="switchMode('register')" class="flex-1 py-4 font-bold text-gray-400 hover:text-gray-600 transition">Registration</button>

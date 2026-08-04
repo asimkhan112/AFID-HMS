@@ -6,7 +6,7 @@ Pydantic schemas for request/response validation.
 from datetime import datetime, date
 from typing import Optional, List
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 import models
 
 
@@ -56,6 +56,11 @@ class PatientBase(BaseModel):
     blood_group: Optional[str] = None
     service_profile: Optional[str] = None
     allergies: Optional[str] = None
+    # The doctor portal's Medical Record tab has always sent these two, but they
+    # existed on neither the model nor this schema, so "Medical record saved."
+    # was a lie -- the values never left the browser.
+    diagnostic_history: Optional[str] = None
+    systemic_status: Optional[str] = None
     room: Optional[str] = None
     assigned_doctor: Optional[str] = None
     procedure_category: Optional[str] = None
@@ -173,7 +178,12 @@ class ProcedureBase(BaseModel):
 
 
 class ProcedureCreate(ProcedureBase):
-    pass
+    # The doctor portal has always POSTed duration_minutes, but it was absent from
+    # this schema -- Pydantic dropped it silently, so every doctor-completed
+    # procedure stored duration_minutes = NULL and was invisible to the HOD timing
+    # reports, which filter on duration_minutes IS NOT NULL.
+    duration_minutes: Optional[int] = None
+    complications: Optional[str] = None
 
 
 class ProcedureOut(ProcedureBase):
@@ -188,6 +198,8 @@ class ProcedureOut(ProcedureBase):
     # by the model_rebuild() at the end of this module.
     id: int
     session_date: datetime
+    duration_minutes: Optional[int] = None
+    complications: Optional[str] = None
     patient: Optional[PatientOut] = None
     doctor: Optional[UserOut] = None
     checklist: List["ChecklistItemOut"] = []
@@ -195,6 +207,11 @@ class ProcedureOut(ProcedureBase):
     pharmacy: List["PharmacyOut"] = []
     diagnostics: List["DiagnosticOut"] = []
     notes: List["ClinicalNoteOut"] = []
+    teeth: List["ProcedureToothOut"] = []
+    archwires: List["ProcedureArchwireOut"] = []
+    findings: List["ProcedureDiagnosisOut"] = []
+    investigations: List["ProcedureInvestigationOut"] = []
+    lab_orders: List["LabOrderOut"] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -224,6 +241,7 @@ PatientWithProceduresOut.model_rebuild()
 class ProcedureMaterialIn(BaseModel):
     material_name: str
     quantity: int = 1
+    unit: Optional[str] = None   # free-text unit typed in the Materials Used tab
 
 
 class ProcedureMaterialOut(BaseModel):
@@ -231,6 +249,7 @@ class ProcedureMaterialOut(BaseModel):
     procedure_id: int
     material_name: str
     quantity: int
+    unit: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -240,6 +259,7 @@ class ProcedureMaterialUpdate(BaseModel):
     already-logged material's quantity be corrected in place instead of forcing
     the caller to log a duplicate row for the same item."""
     quantity: int
+    unit: Optional[str] = None
 
 
 MaterialCreate = ProcedureMaterialIn
@@ -534,6 +554,84 @@ class MaterialOut(BaseModel):
     procedure_id: int
     material_name: str
     quantity: int
+    unit: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Structured clinical detail ────────────────────────────────────────────────
+# procedure_id is taken from the URL path in every case, so it is deliberately
+# absent from the *Create schemas (same convention as ClinicalNoteCreate above).
+
+class ProcedureToothCreate(BaseModel):
+    tooth_code: str = Field(..., max_length=4)
+    arch: Optional[str] = Field(None, max_length=10)
+
+
+class ProcedureToothOut(ProcedureToothCreate):
+    id: int
+    procedure_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProcedureArchwireCreate(BaseModel):
+    arch: Optional[str] = None
+    material: Optional[str] = None
+    size: Optional[str] = None
+    date_placed: Optional[date] = None
+
+
+class ProcedureArchwireOut(ProcedureArchwireCreate):
+    id: int
+    procedure_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProcedureDiagnosisCreate(BaseModel):
+    category: Optional[str] = None
+    finding: str
+
+
+class ProcedureDiagnosisOut(ProcedureDiagnosisCreate):
+    id: int
+    procedure_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProcedureInvestigationCreate(BaseModel):
+    category: Optional[str] = None
+    investigation: str
+
+
+class ProcedureInvestigationOut(ProcedureInvestigationCreate):
+    id: int
+    procedure_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LabOrderCreate(BaseModel):
+    patient_id: int
+    procedure_id: Optional[int] = None
+    appliance_ordered: str
+    date_of_insertion: Optional[date] = None
+
+
+class LabOrderUpdate(BaseModel):
+    appliance_ordered: Optional[str] = None
+    date_of_insertion: Optional[date] = None
+
+
+class LabOrderOut(BaseModel):
+    id: int
+    patient_id: int
+    procedure_id: Optional[int] = None
+    appliance_ordered: str
+    date_of_insertion: Optional[date] = None
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -33,7 +33,7 @@ const PAGES = [
   'staff.html',
   'orthodontic-diagnosis.html',
 ];
-const ASSETS = ['api.js', 'clinic-bg.jpg'];
+const ASSETS = ['api.js', 'clinic-bg.jpeg', 'afid-logo.png', 'afid-main-logo.jpeg'];
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });

@@ -21,8 +21,12 @@
     body { display: flex; height: 100vh; width: 100%; max-width: 100%; background-color: var(--bg-main); color: var(--text-dark); overflow: hidden; overflow-x: hidden; }
 
     .sidebar { width: 260px; background: var(--green-dark); color: white; display: flex; flex-direction: column; justify-content: space-between; }
-    .sidebar-header { padding: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-header { padding: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 12px; }
     .sidebar-header h2 { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+    /* The crest ships as a JPEG -- a green disc on an opaque black square. The
+       disc is inscribed edge-to-edge, so a 50% radius clips the black corners
+       exactly and leaves no halo against the sidebar. */
+    .sidebar-logo { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; flex-shrink: 0; display: block; }
     .nav-group { flex: 1; padding: 20px 12px; display: flex; flex-direction: column; gap: 8px; }
     .nav-item { background: none; border: none; color: #a3b8b0; padding: 12px 16px; text-align: left; font-size: 14px; font-weight: 500; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
     .nav-item:hover, .nav-item.active { background: var(--green-med); color: white; }
@@ -31,6 +35,9 @@
 
     .main-viewport { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
     .content-container { padding: 32px; max-width: 1200px; width: 100%; margin: 0 auto; }
+    /* Institute mark. Already covered by the @media print hide-list below. */
+    .afid-header { display: flex; justify-content: flex-end; align-items: center; padding: 14px 32px 0; flex-shrink: 0; }
+    .afid-logo { height: 52px; width: auto; object-fit: contain; flex-shrink: 0; user-select: none; }
 
     .dashboard-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 2px solid var(--border); padding-bottom: 12px; }
     .dashboard-title-row h1 { font-size: 24px; color: var(--green-dark); font-weight: 700; }
@@ -239,6 +246,7 @@
   <div class="sidebar">
     <div>
       <div class="sidebar-header">
+        <img src="afid-main-logo.jpeg" alt="Army Dental Corps" class="sidebar-logo">
         <h2>Clinical Portal</h2>
       </div>
       <div class="nav-group" id="nav-container">
@@ -253,6 +261,9 @@
 
   <script src="api.js"></script>
   <div class="main-viewport">
+    <div class="afid-header">
+      <img src="afid-logo.png" alt="Armed Forces Institute of Dentistry, Rawalpindi" class="afid-logo">
+    </div>
     <div class="content-container" id="main-root">
     </div>
   </div>

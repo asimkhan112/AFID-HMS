@@ -19,6 +19,11 @@ leave_requests      – leave applications submitted by users
 patient_timeline    – ordered procedure steps for HOD timeline view
 operatory_rooms     – live room status tracked by HOD
 procedure_presets   – predefined procedure templates with materials, pharmacy, diagnostics
+procedure_teeth     – teeth treated per procedure (FDI notation)
+procedure_archwires – archwire placed per procedure
+procedure_diagnosis – diagnosis findings ticked per procedure
+procedure_investigations – investigations ordered per procedure
+lab_orders          – appliance ordered from the lab + planned insertion date
 """
 
 import enum
@@ -157,6 +162,8 @@ class Patient(Base):
     blood_group      = Column(String(10))
     service_profile  = Column(String(120))
     allergies        = Column(Text)                     # free-text allergy notes
+    diagnostic_history = Column(Text)                   # Medical Record tab -- baseline history
+    systemic_status  = Column(Text)                     # Medical Record tab -- systemic findings
     room             = Column(String(30))
     assigned_doctor  = Column(String(120))
     procedure_category = Column(String(120))
@@ -169,6 +176,7 @@ class Patient(Base):
     procedures       = relationship("Procedure", back_populates="patient")
     timeline_steps   = relationship("PatientTimelineStep", back_populates="patient")
     documents        = relationship("PatientDocument", back_populates="patient", cascade="all, delete-orphan")
+    lab_orders       = relationship("LabOrder", back_populates="patient", cascade="all, delete-orphan")
 
 
 # ── Procedure Presets ────────────────────────────────────────────────────────
@@ -238,6 +246,7 @@ class Procedure(Base):
     start_time       = Column(DateTime, nullable=True)       # when the doctor began the procedure
     end_time         = Column(DateTime, nullable=True)       # when the procedure was completed
     duration_minutes = Column(Integer, nullable=True)        # calculated duration in minutes
+    complications    = Column(Text, nullable=True)           # adverse events flagged in Clinical Notes
 
     patient      = relationship("Patient", back_populates="procedures")
     doctor       = relationship("User", back_populates="procedures")
@@ -247,6 +256,11 @@ class Procedure(Base):
     diagnostics  = relationship("ProcedureDiagnostic", back_populates="procedure", cascade="all, delete-orphan")
     notes        = relationship("ClinicalNote", back_populates="procedure", cascade="all, delete-orphan")
     documents    = relationship("PatientDocument", back_populates="procedure")
+    teeth        = relationship("ProcedureTooth", back_populates="procedure", cascade="all, delete-orphan")
+    archwires    = relationship("ProcedureArchwire", back_populates="procedure", cascade="all, delete-orphan")
+    findings     = relationship("ProcedureDiagnosis", back_populates="procedure", cascade="all, delete-orphan")
+    investigations = relationship("ProcedureInvestigation", back_populates="procedure", cascade="all, delete-orphan")
+    lab_orders   = relationship("LabOrder", back_populates="procedure", cascade="all, delete-orphan")
 
 
 class ProcedureChecklist(Base):
@@ -268,6 +282,7 @@ class ProcedureMaterial(Base):
     procedure_id = Column(Integer, ForeignKey("procedures.id", ondelete="CASCADE"))
     material_name = Column(String(255), nullable=False)
     quantity     = Column(Integer, default=1)
+    unit         = Column(String(40))          # "pcs", "ml", … as typed in the Materials tab
 
     procedure    = relationship("Procedure", back_populates="materials")
 
@@ -293,6 +308,83 @@ class ProcedureDiagnostic(Base):
     urgency      = Column(SAEnum(DiagnosticUrgency), default=DiagnosticUrgency.routine)
 
     procedure    = relationship("Procedure", back_populates="diagnostics")
+
+
+# ── Structured clinical detail ────────────────────────────────────────────────
+# The doctor portal captures all of the below, but until now it could only be
+# written into the free-text clinical note (teeth, archwire, lab, complications)
+# or, worse, into procedure_diagnostics as if a diagnosis finding were an ordered
+# test. None of it was queryable. These tables give each its own home.
+
+class ProcedureTooth(Base):
+    """One tooth treated in a procedure, in FDI notation (Tab 4 tooth chart).
+
+    Charted per procedure: two procedures in the same session keep separate tooth
+    sets, which is why the procedure -- not the session -- is the parent.
+    """
+    __tablename__ = "procedure_teeth"
+    __table_args__ = (UniqueConstraint("procedure_id", "tooth_code", name="uq_procedure_tooth"),)
+
+    id           = Column(Integer, primary_key=True, index=True)
+    procedure_id = Column(Integer, ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False)
+    tooth_code   = Column(String(4), nullable=False)   # FDI: "18".."48"
+    arch         = Column(String(10))                  # "Upper" / "Lower"
+
+    procedure    = relationship("Procedure", back_populates="teeth")
+
+
+class ProcedureArchwire(Base):
+    """Archwire placed during a procedure (Tab 4 archwire panel)."""
+    __tablename__ = "procedure_archwires"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    procedure_id = Column(Integer, ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False)
+    arch         = Column(String(20))     # Upper / Lower / Both
+    material     = Column(String(80))     # Stainless steel, NiTi, Copper NiTi, TMA, …
+    size         = Column(String(60))     # e.g. "0.016 x 0.022"
+    date_placed  = Column(Date, nullable=True)
+
+    procedure    = relationship("Procedure", back_populates="archwires")
+
+
+class ProcedureDiagnosis(Base):
+    """A diagnosis finding ticked in Tab 1 (skeletal, dental, space-related, …)."""
+    __tablename__ = "procedure_diagnosis"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    procedure_id = Column(Integer, ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False)
+    category     = Column(String(120))                  # e.g. "Skeletal Diagnosis — Vertical"
+    finding      = Column(String(255), nullable=False)  # e.g. "Hyperdivergent (open bite tendency)"
+
+    procedure    = relationship("Procedure", back_populates="findings")
+
+
+class ProcedureInvestigation(Base):
+    """An investigation ordered in Tab 2. Distinct from ProcedureDiagnostic, which
+    is the pharmacy-style diagnostic order with an urgency attached."""
+    __tablename__ = "procedure_investigations"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    procedure_id = Column(Integer, ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False)
+    category     = Column(String(120))                  # e.g. "Radiographic"
+    investigation = Column(String(255), nullable=False) # e.g. "Lateral cephalogram"
+
+    procedure    = relationship("Procedure", back_populates="investigations")
+
+
+class LabOrder(Base):
+    """Appliance ordered from the lab, with its planned insertion date (Lab tab)."""
+    __tablename__ = "lab_orders"
+
+    id                = Column(Integer, primary_key=True, index=True)
+    procedure_id      = Column(Integer, ForeignKey("procedures.id", ondelete="CASCADE"), nullable=True)
+    patient_id        = Column(Integer, ForeignKey("patients.id", ondelete="CASCADE"), nullable=False)
+    appliance_ordered = Column(String(255), nullable=False)
+    date_of_insertion = Column(Date, nullable=True)
+    created_at        = Column(DateTime, default=datetime.utcnow)
+
+    procedure = relationship("Procedure", back_populates="lab_orders")
+    patient   = relationship("Patient", back_populates="lab_orders")
 
 
 class ClinicalNote(Base):

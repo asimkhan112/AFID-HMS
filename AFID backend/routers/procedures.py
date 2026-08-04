@@ -173,6 +173,8 @@ def add_material(proc_id: int, payload: schemas.MaterialCreate, db: Session = De
     )
     if existing:
         existing.quantity = data.get("quantity", existing.quantity)
+        if data.get("unit"):
+            existing.unit = data["unit"]
         db.commit()
         db.refresh(existing)
         return existing
@@ -201,6 +203,8 @@ def update_material(
     if payload.quantity < 1:
         raise HTTPException(400, "Quantity must be at least 1")
     item.quantity = payload.quantity
+    if payload.unit is not None:
+        item.unit = payload.unit
     db.commit()
     db.refresh(item)
     return item
@@ -268,6 +272,218 @@ def delete_diagnostic(proc_id: int, item_id: int, db: Session = Depends(get_db),
     ).first()
     if not item:
         raise HTTPException(404, "Diagnostic not found")
+    db.delete(item)
+    db.commit()
+
+
+# ── Teeth treated (FDI tooth chart) ───────────────────────────────────────────
+# Charted per procedure: two procedures in one session keep separate tooth sets.
+def _require_procedure(db: Session, proc_id: int) -> models.Procedure:
+    proc = db.query(models.Procedure).filter(models.Procedure.id == proc_id).first()
+    if not proc:
+        raise HTTPException(404, "Procedure not found")
+    return proc
+
+
+@router.get("/{proc_id}/teeth", response_model=List[schemas.ProcedureToothOut])
+def get_teeth(proc_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    return db.query(models.ProcedureTooth).filter(models.ProcedureTooth.procedure_id == proc_id).all()
+
+
+# Re-charting the same tooth means "still this tooth", not a second row -- the
+# unique constraint on (procedure_id, tooth_code) is enforced here so a repeated
+# save is idempotent rather than a 500 from the database.
+@router.post("/{proc_id}/teeth", response_model=schemas.ProcedureToothOut, status_code=201)
+def add_tooth(proc_id: int, payload: schemas.ProcedureToothCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    _require_procedure(db, proc_id)
+    code = (payload.tooth_code or "").strip()
+    if not code:
+        raise HTTPException(400, "tooth_code is required")
+    existing = db.query(models.ProcedureTooth).filter(
+        models.ProcedureTooth.procedure_id == proc_id,
+        models.ProcedureTooth.tooth_code == code,
+    ).first()
+    if existing:
+        if payload.arch:
+            existing.arch = payload.arch
+        db.commit()
+        db.refresh(existing)
+        return existing
+    item = models.ProcedureTooth(procedure_id=proc_id, tooth_code=code, arch=payload.arch)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.put("/{proc_id}/teeth", response_model=List[schemas.ProcedureToothOut])
+def set_teeth(proc_id: int, payload: List[schemas.ProcedureToothCreate], db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Replace the whole tooth chart for this procedure in one call.
+
+    The chart is edited as a set (tick/untick teeth, then Save Chart), so the
+    client should be able to send the final state rather than diffing it into
+    individual POSTs and DELETEs.
+    """
+    _require_procedure(db, proc_id)
+    db.query(models.ProcedureTooth).filter(models.ProcedureTooth.procedure_id == proc_id).delete()
+    seen: set[str] = set()
+    for entry in payload:
+        code = (entry.tooth_code or "").strip()
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        db.add(models.ProcedureTooth(procedure_id=proc_id, tooth_code=code, arch=entry.arch))
+    db.commit()
+    return db.query(models.ProcedureTooth).filter(models.ProcedureTooth.procedure_id == proc_id).all()
+
+
+@router.delete("/{proc_id}/teeth/{item_id}", status_code=204)
+def delete_tooth(proc_id: int, item_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    item = db.query(models.ProcedureTooth).filter(
+        models.ProcedureTooth.id == item_id,
+        models.ProcedureTooth.procedure_id == proc_id,
+    ).first()
+    if not item:
+        raise HTTPException(404, "Tooth entry not found")
+    db.delete(item)
+    db.commit()
+
+
+# ── Archwire detail ───────────────────────────────────────────────────────────
+@router.get("/{proc_id}/archwire", response_model=List[schemas.ProcedureArchwireOut])
+def get_archwires(proc_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    return db.query(models.ProcedureArchwire).filter(models.ProcedureArchwire.procedure_id == proc_id).all()
+
+
+@router.post("/{proc_id}/archwire", response_model=schemas.ProcedureArchwireOut, status_code=201)
+def add_archwire(proc_id: int, payload: schemas.ProcedureArchwireCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    _require_procedure(db, proc_id)
+    if not any([payload.arch, payload.material, payload.size, payload.date_placed]):
+        raise HTTPException(400, "At least one archwire detail is required")
+    item = models.ProcedureArchwire(procedure_id=proc_id, **payload.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/{proc_id}/archwire/{item_id}", status_code=204)
+def delete_archwire(proc_id: int, item_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    item = db.query(models.ProcedureArchwire).filter(
+        models.ProcedureArchwire.id == item_id,
+        models.ProcedureArchwire.procedure_id == proc_id,
+    ).first()
+    if not item:
+        raise HTTPException(404, "Archwire entry not found")
+    db.delete(item)
+    db.commit()
+
+
+# ── Diagnosis findings (Tab 1) ────────────────────────────────────────────────
+# Distinct from /diagnostics: a diagnosis is a FINDING about the patient, not a
+# test ordered with an urgency. Both used to be written to procedure_diagnostics,
+# which made the two indistinguishable in every report.
+@router.get("/{proc_id}/diagnosis", response_model=List[schemas.ProcedureDiagnosisOut])
+def get_diagnosis(proc_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    return db.query(models.ProcedureDiagnosis).filter(models.ProcedureDiagnosis.procedure_id == proc_id).all()
+
+
+@router.post("/{proc_id}/diagnosis", response_model=schemas.ProcedureDiagnosisOut, status_code=201)
+def add_diagnosis(proc_id: int, payload: schemas.ProcedureDiagnosisCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    _require_procedure(db, proc_id)
+    finding = (payload.finding or "").strip()
+    if not finding:
+        raise HTTPException(400, "finding is required")
+    existing = db.query(models.ProcedureDiagnosis).filter(
+        models.ProcedureDiagnosis.procedure_id == proc_id,
+        models.ProcedureDiagnosis.finding == finding,
+    ).first()
+    if existing:
+        return existing
+    item = models.ProcedureDiagnosis(procedure_id=proc_id, category=payload.category, finding=finding)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.put("/{proc_id}/diagnosis", response_model=List[schemas.ProcedureDiagnosisOut])
+def set_diagnosis(proc_id: int, payload: List[schemas.ProcedureDiagnosisCreate], db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Replace the whole diagnosis selection -- the tab is a checkbox set."""
+    _require_procedure(db, proc_id)
+    db.query(models.ProcedureDiagnosis).filter(models.ProcedureDiagnosis.procedure_id == proc_id).delete()
+    seen: set[str] = set()
+    for entry in payload:
+        finding = (entry.finding or "").strip()
+        if not finding or finding in seen:
+            continue
+        seen.add(finding)
+        db.add(models.ProcedureDiagnosis(procedure_id=proc_id, category=entry.category, finding=finding))
+    db.commit()
+    return db.query(models.ProcedureDiagnosis).filter(models.ProcedureDiagnosis.procedure_id == proc_id).all()
+
+
+@router.delete("/{proc_id}/diagnosis/{item_id}", status_code=204)
+def delete_diagnosis(proc_id: int, item_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    item = db.query(models.ProcedureDiagnosis).filter(
+        models.ProcedureDiagnosis.id == item_id,
+        models.ProcedureDiagnosis.procedure_id == proc_id,
+    ).first()
+    if not item:
+        raise HTTPException(404, "Diagnosis finding not found")
+    db.delete(item)
+    db.commit()
+
+
+# ── Investigations (Tab 2) ────────────────────────────────────────────────────
+@router.get("/{proc_id}/investigations", response_model=List[schemas.ProcedureInvestigationOut])
+def get_investigations(proc_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    return db.query(models.ProcedureInvestigation).filter(models.ProcedureInvestigation.procedure_id == proc_id).all()
+
+
+@router.post("/{proc_id}/investigations", response_model=schemas.ProcedureInvestigationOut, status_code=201)
+def add_investigation(proc_id: int, payload: schemas.ProcedureInvestigationCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    _require_procedure(db, proc_id)
+    name = (payload.investigation or "").strip()
+    if not name:
+        raise HTTPException(400, "investigation is required")
+    existing = db.query(models.ProcedureInvestigation).filter(
+        models.ProcedureInvestigation.procedure_id == proc_id,
+        models.ProcedureInvestigation.investigation == name,
+    ).first()
+    if existing:
+        return existing
+    item = models.ProcedureInvestigation(procedure_id=proc_id, category=payload.category, investigation=name)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.put("/{proc_id}/investigations", response_model=List[schemas.ProcedureInvestigationOut])
+def set_investigations(proc_id: int, payload: List[schemas.ProcedureInvestigationCreate], db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Replace the whole investigation selection -- the tab is a checkbox set."""
+    _require_procedure(db, proc_id)
+    db.query(models.ProcedureInvestigation).filter(models.ProcedureInvestigation.procedure_id == proc_id).delete()
+    seen: set[str] = set()
+    for entry in payload:
+        name = (entry.investigation or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        db.add(models.ProcedureInvestigation(procedure_id=proc_id, category=entry.category, investigation=name))
+    db.commit()
+    return db.query(models.ProcedureInvestigation).filter(models.ProcedureInvestigation.procedure_id == proc_id).all()
+
+
+@router.delete("/{proc_id}/investigations/{item_id}", status_code=204)
+def delete_investigation(proc_id: int, item_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    item = db.query(models.ProcedureInvestigation).filter(
+        models.ProcedureInvestigation.id == item_id,
+        models.ProcedureInvestigation.procedure_id == proc_id,
+    ).first()
+    if not item:
+        raise HTTPException(404, "Investigation not found")
     db.delete(item)
     db.commit()
 

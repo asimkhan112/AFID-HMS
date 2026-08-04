@@ -33,7 +33,11 @@
     body { background-color: var(--bg-light); color: var(--text-main); height: 100vh; width: 100%; max-width: 100%; overflow: hidden; overflow-x: hidden; display: flex; }
     .app-container { display: flex; width: 100vw; height: 100vh; overflow: hidden; }
     .sidebar { width: 270px; background-color: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; justify-content: space-between; flex-shrink: 0; padding: 28px 20px; box-shadow: 4px 0 24px rgba(5, 51, 33, 0.15); z-index: 10; }
-    .brand-group { margin-bottom: 20px; }
+    .brand-group { margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+    /* The crest ships as a JPEG -- a green disc on an opaque black square. The
+       disc is inscribed edge-to-edge, so a 50% radius clips the black corners
+       exactly and leaves no halo against the sidebar. */
+    .sidebar-logo { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; flex-shrink: 0; display: block; }
     .brand-title { font-size: 22px; font-weight: 800; letter-spacing: 0.5px; }
     .brand-sub { font-size: 11px; color: #8fa89b; text-transform: uppercase; font-weight: 600; letter-spacing: 1px; margin-top: 4px; }
     .nav-menu { display: flex; flex-direction: column; gap: 10px; margin-top: 36px; }
@@ -47,6 +51,8 @@
     .logout-btn:hover { background-color: #b91c1c; transform: translateY(-2px); }
     .viewport { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 30px 40px; position: relative; }
     .topbar-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
+    .topbar-actions { display: flex; align-items: center; gap: 20px; }
+    .afid-logo { height: 52px; width: auto; object-fit: contain; flex-shrink: 0; user-select: none; }
     .page-title { font-size: 30px; font-weight: 800; color: #042e1e; }
     .page-subtitle { font-size: 14px; color: #52525b; margin-top: 6px; }
     .notif-wrapper { position: relative; }
@@ -178,8 +184,11 @@
     <aside class="sidebar">
       <div>
         <div class="brand-group">
-          <div class="brand-title">HMS PORTAL</div>
-          <div class="brand-sub">Orthodontics Department</div>
+          <img src="afid-main-logo.jpeg" alt="Army Dental Corps" class="sidebar-logo">
+          <div>
+            <div class="brand-title">HMS PORTAL</div>
+            <div class="brand-sub">Orthodontics Department</div>
+          </div>
         </div>
         <nav class="nav-menu" id="nav-container"></nav>
       </div>
@@ -195,18 +204,21 @@
           <h1 class="page-title" id="page-title-text">HMS Portal</h1>
           <div class="page-subtitle" id="page-subtitle-text">Department Operations View</div>
         </div>
-        <div class="notif-wrapper">
-          <button class="bell-btn" id="bell-btn" onclick="toggleNotifPanel()" title="Doctor Treatment Delay Alerts">
-            <svg class="bell-icon" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
-            <span class="notif-badge" id="notif-badge-count">0</span>
-          </button>
-          <div class="notif-panel" id="notif-panel">
-            <div class="notif-header">
-              <span>⚠️ Prolonged Treatment Alerts</span>
-              <span style="font-size:10px; background:rgba(255,255,255,0.2); padding: 2px 6px; border-radius:4px;">> 30 Mins Threshold</span>
+        <div class="topbar-actions">
+          <div class="notif-wrapper">
+            <button class="bell-btn" id="bell-btn" onclick="toggleNotifPanel()" title="Doctor Treatment Delay Alerts">
+              <svg class="bell-icon" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+              <span class="notif-badge" id="notif-badge-count">0</span>
+            </button>
+            <div class="notif-panel" id="notif-panel">
+              <div class="notif-header">
+                <span>⚠️ Prolonged Treatment Alerts</span>
+                <span style="font-size:10px; background:rgba(255,255,255,0.2); padding: 2px 6px; border-radius:4px;">> 30 Mins Threshold</span>
+              </div>
+              <div class="notif-body" id="notif-body-list"></div>
             </div>
-            <div class="notif-body" id="notif-body-list"></div>
           </div>
+          <img src="afid-logo.png" alt="Armed Forces Institute of Dentistry, Rawalpindi" class="afid-logo">
         </div>
       </div>
       <div id="view-target"></div>
