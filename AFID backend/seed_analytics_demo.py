@@ -164,14 +164,17 @@ def ensure_demo_patients(db: Session, doctors: list[models.User]) -> list[models
     return patients
 
 
-def build_sessions(db: Session, doctors: list[models.User], patients: list[models.Patient]) -> int:
+def build_sessions(db: Session, doctors: list[models.User], patients: list[models.Patient],
+                   profiles: dict | None = None, sessions_each: int | None = None) -> int:
     """Create completed procedures with realistic start/end times and durations."""
     rng = random.Random(RANDOM_SEED)
     now = datetime.utcnow()
     created = 0
+    profiles = PROCEDURE_PROFILES if profiles is None else profiles
+    sessions_each = SESSIONS_PER_PROCEDURE if sessions_each is None else sessions_each
 
-    for proc_name, (base_minutes, spread) in PROCEDURE_PROFILES.items():
-        for n in range(SESSIONS_PER_PROCEDURE):
+    for proc_name, (base_minutes, spread) in profiles.items():
+        for n in range(sessions_each):
             # Round-robin the doctors so every one of them gets a comparable
             # sample; pick patients at random so the completions table isn't the
             # same handful of names repeating in order.
@@ -211,11 +214,61 @@ def build_sessions(db: Session, doctors: list[models.User], patients: list[model
     return created
 
 
+def resolve_profiles(db: Session, requested: list[str] | None, everything: bool) -> dict:
+    """Decide which procedure names to seed, and with what duration profile.
+
+    Defaults to PROCEDURE_PROFILES (the seeded presets). The analytics dropdown
+    is wider than that -- it merges presets with the distinct names of every
+    completed procedure -- so a name a doctor has actually performed once, such
+    as "Aligner treatment planning", appears in the list with nothing behind it
+    to plot. --procedure and --all cover those.
+    """
+    if not requested and not everything:
+        return dict(PROCEDURE_PROFILES)
+
+    names: set[str] = set(requested or [])
+    if everything:
+        names |= set(PROCEDURE_PROFILES)
+        names |= {
+            r[0] for r in db.query(models.ProcedurePreset.name)
+            .filter(models.ProcedurePreset.is_active == True)  # noqa: E712
+            .all()
+        }
+        names |= {
+            r[0] for r in db.query(models.Procedure.name)
+            .filter(models.Procedure.is_completed == True)  # noqa: E712
+            .distinct().all()
+        }
+
+    # Unknown names get a middle-of-the-road profile rather than being skipped.
+    return {n: PROCEDURE_PROFILES.get(n, (30, 9)) for n in sorted(names)}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--wipe", action="store_true",
-        help="delete previously generated demo rows before seeding",
+        help="delete previously generated demo rows, THEN seed. Combining this "
+             "with --procedure/--all wipes everything and re-seeds only what you "
+             "named -- use --wipe-only if you just want the rows gone.",
+    )
+    parser.add_argument(
+        "--wipe-only", action="store_true",
+        help="delete previously generated demo rows and stop. Seeds nothing.",
+    )
+    parser.add_argument(
+        "--procedure", action="append", dest="procedures", metavar="NAME",
+        help="seed this procedure name too. Repeatable. "
+             'e.g. --procedure "Aligner treatment planning"',
+    )
+    parser.add_argument(
+        "--all", action="store_true", dest="everything",
+        help="seed every name the analytics dropdown offers: the presets plus "
+             "the distinct names of all completed procedures",
+    )
+    parser.add_argument(
+        "--sessions", type=int, default=SESSIONS_PER_PROCEDURE, metavar="N",
+        help=f"completed sessions per procedure (default {SESSIONS_PER_PROCEDURE})",
     )
     args = parser.parse_args()
 
@@ -229,34 +282,58 @@ def main() -> int:
 
     db = SessionLocal()
     try:
-        if args.wipe:
+        if args.wipe or args.wipe_only:
             pats, procs = wipe_demo_data(db)
             print(f"Wiped {pats} demo patients and {procs} demo procedures.")
+        if args.wipe_only:
+            print("--wipe-only: stopping without seeding.")
+            return 0
 
         doctors = get_doctors(db)
         if not doctors:
             print("No doctors found -- run 'python init_db.py' first.")
             return 1
 
-        existing_demo = (
-            db.query(models.Procedure)
+        profiles = resolve_profiles(db, args.procedures, args.everything)
+        if not profiles:
+            print("Nothing to seed -- no presets, no completed procedures, and no "
+                  "--procedure given.")
+            return 1
+
+        # The bail-out only applies to a plain re-run. Asking for specific names
+        # (or --all) is a deliberate top-up, so only skip the names that already
+        # have demo rows rather than refusing outright.
+        explicit = bool(args.procedures or args.everything)
+        already = {
+            r[0] for r in db.query(models.Procedure.name)
             .join(models.Patient)
             .filter(models.Patient.mr_number.like(f"{DEMO_MR_PREFIX}%"))
-            .count()
-        )
-        if existing_demo:
+            .distinct().all()
+        }
+        if already and not explicit:
             print(
-                f"{existing_demo} demo procedures already present. "
-                "Re-run with --wipe to regenerate."
+                f"{len(already)} procedure type(s) already seeded. "
+                "Re-run with --wipe to regenerate, or --all / --procedure to top up."
             )
             return 0
 
+        skipped = sorted(already & set(profiles))
+        profiles = {k: v for k, v in profiles.items() if k not in already}
+        for name in skipped:
+            print(f"  skipping (already seeded): {name}")
+        if not profiles:
+            print("Every requested procedure already has demo rows. Nothing to do.")
+            return 0
+
         patients = ensure_demo_patients(db, doctors)
-        count = build_sessions(db, doctors, patients)
+        count = build_sessions(db, doctors, patients, profiles, args.sessions)
 
         print(f"Created {len(patients)} demo patients and {count} completed procedures")
-        print(f"across {len(PROCEDURE_PROFILES)} procedure types and {len(doctors)} doctors.")
+        print(f"across {len(profiles)} procedure types and {len(doctors)} doctors:")
+        for name in profiles:
+            print(f"    {args.sessions:>4} × {name}")
         print("\nOpen the HOD portal -> Procedure Analytics and pick any procedure.")
+        print("Undo everything this script added with:  python seed_analytics_demo.py --wipe")
         return 0
     except Exception as exc:
         db.rollback()
