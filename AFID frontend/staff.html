@@ -77,7 +77,14 @@
     .sidebar-header {
       margin-bottom: 24px;
       padding-left: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
+    /* The crest ships as a JPEG -- a green disc on an opaque black square. The
+       disc is inscribed edge-to-edge, so a 50% radius clips the black corners
+       exactly and leaves no halo against the sidebar. */
+    .sidebar-logo { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; flex-shrink: 0; display: block; }
     .sidebar-header .brand {
       font-size: 24px;
       font-weight: 800;
@@ -195,6 +202,8 @@
     .search-wrapper { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 14px; }
     .search-input { border: none; outline: none; width: 280px; color: var(--text-dark); font-size: 14px; background: transparent; }
     .meta-status-group { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #4b5563; font-weight: 600; }
+    /* Sized to clear the 60px utility bar with room to breathe. */
+    .afid-logo { height: 46px; width: auto; object-fit: contain; flex-shrink: 0; user-select: none; }
     .live-indicator { background-color: var(--green-dark); color: #ffffff; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.5px; }
 
     /* Workspace */
@@ -579,8 +588,11 @@
   <aside class="sidebar">
     <div class="sidebar-top">
       <div class="sidebar-header">
-        <div class="brand">AFID</div>
-        <div class="sub">Dental Portal</div>
+        <img src="afid-main-logo.jpeg" alt="Army Dental Corps" class="sidebar-logo">
+        <div>
+          <div class="brand">AFID</div>
+          <div class="sub">Dental Portal</div>
+        </div>
       </div>
 
       <div class="sidebar-menu-label">Navigation</div>
@@ -606,6 +618,7 @@
       <div class="meta-status-group">
         <span id="live-clock">—</span>
         <span class="live-indicator">+ LIVE</span>
+        <img src="afid-logo.png" alt="Armed Forces Institute of Dentistry, Rawalpindi" class="afid-logo">
       </div>
     </div>
 
@@ -692,9 +705,13 @@
       name: p.full_name,
       cnic: p.cnic || '—',
       pa: p.pa_number || '—',
+      // rank was never carried across, so the patient-management filter had
+      // nothing to match a rank against and searching by one hid every row.
+      rank: p.rank || '—',
       location: roomNum,
       rotation: p.procedure_category || '—',
       assignedDoctor: p.assigned_doctor || '—',
+      assignedDoctorId: p.assigned_doctor_id ?? null,
       time: p.registered_at ? new Date(p.registered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00 AM',
       apptDate: p.registered_at ? new Date(p.registered_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       apptDateShort: (p.registered_at ? new Date(p.registered_at) : new Date())
@@ -1118,7 +1135,7 @@
     const visible = q
       ? patientLogs
           .map((p, index) => ({ p, index }))
-          .filter(({ p }) => [p.mr, p.file, p.name, p.pa, p.cnic, p.assignedDoctor]
+          .filter(({ p }) => [p.mr, p.file, p.name, p.pa, p.cnic, p.assignedDoctor, p.rank, p.rotation]
             .some(field => (field || '').toString().toLowerCase().includes(q)))
       : patientLogs.map((p, index) => ({ p, index }));
 
@@ -1300,35 +1317,37 @@
     const [h, m] = rawTime.split(':');
     const formattedTime = new Date(0, 0, 0, h, m).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+    if (!date || !rawTime) {
+      showToast('Pick both a date and a time for the appointment.');
+      return;
+    }
+
     const patientIndex = patientLogs.findIndex(p => p.mr === mr);
-    if (patientIndex !== -1) {
-      const patient = patientLogs[patientIndex];
-      try {
-        const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'WAITING' });
-        patientLogs[patientIndex] = normalizePatient(updated);
-        patientLogs[patientIndex].time = formattedTime;
-        patientLogs[patientIndex].apptDate = date;
-        patientLogs[patientIndex].rotation = procedure;
-      } catch (error) {
-        showToast(error.message || 'Unable to queue next appointment');
-        return;
-      }
-    } else {
-      patientLogs.unshift({
-        id: Date.now(),
-        mr: mr,
-        file: 'F-' + Math.floor(10000 + Math.random() * 90000),
-        name: name,
-        cnic: '—',
-        pa: '—',
-        location: 'Room 12',
-        rotation: procedure,
-        assignedDoctor: doctor,
-        time: formattedTime,
-        apptDate: date,
-        status: 'WAITING',
-        badge: 'badge-waiting'
+    if (patientIndex === -1) {
+      // This branch used to invent a patient with a random file number and push
+      // it into the local array only. There is no record to book against.
+      showToast(`No patient record found for ${mr} — cannot book an appointment.`);
+      return;
+    }
+
+    const patient = patientLogs[patientIndex];
+    try {
+      // Persist the booking. This used to live only in the browser array, so the
+      // confirmation toast appeared and the appointment vanished on refresh.
+      await api.post('/appointments/', {
+        patient_id: patient.id,
+        scheduled_for: `${date}T${rawTime}`,
+        procedure: procedure || null,
+        doctor_name: doctor && doctor !== '—' ? doctor : null,
       });
+      const updated = await api.patch(`/patients/${patient.id}/status`, { status: 'WAITING' });
+      patientLogs[patientIndex] = normalizePatient(updated);
+      patientLogs[patientIndex].time = formattedTime;
+      patientLogs[patientIndex].apptDate = date;
+      patientLogs[patientIndex].rotation = procedure;
+    } catch (error) {
+      showToast(error.message || 'Unable to queue next appointment');
+      return;
     }
 
     closeModal();
